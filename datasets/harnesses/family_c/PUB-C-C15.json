@@ -1,0 +1,16 @@
+{
+  "expected_tier": "VERIFIED",
+  "family": "C",
+  "id": "PUB-C-C15",
+  "oracle_type": "verdict_audit",
+  "spec_meta": {
+    "expected_axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ],
+    "expected_verdict": "weaker",
+    "source_commit": "c0b983bfb85aaef487e40d310dfe0b381e4a62c9",
+    "verdict_id": "audit-linalg-farkas-converse"
+  }
+}

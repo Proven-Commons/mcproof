@@ -1,0 +1,15 @@
+{
+  "expected_tier": "VERIFIED",
+  "family": "C",
+  "id": "PUB-C-V10",
+  "oracle_type": "bar_check",
+  "spec_meta": {
+    "bar_status": "in-progress",
+    "pkg": "TwoPC",
+    "test_cmd": "python3 tests/run_tests.py",
+    "theorem_names": [
+      "TwoPC.Spec.no_split_brain",
+      "TwoPC.Spec.commit_needs_all_yes"
+    ]
+  }
+}

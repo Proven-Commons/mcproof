@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC13\nstructure Mat2 where\n  a : Int\n  b : Int\n  c : Int\n  d : Int\ndef det2 (M : Mat2) : Int := M.a * M.d - M.b * M.c\ndef mul2 (X Y : Mat2) : Mat2 :=\n  \u27e8X.a * Y.a + X.b * Y.c, X.a * Y.b + X.b * Y.d, X.c * Y.a + X.d * Y.c, X.c * Y.b + X.d * Y.d\u27e9\ntheorem det2_id : det2 \u27e81, 0, 0, 1\u27e9 = 1 := by sorry\ntheorem det2_mul (u v p q : Int) : det2 (mul2 \u27e8u, 0, 0, v\u27e9 \u27e8p, 0, 0, q\u27e9) = det2 \u27e8u, 0, 0, v\u27e9 * det2 \u27e8p, 0, 0, q\u27e9 := by sorry\nend PubAC13\n",
+  "family": "A",
+  "id": "PUB-A-C13",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC13.det2_mul",
+  "trap_kind": "anti_bypass_algebra"
+}

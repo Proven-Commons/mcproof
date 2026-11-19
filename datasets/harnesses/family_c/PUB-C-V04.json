@@ -1,0 +1,15 @@
+{
+  "expected_tier": "VERIFIED",
+  "family": "C",
+  "id": "PUB-C-V04",
+  "oracle_type": "bar_check",
+  "spec_meta": {
+    "bar_status": "in-progress",
+    "pkg": "TreeCnt",
+    "test_cmd": "python3 tests/run_tests.py",
+    "theorem_names": [
+      "TreeCnt.Spec.vertices_eq_edges_succ",
+      "TreeCnt.Spec.leaf_step"
+    ]
+  }
+}

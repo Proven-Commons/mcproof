@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C10",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC10\ndef starEdges : Nat \u2192 List (Nat \u00d7 Nat)\n  | 0 => []\n  | k + 1 => (0, k + 1) :: starEdges k\ntheorem starGraph_deg_center (k : Nat) : (starEdges k).length = k := by sorry\nend PubDC10\n",
+    "module_title": "StarTreeEdges",
+    "positive_lean": "namespace PubDC10\n\ndef starEdges : Nat \u2192 List (Nat \u00d7 Nat)\n  | 0 => []\n  | k + 1 => (0, k + 1) :: starEdges k\n\ntheorem starGraph_deg_center (k : Nat) : (starEdges k).length = k := by\n  induction k with\n  | zero => rfl\n  | succ m ih => simp [starEdges, ih]\n\nend PubDC10\n",
+    "theorem_names": [
+      "PubDC10.starGraph_deg_center"
+    ],
+    "verdict_sha": "c77e509342dd7df444aeb4c8c1f49dd5790448f1"
+  }
+}

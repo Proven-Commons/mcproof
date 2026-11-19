@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C17",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC17\ntheorem skew2_quad_zero (b x1 x2 : Int) : x1 * (b * x2) + x2 * ((-b) * x1) = 0 := by sorry\nend PubDC17\n",
+    "module_title": "SkewQuadZero",
+    "positive_lean": "namespace PubDC17\n\ntheorem skew2_quad_zero (b x1 x2 : Int) : x1 * (b * x2) + x2 * ((-b) * x1) = 0 := by\n  rw [Int.neg_mul, Int.mul_neg, \u2190 Int.mul_assoc x1 b x2, Int.mul_comm x1 b, Int.mul_assoc b x1 x2, Int.mul_comm x2 (b * x1), Int.mul_assoc b x1 x2]\n  omega\n\nend PubDC17\n",
+    "theorem_names": [
+      "PubDC17.skew2_quad_zero"
+    ],
+    "verdict_sha": "d92ddc90199df8c1f062f7a3939fb26c915e01c2"
+  }
+}

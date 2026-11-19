@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C05",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC05\ndef modCong (m a b : Nat) : Prop := a % m = b % m\ntheorem modCong_equiv (m a b c : Nat) : (modCong m a b \u2192 modCong m b a) \u2227 (modCong m a b \u2192 modCong m b c \u2192 modCong m a c) := by sorry\nend PubDC05\n",
+    "module_title": "CongSymmTrans",
+    "positive_lean": "namespace PubDC05\n\ndef modCong (m a b : Nat) : Prop := a % m = b % m\n\ntheorem modCong_equiv (m a b c : Nat) :\n    (modCong m a b \u2192 modCong m b a) \u2227 (modCong m a b \u2192 modCong m b c \u2192 modCong m a c) := by\n  unfold modCong\n  refine \u27e8?_, ?_\u27e9\n  \u00b7 intro h; exact h.symm\n  \u00b7 intro h1 h2; exact Eq.trans h1 h2\n\nend PubDC05\n",
+    "theorem_names": [
+      "PubDC05.modCong_equiv"
+    ],
+    "verdict_sha": "774f855d09cf67c362fd8278a2ef2d401125d602"
+  }
+}

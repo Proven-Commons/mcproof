@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAV12\ndef acceptPacket (highWater pktSeq : Nat) : Bool \u00d7 Nat :=\n  if pktSeq > highWater then (true, pktSeq) else (false, highWater)\ntheorem antiReplay_monotonic (hw pkt : Nat) : (acceptPacket hw pkt).2 \u2265 hw \u2227 ((acceptPacket hw pkt).1 = true \u2192 pkt > hw \u2227 (acceptPacket hw pkt).2 = pkt) := by sorry\ntheorem antiReplay_blocks_dup (hw pkt : Nat) (hdup : pkt \u2264 hw) : (acceptPacket hw pkt).1 = false := by sorry\nend PubAV12\n",
+  "family": "A",
+  "id": "PUB-A-V12",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAV12.antiReplay_monotonic",
+  "trap_kind": "anti_bypass_invariant"
+}

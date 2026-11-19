@@ -1,0 +1,50 @@
+{
+  "certificate_sha256": "56820652f47de5866a57fd39bbb092ea2c14c658f2671dbcbcafcc2fa5180b76",
+  "factor_f16_digest": "7ffa87806e74b2c01adb871412031d2aade0a61f43b69a987f3eaee8de162801",
+  "files": {
+    "formal-verification.p2b.binding.json": {
+      "byte_diff_count": 0,
+      "byte_len": 3429,
+      "expected_sha256": "9ea059c61a6dc21fe9328795c4cb639c6c19050d1fbb6459750a2e68f6175c4d",
+      "rederived_sha256": "9ea059c61a6dc21fe9328795c4cb639c6c19050d1fbb6459750a2e68f6175c4d",
+      "zero_byte_diff": true
+    },
+    "formal-verification.p2b.certificate.json": {
+      "byte_diff_count": 0,
+      "byte_len": 312,
+      "expected_sha256": "e0c6b9a7bbd0f7f3da2ad09def08521a07cb62564bef8ca905c0744a5181d4f5",
+      "rederived_sha256": "e0c6b9a7bbd0f7f3da2ad09def08521a07cb62564bef8ca905c0744a5181d4f5",
+      "zero_byte_diff": true
+    },
+    "formal-verification.p2b.f16.gguf": {
+      "byte_diff_count": 0,
+      "byte_len": 189408,
+      "expected_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+      "rederived_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+      "zero_byte_diff": true
+    },
+    "formal-verification.p2b.f16.wfsl": {
+      "byte_diff_count": 0,
+      "byte_len": 189357,
+      "expected_sha256": "7f68b13bac77427e1734d32bf6e5593d61975313abfd62fe1041f878f7b15164",
+      "rederived_sha256": "7f68b13bac77427e1734d32bf6e5593d61975313abfd62fe1041f878f7b15164",
+      "zero_byte_diff": true
+    },
+    "formal-verification.p2b.int4_f16.wfsl": {
+      "byte_diff_count": 0,
+      "byte_len": 78803,
+      "expected_sha256": "cafadd5de9a114655c8a9f2d04bea51de1e292773a81e691fd538ff8c1e70449",
+      "rederived_sha256": "cafadd5de9a114655c8a9f2d04bea51de1e292773a81e691fd538ff8c1e70449",
+      "zero_byte_diff": true
+    },
+    "formal-verification.p2b.int4_int8.wfsl": {
+      "byte_diff_count": 0,
+      "byte_len": 58357,
+      "expected_sha256": "a1b8566c5a4ef4337c55e56673fe9fe6d6bcc6fb90288c9d6ad650787f343d16",
+      "rederived_sha256": "a1b8566c5a4ef4337c55e56673fe9fe6d6bcc6fb90288c9d6ad650787f343d16",
+      "zero_byte_diff": true
+    }
+  },
+  "schema": "mcproof-rederivation-receipt/v0.1",
+  "zero_byte_diff_all": true
+}

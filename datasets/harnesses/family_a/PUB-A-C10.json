@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC10\ndef zipAdd : List Nat \u2192 List Nat \u2192 List Nat\n  | x :: xs, y :: ys => (x + y) :: zipAdd xs ys\n  | _, _ => []\ndef sumList : List Nat \u2192 Nat\n  | [] => 0\n  | x :: xs => x + sumList xs\ntheorem sumList_append (xs ys : List Nat) : sumList (xs ++ ys) = sumList xs + sumList ys := by sorry\ntheorem zipAdd_zero_sides (row : List Nat) : sumList (zipAdd (0 :: row) (row ++ [0])) = 2 * sumList row := by sorry\nend PubAC10\n",
+  "family": "A",
+  "id": "PUB-A-C10",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC10.rowSum_pow2",
+  "trap_kind": "anti_bypass_induction"
+}

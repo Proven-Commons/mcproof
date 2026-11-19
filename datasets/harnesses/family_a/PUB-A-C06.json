@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC06\ntheorem euclid_div_unique (m q1 r1 q2 r2 : Nat) (hr1 : r1 < m) (hr2 : r2 < m) (heq : m * q1 + r1 = m * q2 + r2) : q1 = q2 \u2227 r1 = r2 := by sorry\nend PubAC06\n",
+  "family": "A",
+  "id": "PUB-A-C06",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC06.euclid_div_unique",
+  "trap_kind": "anti_bypass_algebra"
+}

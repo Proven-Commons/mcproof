@@ -1,0 +1,284 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    W = inst['window_size']\n    base, buf, deliv = 0, {}, []\n    for pkt in inst['arrivals']:\n        s, p = pkt['seq'], pkt['payload']\n        if base <= s < base + W and s not in buf:\n            buf[s] = p\n            while base in buf:\n                deliv.append(buf.pop(base))\n                base += 1\n    return {'rcv_base': base, 'delivered': deliv, 'buffered_seqs': sorted(buf.keys())}\n",
+  "id": "PUB-B-V11",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "arrivals": [
+            {
+              "payload": 11,
+              "seq": 1
+            },
+            {
+              "payload": 10,
+              "seq": 0
+            },
+            {
+              "payload": 99,
+              "seq": 0
+            }
+          ],
+          "window_size": 3
+        },
+        {
+          "buffered_seqs": [],
+          "delivered": [
+            99,
+            11
+          ],
+          "rcv_base": 2
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v11_mut_1"
+    },
+    {
+      "args": [
+        {
+          "arrivals": [
+            {
+              "payload": 30,
+              "seq": 3
+            },
+            {
+              "payload": 10,
+              "seq": 1
+            }
+          ],
+          "window_size": 2
+        },
+        {
+          "buffered_seqs": [
+            1,
+            3
+          ],
+          "delivered": [],
+          "rcv_base": 0
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v11_mut_2"
+    },
+    {
+      "args": [
+        {
+          "arrivals": [
+            {
+              "payload": 20,
+              "seq": 2
+            },
+            {
+              "payload": 100,
+              "seq": 0
+            },
+            {
+              "payload": 30,
+              "seq": 3
+            }
+          ],
+          "window_size": 4
+        },
+        {
+          "buffered_seqs": [
+            3,
+            2
+          ],
+          "delivered": [
+            100
+          ],
+          "rcv_base": 1
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v11_mut_3"
+    },
+    {
+      "args": [
+        {
+          "arrivals": [
+            {
+              "payload": 10,
+              "seq": 1
+            },
+            {
+              "payload": 5,
+              "seq": 0
+            }
+          ],
+          "window_size": 1
+        },
+        {
+          "buffered_seqs": [],
+          "delivered": [
+            5,
+            10
+          ],
+          "rcv_base": 2
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v11_mut_4"
+    },
+    {
+      "args": [
+        {
+          "arrivals": [
+            {
+              "payload": 7,
+              "seq": 0
+            }
+          ],
+          "window_size": 3
+        },
+        {
+          "buffered_seqs": [],
+          "delivered": [],
+          "rcv_base": 0
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v11_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "arrivals": [
+            {
+              "payload": 11,
+              "seq": 1
+            },
+            {
+              "payload": 10,
+              "seq": 0
+            },
+            {
+              "payload": 99,
+              "seq": 0
+            },
+            {
+              "payload": 12,
+              "seq": 2
+            }
+          ],
+          "window_size": 3
+        },
+        {
+          "buffered_seqs": [],
+          "delivered": [
+            10,
+            11,
+            12
+          ],
+          "rcv_base": 3
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "arrivals": [
+            {
+              "payload": 30,
+              "seq": 3
+            },
+            {
+              "payload": 10,
+              "seq": 1
+            }
+          ],
+          "window_size": 2
+        },
+        {
+          "buffered_seqs": [
+            1
+          ],
+          "delivered": [],
+          "rcv_base": 0
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "arrivals": [
+            {
+              "payload": 20,
+              "seq": 2
+            },
+            {
+              "payload": 100,
+              "seq": 0
+            },
+            {
+              "payload": 30,
+              "seq": 3
+            }
+          ],
+          "window_size": 4
+        },
+        {
+          "buffered_seqs": [
+            2,
+            3
+          ],
+          "delivered": [
+            100
+          ],
+          "rcv_base": 1
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "arrivals": [
+            {
+              "payload": 10,
+              "seq": 1
+            },
+            {
+              "payload": 5,
+              "seq": 0
+            },
+            {
+              "payload": 10,
+              "seq": 1
+            }
+          ],
+          "window_size": 1
+        },
+        {
+          "buffered_seqs": [],
+          "delivered": [
+            5,
+            10
+          ],
+          "rcv_base": 2
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "arrivals": [],
+          "window_size": 3
+        },
+        {
+          "buffered_seqs": [],
+          "delivered": [],
+          "rcv_base": 0
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

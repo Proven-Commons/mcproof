@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC05\ndef WeakBezout (a b g x y : Int) : Prop := a * x + b * y \u2265 g\ndef checkBezout (a b g x y : Int) : Bool := (g > 0) && (a % g == 0) && (b % g == 0) && (a * x + b * y == g)\ntheorem weakBezout_false_accepts : WeakBezout 6 9 1 1 0 := by sorry\ntheorem bezoutCert_sound (a b g x y : Int) (h : checkBezout a b g x y = true) : g > 0 \u2227 a % g = 0 \u2227 b % g = 0 \u2227 a * x + b * y = g := by sorry\ntheorem bezoutCert_witness : checkBezout 15 21 3 3 (-2) = true := by sorry\nend PubAC05\n",
+  "family": "A",
+  "id": "PUB-A-C05",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC05.bezoutCert_sound",
+  "trap_kind": "weak_statement_vacuous_trap"
+}

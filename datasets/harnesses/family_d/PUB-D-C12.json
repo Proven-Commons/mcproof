@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C12",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC12\ndef sumNat : List Nat \u2192 Nat\n  | [] => 0\n  | x :: xs => x + sumNat xs\ntheorem sum_le_len_of_all_le_one (xs : List Nat) (h : \u2200 x \u2208 xs, x \u2264 1) : sumNat xs \u2264 xs.length := by sorry\nend PubDC12\n",
+    "module_title": "PigeonSum",
+    "positive_lean": "namespace PubDC12\n\ndef sumNat : List Nat \u2192 Nat\n  | [] => 0\n  | x :: xs => x + sumNat xs\n\ntheorem sum_le_len_of_all_le_one (xs : List Nat) (h : \u2200 x \u2208 xs, x \u2264 1) : sumNat xs \u2264 xs.length := by\n  induction xs with\n  | nil => simp [sumNat]\n  | cons x rest ih =>\n    have hx : x \u2264 1 := h x (by simp)\n    have hrest : \u2200 y \u2208 rest, y \u2264 1 := fun y hy => h y (by simp [hy])\n    have ihr := ih hrest\n    simp only [sumNat, List.length_cons]\n    omega\n\nend PubDC12\n",
+    "theorem_names": [
+      "PubDC12.sum_le_len_of_all_le_one"
+    ],
+    "verdict_sha": "3dfe1e53a80a1789981195015147dec66b94fd5b"
+  }
+}

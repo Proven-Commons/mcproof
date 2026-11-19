@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC23\nstructure Coord2PC where\n  committed : Bool\n  aborted : Bool\ndef TautologicalSafe (s : Coord2PC) : Prop := (s.committed = true \u2227 s.aborted = false) \u2192 \u00ac(s.committed = true \u2227 s.aborted = true)\ndef RealSafe (s : Coord2PC) : Prop := \u00ac(s.committed = true \u2227 s.aborted = true)\ndef decide2PC (s : Coord2PC) (allYes : Bool) : Coord2PC := if s.committed || s.aborted then s else if allYes then \u27e8true, false\u27e9 else \u27e8false, true\u27e9\ntheorem splitBrain_meets_tautology : TautologicalSafe \u27e8true, true\u27e9 := by sorry\ntheorem twoPC_safe_step (s : Coord2PC) (allYes : Bool) (h : RealSafe s) : RealSafe (decide2PC s allYes) := by sorry\nend PubAC23\n",
+  "family": "A",
+  "id": "PUB-A-C23",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC23.twoPC_safe_step",
+  "trap_kind": "weak_statement_vacuous_trap"
+}

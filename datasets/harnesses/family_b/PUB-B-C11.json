@@ -1,0 +1,324 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    n, edges = inst['n'], inst['edges']\n    adj = [[] for _ in range(n)]\n    indeg = [0] * n\n    for u, v in edges:\n        adj[u].append(v)\n        indeg[v] += 1\n    q = [i for i in range(n) if indeg[i] == 0]\n    topo = []\n    for u in q:\n        topo.append(u)\n        for v in adj[u]:\n            indeg[v] -= 1\n            if indeg[v] == 0:\n                q.append(v)\n    if len(topo) == n:\n        return {'is_dag': True, 'topo_order': topo, 'cycle': []}\n    state, stk, cyc = [0] * n, [], []\n    def dfs(u):\n        state[u] = 1\n        stk.append(u)\n        for v in adj[u]:\n            if state[v] == 1:\n                cyc.extend(stk[stk.index(v):])\n                return True\n            if state[v] == 0 and dfs(v):\n                return True\n        stk.pop()\n        state[u] = 2\n        return False\n    for i in range(n):\n        if state[i] == 0 and dfs(i):\n            break\n    return {'is_dag': False, 'topo_order': [], 'cycle': cyc}\n",
+  "id": "PUB-B-C11",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              3
+            ],
+            [
+              2,
+              3
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "cycle": [],
+          "is_dag": true,
+          "topo_order": [
+            0,
+            3,
+            1,
+            2
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c11_mut_1"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              3
+            ],
+            [
+              2,
+              3
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "cycle": [],
+          "is_dag": true,
+          "topo_order": [
+            0,
+            1,
+            2,
+            2
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c11_mut_2"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "n": 3
+        },
+        {
+          "cycle": [
+            0,
+            2,
+            1
+          ],
+          "is_dag": false,
+          "topo_order": []
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c11_mut_3"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              3
+            ],
+            [
+              2,
+              3
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "cycle": [
+            0,
+            1,
+            3
+          ],
+          "is_dag": false,
+          "topo_order": []
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c11_mut_4"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "n": 3
+        },
+        {
+          "cycle": [
+            0,
+            1,
+            0
+          ],
+          "is_dag": false,
+          "topo_order": []
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c11_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              3
+            ],
+            [
+              2,
+              3
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "cycle": [],
+          "is_dag": true,
+          "topo_order": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "n": 3
+        },
+        {
+          "cycle": [
+            0,
+            1,
+            2
+          ],
+          "is_dag": false,
+          "topo_order": []
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              1
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "cycle": [
+            1,
+            2
+          ],
+          "is_dag": false,
+          "topo_order": []
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              1,
+              0
+            ]
+          ],
+          "n": 2
+        },
+        {
+          "cycle": [],
+          "is_dag": true,
+          "topo_order": [
+            1,
+            0
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              2,
+              2
+            ]
+          ],
+          "n": 3
+        },
+        {
+          "cycle": [
+            2
+          ],
+          "is_dag": false,
+          "topo_order": []
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

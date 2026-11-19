@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-V07",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDV07\ntheorem twice_midpoint_in_scaled_iv (lo hi : Int) (h : lo \u2264 hi) : 2 * lo \u2264 lo + hi \u2227 lo + hi \u2264 2 * hi := by sorry\nend PubDV07\n",
+    "module_title": "IvMidpoint",
+    "positive_lean": "namespace PubDV07\n\ntheorem twice_midpoint_in_scaled_iv (lo hi : Int) (h : lo \u2264 hi) :\n    2 * lo \u2264 lo + hi \u2227 lo + hi \u2264 2 * hi := by\n  omega\n\nend PubDV07\n",
+    "theorem_names": [
+      "PubDV07.twice_midpoint_in_scaled_iv"
+    ],
+    "verdict_sha": "d905d6358ffa9d996b0d6c5b1c149a8bd625fa1a"
+  }
+}

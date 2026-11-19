@@ -1,0 +1,207 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    seen = {}\n    for idx, val in enumerate(inst['values']):\n        if val in seen:\n            return {'i': seen[val], 'j': idx, 'value': val}\n        seen[val] = idx\n    raise ValueError('no collision')\n",
+  "id": "PUB-B-C12",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "codomain_size": 3,
+          "values": [
+            0,
+            2,
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "i": 0,
+          "j": 4,
+          "value": 0
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c12_mut_1"
+    },
+    {
+      "args": [
+        {
+          "codomain_size": 3,
+          "values": [
+            2,
+            0,
+            1,
+            0
+          ]
+        },
+        {
+          "i": 3,
+          "j": 1,
+          "value": 0
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c12_mut_2"
+    },
+    {
+      "args": [
+        {
+          "codomain_size": 3,
+          "values": [
+            2,
+            0,
+            1,
+            0
+          ]
+        },
+        {
+          "i": 1,
+          "j": 3,
+          "value": 2
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c12_mut_3"
+    },
+    {
+      "args": [
+        {
+          "codomain_size": 3,
+          "values": [
+            2,
+            5,
+            1,
+            5
+          ]
+        },
+        {
+          "i": 1,
+          "j": 3,
+          "value": 5
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c12_mut_4"
+    },
+    {
+      "args": [
+        {
+          "codomain_size": 5,
+          "values": [
+            1,
+            1
+          ]
+        },
+        {
+          "i": 0,
+          "j": 1,
+          "value": 1
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c12_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "codomain_size": 3,
+          "values": [
+            2,
+            0,
+            1,
+            0
+          ]
+        },
+        {
+          "i": 1,
+          "j": 3,
+          "value": 0
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "codomain_size": 4,
+          "values": [
+            3,
+            1,
+            2,
+            1,
+            0
+          ]
+        },
+        {
+          "i": 1,
+          "j": 3,
+          "value": 1
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "codomain_size": 2,
+          "values": [
+            1,
+            1,
+            0
+          ]
+        },
+        {
+          "i": 0,
+          "j": 1,
+          "value": 1
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "codomain_size": 5,
+          "values": [
+            4,
+            2,
+            0,
+            3,
+            1,
+            4
+          ]
+        },
+        {
+          "i": 0,
+          "j": 5,
+          "value": 4
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "codomain_size": 3,
+          "values": [
+            0,
+            2,
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "i": 1,
+          "j": 3,
+          "value": 2
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

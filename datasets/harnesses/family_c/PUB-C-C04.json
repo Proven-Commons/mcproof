@@ -1,0 +1,15 @@
+{
+  "expected_tier": "CONJECTURE",
+  "family": "C",
+  "id": "PUB-C-C04",
+  "oracle_type": "verdict_audit",
+  "spec_meta": {
+    "expected_axioms": [
+      "propext",
+      "sorryAx"
+    ],
+    "expected_verdict": "does not build",
+    "source_commit": "e0371b88aaa8fccd01e9c90893cddfe2a213871d",
+    "verdict_id": "audit-nt-fermat-sorry"
+  }
+}

@@ -1,0 +1,296 @@
+{
+  "_meta": {
+    "gg.siliconcordat/mde": {
+      "adapter_class": "class1_rederivable",
+      "hard_vetoes_enforced": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "l1_bank_tag": 3,
+      "primary_zone": "formal_proof",
+      "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
+    }
+  },
+  "adapters": {
+    "corpus": {
+      "adapter_id": "mde:corpus",
+      "certificate_sha256": "315a36a3ab1fcd965eb1bcf5ef89c1e77dc3d831703665b8b3d39df5423d974e",
+      "gguf_bytes": 189184,
+      "gguf_sha256": "d81bab6b8c5555674dbbe29e38566435fedc1828d652fbfbf12f35f9562ea640",
+      "llama_adapter_id": 0,
+      "source_kind": "compiler_handoff"
+    },
+    "formal-verification": {
+      "adapter_id": "mde:formal-verification",
+      "certificate_sha256": "56820652f47de5866a57fd39bbb092ea2c14c658f2671dbcbcafcc2fa5180b76",
+      "gguf_bytes": 189408,
+      "gguf_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+      "llama_adapter_id": 2,
+      "source_kind": "compiler_handoff"
+    },
+    "weft-eido": {
+      "adapter_id": "mde:weft-eido",
+      "certificate_sha256": "2dda92d7903895770f1b952a9a0aba21affe710ab502027d1c01948f6c430e74",
+      "gguf_bytes": 189184,
+      "gguf_sha256": "29f1b18c7061edcafe74d85271eb3738029258f1a29b9353087629693400b4bb",
+      "llama_adapter_id": 1,
+      "source_kind": "compiler_handoff"
+    }
+  },
+  "elapsed_total_s": 195.836,
+  "exo_ledger_entries_verified": 55,
+  "gates": {
+    "T_C1_solo_preservation": {
+      "adapter_sources": {
+        "corpus": "compiler_handoff",
+        "formal-verification": "compiler_handoff",
+        "weft-eido": "compiler_handoff"
+      },
+      "formal_dataset_eval": null,
+      "min_retention_pct": 99.85,
+      "passed": true,
+      "required_min_retention_pct": 90.0,
+      "routed_domain_retention": {
+        "corpus": {
+          "paired_retention_pct": 100.0,
+          "paired_routed_scales": {
+            "corpus": 1.0,
+            "formal-verification": 0.0
+          },
+          "paired_step0_drift_from_solo": 0.0,
+          "solo_logprob_shift": 0.02351606,
+          "triple_retention_pct": 100.0,
+          "triple_routed_scales": {
+            "corpus": 1.0,
+            "formal-verification": 0.0,
+            "weft-eido": 0.0
+          },
+          "triple_step0_drift_from_solo": 0.0,
+          "zone": "prose"
+        },
+        "formal-verification": {
+          "paired_retention_pct": 100.0,
+          "paired_routed_scales": {
+            "formal-verification": 1.0,
+            "weft-eido": 0.0
+          },
+          "paired_step0_drift_from_solo": 0.0,
+          "solo_logprob_shift": 0.1797455,
+          "triple_retention_pct": 100.0,
+          "triple_routed_scales": {
+            "corpus": 0.0,
+            "formal-verification": 1.0,
+            "weft-eido": 0.0
+          },
+          "triple_step0_drift_from_solo": 0.0,
+          "zone": "formal_proof"
+        },
+        "weft-eido": {
+          "paired_retention_pct": 100.0,
+          "paired_routed_scales": {
+            "formal-verification": 0.0,
+            "weft-eido": 1.0
+          },
+          "paired_step0_drift_from_solo": 0.0,
+          "solo_logprob_shift": 0.00192213,
+          "triple_retention_pct": 99.85,
+          "triple_routed_scales": {
+            "corpus": 0.2,
+            "formal-verification": 0.0,
+            "weft-eido": 1.0
+          },
+          "triple_step0_drift_from_solo": 0.06107306,
+          "zone": "ui_module"
+        }
+      },
+      "simultaneous_research_page_subspace_retention": {
+        "formal_verification_pct": 100.0,
+        "weft_eido_pct": 99.85
+      }
+    },
+    "T_C2_mixed_zone_isolation": {
+      "contested_hard_veto2_escalations": 0,
+      "external_grader_used": false,
+      "failing_items": [],
+      "formal_block_corruptions": 0,
+      "passed": true,
+      "prompt_source": "public_non_vault_30",
+      "prompts_evaluated": 30,
+      "prose_rule_leaks": 0
+    },
+    "T_C3_base_capability_retention": {
+      "beats_naive_unweighted_summation": true,
+      "drop_pp_vs_w0": 0.0,
+      "external_grader_used": false,
+      "max_allowed_drop_pp": 1.5,
+      "naive_unweighted_sum_accuracy_pct": 4.0,
+      "naive_unweighted_sum_passed": 1,
+      "passed": true,
+      "prompt_source": "public_non_vault_25",
+      "prompts_evaluated": 25,
+      "routed_triple_accuracy_pct": 92.0,
+      "routed_triple_passed": 23,
+      "w0_accuracy_pct": 92.0,
+      "w0_passed": 23
+    },
+    "T_C4_order_invariance_and_rollback": {
+      "cpu_float64_max_forward_diff": 4.440892098500626e-16,
+      "cpu_float64_max_matrix_diff": 0.0,
+      "full_stack_o1_rollback_ms": 5.067,
+      "full_stack_rollback_max_logprob_diff": 0.0,
+      "live_llama_order_max_logprob_diff": 0.0,
+      "passed": true,
+      "per_slot_selective_rollback_logprob_diff": 0.0,
+      "permutations_tested": 6
+    },
+    "T_C5_serving_budget": {
+      "latency_overhead_pct": 0.0,
+      "live_slot_kv_ctx_tokens": 8192,
+      "m1_max_measured_stack_rss_mib": 7609.88,
+      "m1_max_measured_w0_rss_mib": 4757.67,
+      "max_allowed_overhead_pct": 15.0,
+      "min_required_kv_ctx_tokens": 8192,
+      "passed": true,
+      "rtx_3080_8gib_vram_accounting_gib": {
+        "base_gguf_gib": 4.1746,
+        "companion_q4_k_m_headless_vram_gib": 3.4034,
+        "companion_q4_k_m_windows_wddm_vram_gib": 4.6034,
+        "deltanet_state_and_compute_scratch_gib": 0.52,
+        "hard_vram_ceiling_gib": 7.2,
+        "kv_cache_8k_gib": 0.25,
+        "kv_cache_dtype": "f16",
+        "rtx_3080_host_note": "geminus (<tailscale-host>, Windows UX582HS 8 GiB RTX 3080) online on Tailscale with sshHostKeys=false and SSH/RPC ports closed (only SMB 445 open); charminar (<tailscale-host>) is AMD Radeon Vega Mobile iGPU; both Q8_0 and Q4_K_M clear <=7.2 GiB",
+        "three_f16_loras_mib": 0.541,
+        "total_estimated_vram_gib": 4.9451,
+        "windows_wddm_desktop_estimated_vram_gib": 6.1451
+      },
+      "triple_lora_median_tok_per_s": 35.21,
+      "w0_median_tok_per_s": 27.92
+    }
+  },
+  "lineage_pinned": {
+    "contested_heads": [],
+    "corpus_tree_sha256": "5bdb7f30363b956e82947f668f98c48f99876e87fb5ed4f785b873e4f4f98305",
+    "domain_commits": {
+      "corpus": "7b22e542f0db0f3013ab1439cf5d1947676a5083",
+      "formal-verification": "49beff2a0185cfa4032170b614a543c0d6754149",
+      "weft-eido": "be27665255d9aa2553060d275f7d1b1b3306c703"
+    }
+  },
+  "passed": true,
+  "phase": "Phase 6: Multi-MDE Composition (T-C1 to T-C5) and Seven Hazards",
+  "precedence_contract": "Tier 1 Human Authority > Tier 2 RepoPolicy > Specialist Pack in its L5 syntax zone > Base Prose Pack",
+  "seven_hazards": {
+    "H1_negative_clause_vs_what_is_not_proved": {
+      "active_lora": [
+        {
+          "id": 2,
+          "scale": 1.0
+        }
+      ],
+      "allow_negative_disclaimers": true,
+      "passed": true,
+      "routed_scales": {
+        "corpus": 0.0,
+        "formal-verification": 1.0,
+        "weft-eido": 0.0
+      },
+      "verified_sections_present": [
+        "What is not proved",
+        "What you must trust"
+      ]
+    },
+    "H2_jargon_7char_sha_vs_lean_axioms_40char_sha": {
+      "allow_exact_formal_notation": true,
+      "passed": true,
+      "preserved_40char_sha": "77b9a1c64ed66d17bf75cc29be1b22ef262e5610",
+      "preserved_axiom": "Quot.sound",
+      "protect_axioms": true,
+      "protect_sha_digests": true
+    },
+    "H3_divergent_claim_tiers_locked_in_repo_policy": {
+      "passed": true,
+      "tier2_policy_violations_caught": {
+        "foundation0_checker_result_mix": [
+          "locked_checker_and_result_mixed:checkers=['scripts/gate.py'],results=['results/run1.json']"
+        ],
+        "weft_eido_missing_dco": [
+          "missing_required_trailer:Signed-off-by (DCO)"
+        ]
+      },
+      "vocabularies_by_repo": {
+        "Foundation-0/f0": "foundation0",
+        "Moissanite-Labs/weft-eido": "corpus",
+        "Proven-Commons/mcproof": "proven_commons",
+        "aska-digital/corpus": "corpus"
+      }
+    },
+    "H4_prose_grammar_bans_vs_terse_condensed_json": {
+      "allow_telegraphic_condense": true,
+      "passed": true,
+      "routed_scales": {
+        "corpus": 0.0,
+        "formal-verification": 0.0,
+        "weft-eido": 0.0
+      },
+      "strict_condensed_problems": [],
+      "validated_eido_passages": 41
+    },
+    "H5_static_html_vs_dual_theme_oklch_hard_veto_2": {
+      "passed": true,
+      "pr25_wcag_360hue_audit": {
+        "darkFailuresAtDefaultHue": 0,
+        "darkHuesBelowBar": 0,
+        "darkWeakestMutedOnWash": 4.99,
+        "lightFailuresAtDefaultHue": 24,
+        "lightWorstAccent2OnWash": 3.4
+      },
+      "resolved_precedence_winner": "weft-eido",
+      "resolved_scales": {
+        "corpus": 0.0,
+        "weft-eido": 1.0
+      },
+      "unoverridden_conflict_key": "html_delivery",
+      "warp_contested_lineage_code": "ERR_CONTESTED_LINEAGE"
+    },
+    "H6_float64_canvas_vs_float_free_exact_verification": {
+      "exact_fraction_verifier_clean": true,
+      "forbid_float_in_exact_math": true,
+      "passed": true,
+      "require_certificate_binding": true,
+      "require_illustrative_tag": true,
+      "routed_scales": {
+        "corpus": 0.0,
+        "formal-verification": 1.0,
+        "weft-eido": 1.0
+      },
+      "simultaneous_active_lora": [
+        {
+          "id": 1,
+          "scale": 1.0
+        },
+        {
+          "id": 2,
+          "scale": 1.0
+        }
+      ]
+    },
+    "H7_automated_condensing_stripping_formal_hedges": {
+      "eido_dom_passage_extraction": {
+        "markedPassageCount": 1,
+        "markedTexts": [
+          "Overview prose introducing the finite lattice check for readers."
+        ],
+        "unmarkedPassageCount": 2
+      },
+      "marked_enforce_data_eido_skip": true,
+      "passed": true,
+      "unmarked_conflict_key": "condense_formal_claims"
+    }
+  },
+  "signed_warp_ledger_receipts_verified": 11,
+  "weft_eido_pr25_unit_tests_passed": 120
+}

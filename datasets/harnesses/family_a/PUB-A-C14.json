@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC14\ndef WeakSubset (lo1 hi1 lo2 hi2 : Int) : Prop := \u2200 x : Int, lo1 \u2264 x \u2227 x \u2264 hi1 \u2192 lo2 \u2264 x \u2227 x \u2264 hi2\ndef checkNonEmptySubset (lo1 hi1 lo2 hi2 : Int) : Bool := (lo1 \u2264 hi1) && (lo2 \u2264 lo1) && (hi1 \u2264 hi2)\ntheorem inverted_interval_vacuous : WeakSubset 10 2 0 1 := by sorry\ntheorem nonEmptySubset_sound (lo1 hi1 lo2 hi2 : Int) (h : checkNonEmptySubset lo1 hi1 lo2 hi2 = true) : (\u2203 x : Int, lo1 \u2264 x \u2227 x \u2264 hi1) \u2227 WeakSubset lo1 hi1 lo2 hi2 := by sorry\nend PubAC14\n",
+  "family": "A",
+  "id": "PUB-A-C14",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC14.nonEmptySubset_sound",
+  "trap_kind": "weak_statement_vacuous_trap"
+}

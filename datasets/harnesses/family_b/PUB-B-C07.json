@@ -1,0 +1,358 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    n, edges = inst['n'], inst['edges']\n    adj = [[] for _ in range(n)]\n    for u, v in edges:\n        adj[u].append(v)\n        adj[v].append(u)\n    col, par = [-1] * n, [-1] * n\n    for s in range(n):\n        if col[s] != -1:\n            continue\n        col[s], q = 0, [s]\n        for u in q:\n            for v in adj[u]:\n                if col[v] == -1:\n                    col[v], par[v] = 1 - col[u], u\n                    q.append(v)\n                elif col[v] == col[u]:\n                    pu, pv = [], []\n                    x = u\n                    while x != -1:\n                        pu.append(x)\n                        x = par[x]\n                    x = v\n                    while x != -1:\n                        pv.append(x)\n                        x = par[x]\n                    lca = next(z for z in pu if z in pv)\n                    cyc = pu[:pu.index(lca)+1] + pv[:pv.index(lca)][::-1]\n                    return {'bipartite': False, 'colors': [], 'odd_cycle': cyc}\n    return {'bipartite': True, 'colors': col, 'odd_cycle': []}\n",
+  "id": "PUB-B-C07",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "n": 3
+        },
+        {
+          "bipartite": false,
+          "colors": [],
+          "odd_cycle": [
+            0,
+            1,
+            0
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c07_mut_1"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "bipartite": false,
+          "colors": [],
+          "odd_cycle": [
+            0,
+            1,
+            2
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c07_mut_2"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "bipartite": true,
+          "colors": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "odd_cycle": []
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c07_mut_3"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "bipartite": true,
+          "colors": [
+            0,
+            1,
+            1,
+            0
+          ],
+          "odd_cycle": []
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c07_mut_4"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "n": 3
+        },
+        {
+          "bipartite": false,
+          "colors": [],
+          "odd_cycle": [
+            0
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c07_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "bipartite": true,
+          "colors": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "odd_cycle": []
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "n": 3
+        },
+        {
+          "bipartite": false,
+          "colors": [],
+          "odd_cycle": [
+            1,
+            0,
+            2
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              4
+            ],
+            [
+              4,
+              0
+            ]
+          ],
+          "n": 5
+        },
+        {
+          "bipartite": false,
+          "colors": [],
+          "odd_cycle": [
+            2,
+            1,
+            0,
+            4,
+            3
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              3,
+              4
+            ]
+          ],
+          "n": 5
+        },
+        {
+          "bipartite": true,
+          "colors": [
+            0,
+            1,
+            1,
+            0,
+            1
+          ],
+          "odd_cycle": []
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              1
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "bipartite": false,
+          "colors": [],
+          "odd_cycle": [
+            2,
+            1,
+            3
+          ]
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

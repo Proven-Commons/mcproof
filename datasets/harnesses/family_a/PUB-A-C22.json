@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC22\nstructure Ring3 where\n  t0 : Nat\n  t1 : Nat\n  t2 : Nat\ndef oneToken (r : Ring3) : Prop := r.t0 + r.t1 + r.t2 = 1\ninductive Hop | h01 | h12 | h20\ndef stepRing (r : Ring3) : Hop \u2192 Ring3\n  | .h01 => if r.t0 > 0 then \u27e8r.t0 - 1, r.t1 + 1, r.t2\u27e9 else r\n  | .h12 => if r.t1 > 0 then \u27e8r.t0, r.t1 - 1, r.t2 + 1\u27e9 else r\n  | .h20 => if r.t2 > 0 then \u27e8r.t0 + 1, r.t1, r.t2 - 1\u27e9 else r\ntheorem ring3_mutex_trace (r : Ring3) (hops : List Hop) (h : oneToken r) : let r' := hops.foldl stepRing r; oneToken r' \u2227 r'.t0 \u2264 1 \u2227 r'.t1 \u2264 1 \u2227 r'.t2 \u2264 1 := by sorry\nend PubAC22\n",
+  "family": "A",
+  "id": "PUB-A-C22",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC22.ring3_mutex_trace",
+  "trap_kind": "anti_bypass_invariant"
+}

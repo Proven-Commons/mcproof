@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "mcproof Dataset Prompt Record v0.1",
+  "type": "object",
+  "required": [
+    "id",
+    "split",
+    "family",
+    "zone",
+    "prompt",
+    "oracle_cmd",
+    "expected_tier",
+    "sha256"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 3
+    },
+    "split": {
+      "type": "string",
+      "enum": [
+        "compile",
+        "validation",
+        "private_holdout",
+        "canary",
+        "general_retention",
+        "mixed_composition",
+        "hybrid_k0"
+      ]
+    },
+    "family": {
+      "type": "string",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "safety",
+        "general",
+        "mixed",
+        "k0"
+      ]
+    },
+    "zone": {
+      "type": "string",
+      "enum": [
+        "formal_proof",
+        "code",
+        "prose",
+        "condensed_json",
+        "ui_module",
+        "research_page",
+        "html_report"
+      ]
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "oracle_cmd": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_tier": {
+      "type": "string",
+      "enum": [
+        "PROVEN",
+        "VERIFIED",
+        "KNOWN",
+        "CONJECTURE",
+        "REFUSED",
+        "PRESERVATION"
+      ]
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "domain_topic": {
+      "type": "string"
+    },
+    "positive_completion": {
+      "type": "string"
+    },
+    "negative_completion": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

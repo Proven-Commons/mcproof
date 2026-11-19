@@ -1,0 +1,155 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    a, b = inst['a'], inst['b']\n    old_r, r = a, b\n    old_s, s = 1, 0\n    old_t, t = 0, 1\n    while r != 0:\n        q = old_r // r\n        old_r, r = r, old_r - q * r\n        old_s, s = s, old_s - q * s\n        old_t, t = t, old_t - q * t\n    return {'g': old_r, 'x': old_s, 'y': old_t}\n",
+  "id": "PUB-B-C01",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "a": 15,
+          "b": 21
+        },
+        {
+          "g": 3,
+          "x": 1,
+          "y": 0
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c01_mut_1"
+    },
+    {
+      "args": [
+        {
+          "a": 15,
+          "b": 21
+        },
+        {
+          "g": 1,
+          "x": 3,
+          "y": -2
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c01_mut_2"
+    },
+    {
+      "args": [
+        {
+          "a": 252,
+          "b": 105
+        },
+        {
+          "g": -21,
+          "x": 1,
+          "y": -2
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c01_mut_3"
+    },
+    {
+      "args": [
+        {
+          "a": 252,
+          "b": 105
+        },
+        {
+          "g": 7,
+          "x": -2,
+          "y": 5
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c01_mut_4"
+    },
+    {
+      "args": [
+        {
+          "a": 35,
+          "b": 64
+        },
+        {
+          "g": 0,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c01_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "a": 15,
+          "b": 21
+        },
+        {
+          "g": 3,
+          "x": 3,
+          "y": -2
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 35,
+          "b": 64
+        },
+        {
+          "g": 1,
+          "x": 11,
+          "y": -6
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 252,
+          "b": 105
+        },
+        {
+          "g": 21,
+          "x": -2,
+          "y": 5
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 1071,
+          "b": 462
+        },
+        {
+          "g": 21,
+          "x": -3,
+          "y": 7
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 97,
+          "b": 43
+        },
+        {
+          "g": 1,
+          "x": 4,
+          "y": -9
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

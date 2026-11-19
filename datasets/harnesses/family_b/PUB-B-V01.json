@@ -1,0 +1,185 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    a, b = inst['a'], inst['b']\n    x, y = a, b\n    while y:\n        x, y = y, x % y\n    g = x\n    u, v = a // g, b // g\n    r0, r1, s0, s1, t0, t1 = u, v, 1, 0, 0, 1\n    while r1:\n        q = r0 // r1\n        r0, r1, s0, s1, t0, t1 = r1, r0 - q * r1, s1, s0 - q * s1, t1, t0 - q * t1\n    return {'gcd': g, 'lcm': (a // g) * b, 'u': u, 'v': v, 's': s0, 't': t0}\n",
+  "id": "PUB-B-V01",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "a": 12,
+          "b": 18
+        },
+        {
+          "gcd": 2,
+          "lcm": 108,
+          "s": -1,
+          "t": 1,
+          "u": 6,
+          "v": 9
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v01_mut_1"
+    },
+    {
+      "args": [
+        {
+          "a": 12,
+          "b": 18
+        },
+        {
+          "gcd": 6,
+          "lcm": 36,
+          "s": 1,
+          "t": 1,
+          "u": 2,
+          "v": 3
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v01_mut_2"
+    },
+    {
+      "args": [
+        {
+          "a": 12,
+          "b": 18
+        },
+        {
+          "gcd": -6,
+          "lcm": -36,
+          "s": 1,
+          "t": -1,
+          "u": -2,
+          "v": -3
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v01_mut_3"
+    },
+    {
+      "args": [
+        {
+          "a": 12,
+          "b": 18
+        },
+        {
+          "gcd": 6,
+          "lcm": 72,
+          "s": -1,
+          "t": 1,
+          "u": 2,
+          "v": 3
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v01_mut_4"
+    },
+    {
+      "args": [
+        {
+          "a": 12,
+          "b": 18
+        },
+        {
+          "gcd": 6,
+          "lcm": 36,
+          "s": 1,
+          "t": -1,
+          "u": 3,
+          "v": 2
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v01_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "a": 12,
+          "b": 18
+        },
+        {
+          "gcd": 6,
+          "lcm": 36,
+          "s": -1,
+          "t": 1,
+          "u": 2,
+          "v": 3
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 21,
+          "b": 14
+        },
+        {
+          "gcd": 7,
+          "lcm": 42,
+          "s": 1,
+          "t": -1,
+          "u": 3,
+          "v": 2
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 17,
+          "b": 19
+        },
+        {
+          "gcd": 1,
+          "lcm": 323,
+          "s": 9,
+          "t": -8,
+          "u": 17,
+          "v": 19
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 100,
+          "b": 75
+        },
+        {
+          "gcd": 25,
+          "lcm": 300,
+          "s": 1,
+          "t": -1,
+          "u": 4,
+          "v": 3
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 48,
+          "b": 180
+        },
+        {
+          "gcd": 12,
+          "lcm": 720,
+          "s": 4,
+          "t": -1,
+          "u": 4,
+          "v": 15
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

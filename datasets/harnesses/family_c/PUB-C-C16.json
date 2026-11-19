@@ -1,0 +1,14 @@
+{
+  "expected_tier": "VERIFIED",
+  "family": "C",
+  "id": "PUB-C-C16",
+  "oracle_type": "verdict_audit",
+  "spec_meta": {
+    "expected_axioms": [
+      "propext"
+    ],
+    "expected_verdict": "weaker",
+    "source_commit": "5d6855b204baf25ccde2c3d1356a7895b3a87e72",
+    "verdict_id": "audit-linalg-det-diag-only"
+  }
+}

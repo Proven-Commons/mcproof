@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C07",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC07\ntheorem reverse_involutive_len (xs : List Nat) : xs.reverse.reverse = xs \u2227 xs.reverse.length = xs.length := by sorry\nend PubDC07\n",
+    "module_title": "RevInvolution",
+    "positive_lean": "namespace PubDC07\n\ntheorem reverse_involutive_len (xs : List Nat) :\n    xs.reverse.reverse = xs \u2227 xs.reverse.length = xs.length := by\n  exact \u27e8List.reverse_reverse xs, List.length_reverse\u27e9\n\nend PubDC07\n",
+    "theorem_names": [
+      "PubDC07.reverse_involutive_len"
+    ],
+    "verdict_sha": "5777b659ecb566c29a3a9ed9627c61635be8a8b2"
+  }
+}

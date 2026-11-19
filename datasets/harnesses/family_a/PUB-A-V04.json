@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAV04\ndef triEdges : Nat \u2192 Nat\n  | 0 => 0\n  | n + 1 => triEdges n + n\ntheorem completeGraph_edges_twice (n : Nat) : 2 * triEdges n + n = n * n := by sorry\nend PubAV04\n",
+  "family": "A",
+  "id": "PUB-A-V04",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAV04.completeGraph_edges_twice",
+  "trap_kind": "anti_bypass_induction"
+}

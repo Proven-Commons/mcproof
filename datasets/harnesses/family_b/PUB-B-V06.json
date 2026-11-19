@@ -1,0 +1,393 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    n, edges = inst['n'], inst['edges']\n    adj = [[] for _ in range(n)]\n    for eid, (u, v) in enumerate(edges):\n        adj[u].append((v, eid))\n        if u != v:\n            adj[v].append((u, eid))\n    used = [False] * len(edges)\n    vstk, estk, vout, eout = [0], [], [], []\n    while vstk:\n        u = vstk[-1]\n        while adj[u] and used[adj[u][-1][1]]:\n            adj[u].pop()\n        if adj[u]:\n            v, eid = adj[u].pop()\n            used[eid] = True\n            vstk.append(v)\n            estk.append(eid)\n        else:\n            vout.append(vstk.pop())\n            if estk:\n                eout.append(estk.pop())\n    return {'vertices': vout[::-1], 'edge_order': eout[::-1]}\n",
+  "id": "PUB-B-V06",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "n": 3
+        },
+        {
+          "edge_order": [
+            0,
+            0,
+            0
+          ],
+          "vertices": [
+            0,
+            1,
+            0,
+            1
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v06_mut_1"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "n": 3
+        },
+        {
+          "edge_order": [
+            1,
+            2,
+            0
+          ],
+          "vertices": [
+            1,
+            2,
+            0,
+            1
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v06_mut_2"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "n": 3
+        },
+        {
+          "edge_order": [
+            0,
+            1,
+            2
+          ],
+          "vertices": [
+            0,
+            2,
+            1,
+            0
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v06_mut_3"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "n": 3
+        },
+        {
+          "edge_order": [
+            0,
+            1
+          ],
+          "vertices": [
+            0,
+            1,
+            2
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v06_mut_4"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "n": 3
+        },
+        {
+          "edge_order": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "vertices": [
+            0,
+            1,
+            0,
+            2,
+            1
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v06_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "n": 3
+        },
+        {
+          "edge_order": [
+            2,
+            1,
+            0
+          ],
+          "vertices": [
+            0,
+            2,
+            1,
+            0
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "n": 3
+        },
+        {
+          "edge_order": [
+            3,
+            2,
+            1,
+            0
+          ],
+          "vertices": [
+            0,
+            2,
+            0,
+            1,
+            0
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              1,
+              3
+            ],
+            [
+              3,
+              2
+            ],
+            [
+              2,
+              1
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "edge_order": [
+            2,
+            5,
+            3,
+            4,
+            1,
+            0
+          ],
+          "vertices": [
+            0,
+            2,
+            1,
+            3,
+            2,
+            1,
+            0
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "n": 1
+        },
+        {
+          "edge_order": [
+            1,
+            0
+          ],
+          "vertices": [
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "edge_order": [
+            3,
+            2,
+            1,
+            0
+          ],
+          "vertices": [
+            0,
+            3,
+            2,
+            1,
+            0
+          ]
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

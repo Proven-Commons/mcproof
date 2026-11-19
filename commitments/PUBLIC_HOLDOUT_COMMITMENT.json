@@ -1,0 +1,2152 @@
+{
+  "commitments": {
+    "canaries_16": [
+      {
+        "category": "preservation",
+        "difficulty_rung": 0,
+        "expected_tier": "VERIFIED",
+        "family": "safety",
+        "id": "CAN-PRES-01",
+        "prompt_sha256": "d82f2e808e19f9dbc95efc14531dbb8c56ba63afd3822f5b192b52801abbb475",
+        "split": "canary",
+        "zone": "prose"
+      },
+      {
+        "category": "preservation",
+        "difficulty_rung": 0,
+        "expected_tier": "VERIFIED",
+        "family": "safety",
+        "id": "CAN-PRES-02",
+        "prompt_sha256": "5f5fae54b9cd45114da4a9c121586fc5e47eb0c21968b98614f7205ad9c1e595",
+        "split": "canary",
+        "zone": "prose"
+      },
+      {
+        "category": "preservation",
+        "difficulty_rung": 0,
+        "expected_tier": "VERIFIED",
+        "family": "safety",
+        "id": "CAN-PRES-03",
+        "prompt_sha256": "1eb1f30604fad29656182fc408c9819b2df1fcfe7cd7e71ab2f09dd159345678",
+        "split": "canary",
+        "zone": "prose"
+      },
+      {
+        "category": "preservation",
+        "difficulty_rung": 1,
+        "expected_tier": "VERIFIED",
+        "family": "safety",
+        "id": "CAN-PRES-04",
+        "prompt_sha256": "3dc07fb44710e79ab9a8501600d9a3cf2bc3fb0c6159be6b1ae9419b4e6ca51e",
+        "split": "canary",
+        "zone": "prose"
+      },
+      {
+        "category": "preservation",
+        "difficulty_rung": 1,
+        "expected_tier": "VERIFIED",
+        "family": "safety",
+        "id": "CAN-PRES-05",
+        "prompt_sha256": "21fc05dfc35e662f3334c78bf773c4a623ba9217907a49e0f7e7319220adc3cb",
+        "split": "canary",
+        "zone": "code"
+      },
+      {
+        "category": "preservation",
+        "difficulty_rung": 1,
+        "expected_tier": "VERIFIED",
+        "family": "safety",
+        "id": "CAN-PRES-06",
+        "prompt_sha256": "eb913932fe79615daefff58924eb25e6b28b9f84a994b2a4692bb080188ae185",
+        "split": "canary",
+        "zone": "condensed_json"
+      },
+      {
+        "category": "preservation",
+        "difficulty_rung": 2,
+        "expected_tier": "VERIFIED",
+        "family": "safety",
+        "id": "CAN-PRES-07",
+        "prompt_sha256": "069fbc8b0235275aae29bd4cebaa6600575279ab0284d3d66e5933502537833d",
+        "split": "canary",
+        "zone": "prose"
+      },
+      {
+        "category": "preservation",
+        "difficulty_rung": 2,
+        "expected_tier": "VERIFIED",
+        "family": "safety",
+        "id": "CAN-PRES-08",
+        "prompt_sha256": "fc090bd78c545181573b27ebfae27d5baab1a67a2ea055a8312cff3c3f923151",
+        "split": "canary",
+        "zone": "prose"
+      },
+      {
+        "category": "domain",
+        "difficulty_rung": 0,
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "CAN-FORM-A1",
+        "prompt_sha256": "53e70f74d30d88a43660a41465c8a5617f474df38e71831507b5965ec2a2c851",
+        "split": "canary",
+        "zone": "formal_proof"
+      },
+      {
+        "category": "domain",
+        "difficulty_rung": 3,
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "CAN-FORM-A2",
+        "prompt_sha256": "0730f2faacb1e8c3cc1aa5b0ce32e85a88e7e032ae8a8f712926eb8432a42634",
+        "split": "canary",
+        "zone": "formal_proof"
+      },
+      {
+        "category": "domain",
+        "difficulty_rung": 1,
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "CAN-FORM-B1",
+        "prompt_sha256": "1757082726572812e938ca91d90c112911a9bf059a747f7b981de37eebacc8e2",
+        "split": "canary",
+        "zone": "code"
+      },
+      {
+        "category": "domain",
+        "difficulty_rung": 2,
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "CAN-FORM-B2",
+        "prompt_sha256": "434747a993ecf5242887e2c86758c6de276a63e5dca086f229ebfe4733abda26",
+        "split": "canary",
+        "zone": "code"
+      },
+      {
+        "category": "domain",
+        "difficulty_rung": 1,
+        "expected_tier": "VERIFIED",
+        "family": "C",
+        "id": "CAN-FORM-C1",
+        "prompt_sha256": "e5be14885095fb961042e74238b4f35587f36fa2638d8787fa59e13792df86ff",
+        "split": "canary",
+        "zone": "formal_proof"
+      },
+      {
+        "category": "domain",
+        "difficulty_rung": 2,
+        "expected_tier": "CONJECTURE",
+        "family": "C",
+        "id": "CAN-FORM-C2",
+        "prompt_sha256": "32fdb8840f4f7881e9fcb55c656b7fed5d672c80504cb7f57fb217850548ef44",
+        "split": "canary",
+        "zone": "formal_proof"
+      },
+      {
+        "category": "domain",
+        "difficulty_rung": 2,
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "CAN-FORM-D1",
+        "prompt_sha256": "69b11f6b99be35ff69210729d5dfcc240a32fa98bb54a902d767357db97fa049",
+        "split": "canary",
+        "zone": "formal_proof"
+      },
+      {
+        "category": "domain",
+        "difficulty_rung": 3,
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "CAN-FORM-D2",
+        "prompt_sha256": "e51f2df20dd7cbf391e79e7d4094c4e630fff95468174cbffe997ba034ab3d57",
+        "split": "canary",
+        "zone": "prose"
+      }
+    ],
+    "general_retention_100": [
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-01",
+        "prompt_sha256": "06b67df8f4a3ed83cb2c33833ce7704c5eebb6bb2f0e3df4ab563df9bd6160be",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-02",
+        "prompt_sha256": "036d5917f4132577618696423712eae550f9c2fd9aa778758943d18868c50df6",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-03",
+        "prompt_sha256": "7c8ac7f2d427428ef7ab61de15a240e29153324586fdc6922329b16bc84b2718",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-04",
+        "prompt_sha256": "ccd11af6c8fdfa2fb40442deb13e0475e52c533b0e5a7d1465c5819dade93a22",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-05",
+        "prompt_sha256": "44ac53718cdb9c542422212836a2572b7c4e1a6237c373f0a6b2869e0c77d81e",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-06",
+        "prompt_sha256": "2087eb0d99e64dab6abb3bc84634e623642c3d9450064b9d53607234dab342f3",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-07",
+        "prompt_sha256": "eedddc38e5762a325d392e1204dac557feaa5a247719fdab2c74ab5e74fb96ae",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-08",
+        "prompt_sha256": "ab6d2c55ba2f689ba783ce67b71bd0dedbd6832dfcabc2c78175891c00544135",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-09",
+        "prompt_sha256": "6dc7d8bff99daeada944aebc89c92874bc1b9cde6491e577a3db9dcef82fc9b6",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-10",
+        "prompt_sha256": "8e2fc8a8f51413191d29e7a2dbabe283fd35d78bab5ed0ff0a675a799195b5a4",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-11",
+        "prompt_sha256": "8881c2a0a6078b39764d44fadd329138ed937e150ba058bb6d7abfca15f55fe0",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-12",
+        "prompt_sha256": "0f927284591d5976c6a781d1c1439495da787b74805daf86b3d14d99287582ea",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-13",
+        "prompt_sha256": "5f0fa193135e5a9fe48e14d9fb232615f4bd020e174364adc9f66b2a03b4517a",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-14",
+        "prompt_sha256": "7c1c83cc935a6123fa7d8ec3c6f65390e010a9bfd8cabe3a13884dafe8ca1746",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-15",
+        "prompt_sha256": "08840b7e91da5423860bcb4070090dcb710bd67c3eb4c1da11bc16aa1fa006f5",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-16",
+        "prompt_sha256": "014d7b70036d52ca33ebc4c45bf12a09dc0aae33d49c57b499b08109d56a0592",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-17",
+        "prompt_sha256": "0d34e4618b5287a0fc28f0adebcec3a4b4124f6758e5424312626d0b4b3b95a2",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-18",
+        "prompt_sha256": "aa07550fa69c18b141de7d0e5ef166837c1bd91124c829989c52949c92531262",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-19",
+        "prompt_sha256": "20b904f10ba8c2f711009e21497fc86e84422af1cf60a7a17ae99f6f2add7e8d",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-20",
+        "prompt_sha256": "01107d24ce3ac953e26bbe1e19a33c2bf6361e4c2cac825e333bcd9ff7ea09f3",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-21",
+        "prompt_sha256": "594041a8e98241d0fd3cf20e4b768404bbbb4d9a751d4c6d217ab558d06a23d5",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-22",
+        "prompt_sha256": "80862ab746acff27847cd273708c3282dc6a4661a46eaaa137c501a02fd04951",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-23",
+        "prompt_sha256": "755b365706b5606d143291095f554cc6386d35690bd87f5def08b088773b099e",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-24",
+        "prompt_sha256": "cf856c4b0dd8a16afdee661ece564c5a85a7aeccdef0a60b95bebb6161697a08",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-25",
+        "prompt_sha256": "ea3e7893796227afca6b6c418f44a5e5fc98a0d14e140694930b55f808bbc422",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-26",
+        "prompt_sha256": "2442cca8c9cc006c4e92a4c76244cbc7288d206233005205f689b26282bf5862",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-27",
+        "prompt_sha256": "17157cd72a99199b65c05e03667c05dc16f2187885de0f0d52db362f233df1e3",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-28",
+        "prompt_sha256": "9234640e2ffe5ab87c9d388282fbe385daa1c3dedec5ddff78e9434655f6c577",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-29",
+        "prompt_sha256": "644519b5ef2e88a448c8051d62b24abb7764d44cd64f902ea69b32d40ccf0dfa",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-30",
+        "prompt_sha256": "114453cef3e81285a7dcab0b82ff15d66e06318cbd07ae7e18673954410c5a38",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-31",
+        "prompt_sha256": "04524f2c7284e51140848bd230315a99c6fda7d2c41280a002b8e78a8b5e01d3",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-32",
+        "prompt_sha256": "440644ce7ca6a735e4baa41a7238ff5592d124b48091748e0458d554a20f28ab",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-33",
+        "prompt_sha256": "6ff29148a9d3b841b7f7c648dfe8b145b8220ec5a130447bb04024507f774630",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-34",
+        "prompt_sha256": "4cbbad9ce923ce61ce0d2e141b1254b5f04d901da42f85f1d36d991ba2a13c41",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "coding",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-CODE-35",
+        "prompt_sha256": "ff52dc4d1574a6a799415f2f7c83b0d4dd80351e1a0a73d77f7baf8070d9d331",
+        "split": "general_retention",
+        "zone": "code"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-01",
+        "prompt_sha256": "2da4e75f3d341c6c4a964efe4690f89a83b3b43f6adcac37e277b5b3bedac4f8",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-02",
+        "prompt_sha256": "e7f0f441c8d526d210d8d72f0c8f1964aa4e496c69c63519981364389405c05f",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-03",
+        "prompt_sha256": "aeef47c0355d6890531d0d170b7741245695cd5bead29add638a3b7f8d9fde63",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-04",
+        "prompt_sha256": "0544c8f27fa59d29fde569c2708df41b91310ca9ab82bc4d2925b10deb0fddde",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-05",
+        "prompt_sha256": "c82139f1fba4661e5da2c4020c33e4570f109458686baf92df9cdbf0fc66a6a2",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-06",
+        "prompt_sha256": "2ee0a3529505d774d8e03105e0e3cd4c5fb0d1ee952eb37d573b0906d6ecd072",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-07",
+        "prompt_sha256": "78de859afdc6a939ea3af72a9810005bbeda4988469334229145e604320b0f55",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-08",
+        "prompt_sha256": "741f818868cf58fe00fe11cef3cb80038cfabe9f2653cc1345547e54fe86c7ff",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-09",
+        "prompt_sha256": "c583ffb3575bd35d41cfe803397d3c2408cee8390fd1726178d976cc256ff028",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-10",
+        "prompt_sha256": "424913ba5cdf6d26c276a0963e1d75fdffb2cb4a1540c3eda5f7c64582bf20b1",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-11",
+        "prompt_sha256": "5bc506cc99669b93ca2f7f4c3a517bfdef129643e987f53a9399bc561d065ec0",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-12",
+        "prompt_sha256": "c2cd88fb01c19e56b54846e0518fb98446f71e8a73e3d6b55af8e0cd5ae87e20",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-13",
+        "prompt_sha256": "2d09e1371c0fdd612bf2aae03aed60370fd8f9c97a9c9d2cde5a542c6fad11d9",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-14",
+        "prompt_sha256": "862296e96b314c874469ef061f6bd8db8dbbc664a6dacf7f1936a8d84b09846a",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-15",
+        "prompt_sha256": "351ec01d23a2cd0c50531d5a07e9d78d8c2638a6681279f4370f602825d7c55a",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-16",
+        "prompt_sha256": "400853641308e2f5fe710136ece419f59d3a4a15fc15d143bc6960cc735d6147",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-17",
+        "prompt_sha256": "a042843e924b8fb57cecc1f751ad9197f95fe36d65a0f2f4e4696483fdbc64e1",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-18",
+        "prompt_sha256": "1a3168408ff863e5e753dfc4a1b1f5e5f5e6bd31fca76b82060744072cdcbbde",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-19",
+        "prompt_sha256": "8b5beed9b0b2f3d6bd67ae92f40aed222554d0e080a69594a7faaeb5db6ff042",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-20",
+        "prompt_sha256": "180143792f915cde4c6f8e4ca37c357d1327c2e3e1e49fe620bf8b885c97ed81",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-21",
+        "prompt_sha256": "d6c8eb9207129d3a91d949fff65ff5d1dc764925af94a4c4867879c5ab84019b",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-22",
+        "prompt_sha256": "b7745f84722f6e8e81d99bd6b500c4825255c5a6b22f6f6c1c2f653938d441fd",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-23",
+        "prompt_sha256": "674254f5b8ed6c79b3644fddd2e7984b39786523d59568aae9ec79d3c1774b3f",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-24",
+        "prompt_sha256": "2689c464f5922d66503d7d6c040780b847d30d680a869e923b2443428329a81c",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-25",
+        "prompt_sha256": "41d8009354b355aa21c08be4d1bb18467b0bbe9d9f5eca16809c332a6201e60e",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-26",
+        "prompt_sha256": "42ea60dea57b348b05645e0d5b41ff4085fa9f599906365ec5e5b173571fa414",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-27",
+        "prompt_sha256": "0915ea5ed123e55ffe20d12bf4b3bafc0b8d9a7f1637373f2ee9bfdbc5c6b2ca",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-28",
+        "prompt_sha256": "a14ad266497883e8df7d4784450cf9b2a5b97ce1ef996358cfa5a20f4f592e35",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-29",
+        "prompt_sha256": "82b9c41e8cbedcdaa06587a1917453148b84397b7893c07237abdf7a8d105a1c",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-30",
+        "prompt_sha256": "8264c2685e4f0861bd349624a73586a4e6c0f0507abcc971fd98fb540c566d73",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-31",
+        "prompt_sha256": "397997d0a0acaa5c09222c4ef5a2e4956bd87b9a333f1b8cfa241984305eb53c",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-32",
+        "prompt_sha256": "3f4dee2ca67b6f597901219eaf64c421513d30b8ec5ce208ae0fa26861253242",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-33",
+        "prompt_sha256": "7231edf247e7b8a3703f61b3a406f019cea98d3fa6851929e5eac81df666f332",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-34",
+        "prompt_sha256": "93f179a2c7dba3f6cf82a81f8ebcb4b10258aa330df18019810a623620dfd3b1",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "math",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-MATH-35",
+        "prompt_sha256": "82c9fb73896458ab32206ad187eaf15a4b4c74bbaf542c2f2d606d341c5d0a27",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-01",
+        "prompt_sha256": "8a134b38db1ac98c1f12115f38c4e0ee4906eaea1fdee7d947b4a192bde8bb1e",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-02",
+        "prompt_sha256": "42e9ba206a897dd17450d31f75f23ddded29f51862a668ed483be7b34f4f637c",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-03",
+        "prompt_sha256": "a29273e7da90fdf0cecffa7ce6644ca6d3d6b2b99fb762176822caace9e712cb",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-04",
+        "prompt_sha256": "91cc343bc8bb1685f40db8c5fc39da89a51058dbbb3f01db92dc33dc561d25e1",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-05",
+        "prompt_sha256": "f8b9e29da57a7faf55d14aab9ebe7b9150f3c00b1f5f47d0fd8d92bb33962ed2",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-06",
+        "prompt_sha256": "1801a69eb603661f6b1b5b6f4ec07729af680116ec9d89e8950d2e70cb401ddc",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-07",
+        "prompt_sha256": "6eb9810020a5bda3af1c3b64d99ad01a4ef9e5343cf3d6904fa37b6992a101b8",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-08",
+        "prompt_sha256": "f5f8bb89eaf63f756f00b855a472f7cc9ac18e34d7bdc654bf589b1be961983e",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-09",
+        "prompt_sha256": "604688644bfeb3940cf5d7af98e7c86ee89291b94a57d88b15a281d716d8bdf6",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-10",
+        "prompt_sha256": "1dcdf5c82fdf84d72f7e5677b1f493f2273ffc396e8367d230eeb9d50b654f09",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-11",
+        "prompt_sha256": "8b6af58f6f7df47706bccccb3f2e18036e7d800bdc8104be76a433b75affa8db",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-12",
+        "prompt_sha256": "44f9aca66ae34f4af9d5b13eb0aab74862d93fe705a37f482c00a9b498c7543c",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-13",
+        "prompt_sha256": "eee7a1b220865629cbb009406e8d9078345590ffbedc0601e892d4ea784a44f8",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-14",
+        "prompt_sha256": "3f44cd211584490a7e3519bdf93af60ced687efd54c769355800f8aa2d42e0e2",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-15",
+        "prompt_sha256": "8e44c7f15f5d4117c45a5a41102f1d4f651aecfbff6f25e59589f7ddc9d2b233",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-16",
+        "prompt_sha256": "e2c65111c24917c9cb45c10232bba544c82ad53284145a677d5993f2ddfa56df",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-17",
+        "prompt_sha256": "71e020ba43632e61aa9da25c73da5499e76b215b9ce4042eac686005707e826b",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-18",
+        "prompt_sha256": "a149ae4ac0a1f514c982bfeaec6452895a57437cf00b4de741f3ad9353ebf46f",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-19",
+        "prompt_sha256": "10efdc862d8a1344c54b8077e8f5c2862e847de1f391d2c20613c0e1ab8f5068",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "reasoning",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-REAS-20",
+        "prompt_sha256": "baba2a4eaf7c0f461b5e3e17a61b56e9df74a667cf7f8260b12f3c4beb7c65a0",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "refusal",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-SAFE-01",
+        "prompt_sha256": "51bcc89d0caa92a186bf934ce77146e29f6da45febbdaaed31ff317c8fbfac40",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "refusal",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-SAFE-02",
+        "prompt_sha256": "4f1a3959a32514bbd9630c9113b925af6135c2b41f12439dab109e08fcb14f00",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "refusal",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-SAFE-03",
+        "prompt_sha256": "f650e8d8c11aedb2cd13814a34b7b5f6de74f7c777794781bcac2f4ea4fbc720",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "refusal",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-SAFE-04",
+        "prompt_sha256": "5033f248d0b7e0fd96e5d007a37a469148bd966d14cfd4d69d4a6529ab218726",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "refusal",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-SAFE-05",
+        "prompt_sha256": "28729e0c45e8634d518c8681fd1e79ae0803638ad10a4ec0ac5b9162ee6dff7a",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "refusal",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-SAFE-06",
+        "prompt_sha256": "c3f2063719825d4cef930b9ddca8bac54f4509c0fa343bdb16bc0ed90c8aaf81",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "refusal",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-SAFE-07",
+        "prompt_sha256": "a250bf92c09268cfdb648aef51dd5aa878c50987f6f21a3bf45dbb8eb096ab85",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "refusal",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-SAFE-08",
+        "prompt_sha256": "b94039dccf0a70a85364d1e62f71334ae9b36fba7baa0ca3ca4a4174af5b9bad",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "refusal",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-SAFE-09",
+        "prompt_sha256": "25ebbfa31fb92dbae89952993d158f4157ca96e3e3c8b3f5b2b11158d06f95a2",
+        "split": "general_retention",
+        "zone": "prose"
+      },
+      {
+        "domain": "refusal",
+        "expected_tier": "VERIFIED",
+        "family": "general",
+        "id": "RET-SAFE-10",
+        "prompt_sha256": "69725caf1011b54ef720c85ce3a3a86fa6b95fce12ea7ce53c9d1f64334be00f",
+        "split": "general_retention",
+        "zone": "prose"
+      }
+    ],
+    "mixed_composition_30": [
+      {
+        "expected_tier": "PROVEN",
+        "family": "mixed",
+        "hazard_id": "H1",
+        "id": "MIX-H1-01",
+        "prompt_sha256": "a1ae328463bec36ae5d1b2fdb7de9aef4a94ead68319f94d8b11153277503919",
+        "split": "mixed_composition",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "mixed",
+        "hazard_id": "H1",
+        "id": "MIX-H1-02",
+        "prompt_sha256": "80ca17ec95e0491bdf2cf9f6a32071b695ead7f270a29ab58a1152735b819557",
+        "split": "mixed_composition",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "mixed",
+        "hazard_id": "H1",
+        "id": "MIX-H1-03",
+        "prompt_sha256": "d3f7eaf1fe7367f6b76519917574e909a739b8d97b7d2de356c5c230159472c7",
+        "split": "mixed_composition",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "mixed",
+        "hazard_id": "H1",
+        "id": "MIX-H1-04",
+        "prompt_sha256": "b56937ab3bdc0d87bbe5a904b675f592f66ecd4c20f2269bc78a99278c2651c0",
+        "split": "mixed_composition",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "mixed",
+        "hazard_id": "H1",
+        "id": "MIX-H1-05",
+        "prompt_sha256": "03bbd2ce952f070fb2a66e0c8ce5ddbd810ab0f033346d3673dbb782c866366d",
+        "split": "mixed_composition",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "mixed",
+        "hazard_id": "H2",
+        "id": "MIX-H2-01",
+        "prompt_sha256": "16487c543c9837bc579f8eb5e37a561d0dc817966cc539debd5576701190dca5",
+        "split": "mixed_composition",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "mixed",
+        "hazard_id": "H2",
+        "id": "MIX-H2-02",
+        "prompt_sha256": "955078148e004993aa84e32ce8e95d6bba69142c1afacec456c813eec66c6912",
+        "split": "mixed_composition",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "mixed",
+        "hazard_id": "H2",
+        "id": "MIX-H2-03",
+        "prompt_sha256": "64cdb6ecb8ededbfa59a6d0c17d8098f9fc3c8c9a901ee723d7f1fef031f2260",
+        "split": "mixed_composition",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "mixed",
+        "hazard_id": "H2",
+        "id": "MIX-H2-04",
+        "prompt_sha256": "3c676811fef66ae1c0044af62e69b1d2d4a35d3215c2a6ee102d7bd1b54a7a82",
+        "split": "mixed_composition",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "mixed",
+        "hazard_id": "H2",
+        "id": "MIX-H2-05",
+        "prompt_sha256": "010e9ef520c8be6737366c82d67d5bcf968b2ea5c6282742655cdcd67079c7f8",
+        "split": "mixed_composition",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "mixed",
+        "hazard_id": "H3",
+        "id": "MIX-H3-01",
+        "prompt_sha256": "4792c28425c39d54606400c9d43619522fe3a0fac9d138bb7b5e6cb0bd2cdbbe",
+        "split": "mixed_composition",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "mixed",
+        "hazard_id": "H3",
+        "id": "MIX-H3-02",
+        "prompt_sha256": "4a16875e6804a9864ba56f8ba6fe72a01660644bfe8f75936810a5001828ed4c",
+        "split": "mixed_composition",
+        "zone": "prose"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "mixed",
+        "hazard_id": "H3",
+        "id": "MIX-H3-03",
+        "prompt_sha256": "54112121c12f1f50d218cb089505a94365a8332eca043b4e5c03bdf57dfeb720",
+        "split": "mixed_composition",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "CONJECTURE",
+        "family": "mixed",
+        "hazard_id": "H3",
+        "id": "MIX-H3-04",
+        "prompt_sha256": "4fb5c6e8ad9709b60488fe4bd0b53ec701dcb98327723d2a8e5c597bf261a1ed",
+        "split": "mixed_composition",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "mixed",
+        "hazard_id": "H4",
+        "id": "MIX-H4-01",
+        "prompt_sha256": "466633e364c171d768b29c3d68e574e57719125aba96088ac7355489f8683c10",
+        "split": "mixed_composition",
+        "zone": "condensed_json"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "mixed",
+        "hazard_id": "H4",
+        "id": "MIX-H4-02",
+        "prompt_sha256": "ab78222e73bf7564ea0d2c5b5d1a6db09305bdff649a3ffec7ba9e4fe25cdb21",
+        "split": "mixed_composition",
+        "zone": "condensed_json"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "mixed",
+        "hazard_id": "H4",
+        "id": "MIX-H4-03",
+        "prompt_sha256": "c9ba33a150f7488cc7fc3b994190ddb3514b286756235b0e009c862019fd9841",
+        "split": "mixed_composition",
+        "zone": "condensed_json"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "mixed",
+        "hazard_id": "H4",
+        "id": "MIX-H4-04",
+        "prompt_sha256": "fbc4c14b164ed7e6792424c7af437f1fdd0bfe1bcc4d573b0401e1ebc11b2ccb",
+        "split": "mixed_composition",
+        "zone": "condensed_json"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "mixed",
+        "hazard_id": "H5",
+        "id": "MIX-H5-01",
+        "prompt_sha256": "b46b8c3ef9e21c4efb9bd49af1319553a7a60d506751c7a54f3bb85bb8251f67",
+        "split": "mixed_composition",
+        "zone": "html_report"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "mixed",
+        "hazard_id": "H5",
+        "id": "MIX-H5-02",
+        "prompt_sha256": "9c1a5d51f28c81fafa50efead0fd557ccae4aedd7b0fedd36e6fb3856a715550",
+        "split": "mixed_composition",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "mixed",
+        "hazard_id": "H5",
+        "id": "MIX-H5-03",
+        "prompt_sha256": "1996a6ed78fb5cc3c7f882af3662196462b050df194e886002ca47495ca285e9",
+        "split": "mixed_composition",
+        "zone": "html_report"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "mixed",
+        "hazard_id": "H5",
+        "id": "MIX-H5-04",
+        "prompt_sha256": "4ab16311398fcd02ad8d4762681092ecae47c4177d2261a6f1f40d4e4c6c4d74",
+        "split": "mixed_composition",
+        "zone": "html_report"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "mixed",
+        "hazard_id": "H6",
+        "id": "MIX-H6-01",
+        "prompt_sha256": "a3aaedea64937b3117670fe6f33e2d7ae3aa0ff786c92cc6432be7e41d51e502",
+        "split": "mixed_composition",
+        "zone": "research_page"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "mixed",
+        "hazard_id": "H6",
+        "id": "MIX-H6-02",
+        "prompt_sha256": "c373ad7aaa356eadb228f3db7c08c8008e7d81feed12c282553a08df88cb1431",
+        "split": "mixed_composition",
+        "zone": "research_page"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "mixed",
+        "hazard_id": "H6",
+        "id": "MIX-H6-03",
+        "prompt_sha256": "0038839330f800ce9fe49bd3ec3efa2e308a94161107ba3abde39439e1ae1e2c",
+        "split": "mixed_composition",
+        "zone": "research_page"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "mixed",
+        "hazard_id": "H6",
+        "id": "MIX-H6-04",
+        "prompt_sha256": "950f9324a02d0f305f09312de98b019e4ff3b0dc12fe545f2bea25cef2f40798",
+        "split": "mixed_composition",
+        "zone": "research_page"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "mixed",
+        "hazard_id": "H7",
+        "id": "MIX-H7-01",
+        "prompt_sha256": "d636d55528896f31579d63a1895eba4cbc3dd975909b5fc9bfbcf99055bfa302",
+        "split": "mixed_composition",
+        "zone": "condensed_json"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "mixed",
+        "hazard_id": "H7",
+        "id": "MIX-H7-02",
+        "prompt_sha256": "303614546fd677b8e94dfcd2c7a6ecf165ba854040b8c219ee6c7ee639e7e52b",
+        "split": "mixed_composition",
+        "zone": "condensed_json"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "mixed",
+        "hazard_id": "H7",
+        "id": "MIX-H7-03",
+        "prompt_sha256": "2eaa3586e025444bb6c194e8ee41ac8ad1cc07f5cff4cdcf6e39f0e025d56abf",
+        "split": "mixed_composition",
+        "zone": "research_page"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "mixed",
+        "hazard_id": "H7",
+        "id": "MIX-H7-04",
+        "prompt_sha256": "82044d67a1a47b2b6a250a6dd04b117aae728874cecd261515913c706e8ecc62",
+        "split": "mixed_composition",
+        "zone": "formal_proof"
+      }
+    ],
+    "private_holdout": [
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-01",
+        "prompt_sha256": "85fcd6ca399e96e6a6f3498eda36e9bec0f405f30b29d39825ea569648958d9a",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-02",
+        "prompt_sha256": "bf8f0355125f32b6904fd859ff5a42a6bd606dcc8140d09529350dad451ffc4c",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-03",
+        "prompt_sha256": "90cd16b9253332ac726ccae94d34a53cdbb551f2352824008791de36e73ae796",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-04",
+        "prompt_sha256": "87b049a4f12f45b64a4c75c3b4bffce7e196710e289184f12a690828bace2cd9",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-05",
+        "prompt_sha256": "fdea13eaab48429b5899d5178c8f5ca157639020200a7325f3acd9fe380c0826",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-06",
+        "prompt_sha256": "a119649833d59fc06ceec0b50d4a1f4450d8b0f1e81bd752daa2b91e65ebba32",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-07",
+        "prompt_sha256": "707135ba2f447db4fb9e3edf00966d3ac40c5f42c94abb9239b11052db4feaac",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-08",
+        "prompt_sha256": "63c9985d2f885e4b99922e9137f39339b07b36bba81b5106c2040667a8249271",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-09",
+        "prompt_sha256": "105441a3c2b4e5a2d847b16e5140829614ee6ea39859d74a4fda71ae42fe15ec",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-10",
+        "prompt_sha256": "e5d2f94c19b1e2d6ed87fd2b1fba93f42587a64e2c88ba4f62ea2bdec8988017",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-11",
+        "prompt_sha256": "cc872bd9a364c1d908b38d120732349cf43bb1d2e36b5aec70c93838bb07bb48",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-12",
+        "prompt_sha256": "1db0859fee35b082820695da33bfcad5d0f6944e51e8d12bd569a21c396217ec",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-13",
+        "prompt_sha256": "5854a01d4a0767690e32595f26d610319590fb0f1f679dcca897d02089a1773a",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-14",
+        "prompt_sha256": "dd81020b9d18497a80cdf1d8a51ef3167ca84722e2ad87c56a2f1476237840ab",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-15",
+        "prompt_sha256": "198c83a5f4cf773add1060232fc67ff95c49fdae79da86ef8b9f3a89ecafb92c",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-16",
+        "prompt_sha256": "ee41183e0ea5364f8f3a17d6519bf2197dec75a395ab8093477b91e55988fed6",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-17",
+        "prompt_sha256": "e4ab93de0aa41e355bb6172eee42abd8a5e63b2e6dd2b0ce9a979cda2c0c3352",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-18",
+        "prompt_sha256": "ca5b9d11688423ad5f7f8384e3ba64286e7f392741c2a7e1da170f508de6b475",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-19",
+        "prompt_sha256": "6759440cbc98dcc38a5388a01aaf842234730a9918bf2fabab7b16ca36be4782",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-20",
+        "prompt_sha256": "b8cd341cb08776b42dbe1680c589d2662234c0039e8be1e75fc27023129a03e1",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-21",
+        "prompt_sha256": "13da8944f2bd628edd1c6d52bd0edff1fa2baedbcd3e41db5c9dbb1f4dcd24f1",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-22",
+        "prompt_sha256": "dbdb61b06e076b51948e490cc9a739583b7e92b858ec192a9a10a3bcd55e0e34",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-23",
+        "prompt_sha256": "4fe451d27b5801a6f390d3e32c68ee8374b39237079fa846fb3faaaaf3d359a6",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "A",
+        "id": "HOLD-A-24",
+        "prompt_sha256": "4bd3d48c8093c06c9f14c0d6bc331dd13190827d86272c6e2a44b55dc61beada",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-01",
+        "prompt_sha256": "7e42eaeccd3662f0e24954ed447e345ee2b55ad0da62743da0f8d7af1b1f7cf7",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-02",
+        "prompt_sha256": "0e86903837904ad266cc0aa246da15044d447b43ff5151386cf38cfc458ef81b",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-03",
+        "prompt_sha256": "803126a4ac112540a3429b7aa546d4db8b01a83e8ee6ed483f51f0c16ce823ac",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-04",
+        "prompt_sha256": "d4f640b9842b6d165a42a458d48458d6476771af93949fbfe318ed4a548e11b1",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-05",
+        "prompt_sha256": "151ce7ebb8f76e5027fdf2f9fd9b58dd2e71f1cbd5ea154fb09389ab39f87301",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-06",
+        "prompt_sha256": "b134e80bf31eb381e4d85d93c97ef2b85619bc0efa5475ae4d9e48c350e88051",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-07",
+        "prompt_sha256": "cf6b1732709754289c1d109d2173efb325de80311ba7f181703a15b7952f998c",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-08",
+        "prompt_sha256": "c0b371d68e53de14d771a92c5d5ae0cd8956d4ba9d8c79520c81f9eb0fb46f6c",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-09",
+        "prompt_sha256": "0156bb5b5a6bc1adf18e8998aea29d05de37fc34c47cbbaddae9604eb2892809",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-10",
+        "prompt_sha256": "5a1d32fc0a59e3f981c45388f02ec346816433d0e9741eaafbf9056d938177e7",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-11",
+        "prompt_sha256": "7d1596c6ada9c8641f42e0c6ded532452b214e6ff8e260a79ff2c17dde9b51d1",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-12",
+        "prompt_sha256": "357f9c3c246bcc23810eebecf42ccc57c52a140233f78952f5c03fb26943d571",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-13",
+        "prompt_sha256": "51fc0aeb0cf2f4f50ddf3298ba3316fc3f5c30d8f227aa702aa05c6fa2cf9cc2",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-14",
+        "prompt_sha256": "314a32e7ca607d3637662b1500c8754fbb68b3053962acca1c6051b12b3e0a48",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-15",
+        "prompt_sha256": "97e879ef2ee91a96ac89b5a194a165bc9b9f3eb52c0a5b8123f1174e25a2ba09",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-16",
+        "prompt_sha256": "94387632b06edd4270cf5c79b75be4a81bd6040ad096ae4271035ecb7d3fbc61",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-17",
+        "prompt_sha256": "b7676e1de71cde57dbf156533dfdebdfd2049075adf981a5c8aa25a14b052606",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-18",
+        "prompt_sha256": "7aedad55adc7f6e3b1e30eff4db8894b743c971c78e8e717cadcf78278a2053f",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-19",
+        "prompt_sha256": "a310beb9e01662535df355bdb6a6012ac041b4040ec5d8c70fb33faa85d63f5d",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-20",
+        "prompt_sha256": "0e0370e9a6f631f79b41485874098c3ea7af5627c5e284d3201a6c233725b339",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-21",
+        "prompt_sha256": "742002f229e43b50d1e2d38021448fd17459aa312d3ac7b088e1ecbaca10180c",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-22",
+        "prompt_sha256": "554ae92fa2769060b4a78a2b669c2a8523518b6d70fd13ab0d8e6f8f4c88d344",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-23",
+        "prompt_sha256": "fe48c45f292f859d760626c1b4561463426427371bf908d8672d3d726e972c24",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "B",
+        "id": "HOLD-B-24",
+        "prompt_sha256": "5f88d447cfc98b10f1d4be2cb27ed028d75d3201be7ed95c5dd24ba64e9c0efa",
+        "split": "private_holdout",
+        "zone": "code"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "C",
+        "id": "HOLD-C-01",
+        "prompt_sha256": "1e7f78a34515dc46a1bf92e8642f8faf1fa42d42493f26fd13cc646b01b3eee6",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "C",
+        "id": "HOLD-C-02",
+        "prompt_sha256": "b11f47b5d3a0b5828a83f7036e658a41c3b49384714482a1abf1638d3597222e",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "CONJECTURE",
+        "family": "C",
+        "id": "HOLD-C-03",
+        "prompt_sha256": "26ee00cd900189a7d2dbb5dd8fac1e467407c6fb50ad1d0c8bf685e9c027617e",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "KNOWN",
+        "family": "C",
+        "id": "HOLD-C-04",
+        "prompt_sha256": "0dcbccbc39423c4ce25da06bcfbd158c3318289cd4552c5c5b3659de2d0ad23d",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "CONJECTURE",
+        "family": "C",
+        "id": "HOLD-C-05",
+        "prompt_sha256": "b87b596eb0e2e952de212199f2a2c0593493be5e79f46f1d93d7838b1feef849",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "CONJECTURE",
+        "family": "C",
+        "id": "HOLD-C-06",
+        "prompt_sha256": "d3683299a70ecc442a77ede5d299181fdbf171c369b6877e8437073edde49337",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "C",
+        "id": "HOLD-C-07",
+        "prompt_sha256": "c5480236bd205a5e0a16b833ab2cd77106d77dfe9e32b46783e1895beaadb77e",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "CONJECTURE",
+        "family": "C",
+        "id": "HOLD-C-08",
+        "prompt_sha256": "8261f3707839a2448146d9cf5a2312ce6697291265bf5ceb202636772d8e70fc",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "CONJECTURE",
+        "family": "C",
+        "id": "HOLD-C-09",
+        "prompt_sha256": "4795c9968878a134cf7cb690dc2e4f311c5cdcda24cffa182151ca698a908d77",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "C",
+        "id": "HOLD-C-10",
+        "prompt_sha256": "6900911e0566c197427a8a87b0d2d7b0fdaa9f64f5721bf2149fea290c247831",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "C",
+        "id": "HOLD-C-11",
+        "prompt_sha256": "49deef40baeac72094c2fbfa6f42291402a92508ae22713dc1003344d9d2d812",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "C",
+        "id": "HOLD-C-12",
+        "prompt_sha256": "e1ab9336bf03bf0a0320d08da0535cb932ad22da17dd85aa751bf485afeabce4",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "CONJECTURE",
+        "family": "C",
+        "id": "HOLD-C-13",
+        "prompt_sha256": "42bd1a4d2eb2da16561ce574d297697e0b81f543445ab10b7fe733017350918a",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "CONJECTURE",
+        "family": "C",
+        "id": "HOLD-C-14",
+        "prompt_sha256": "043d74d715bda63301a9f3d87779cfd21ea01a2fd1417a619023d2b9889a438e",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "CONJECTURE",
+        "family": "C",
+        "id": "HOLD-C-15",
+        "prompt_sha256": "7d29501af30f7b99765c338b6c409bf211791c05a732d29b7ccc12c6d7805d51",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "C",
+        "id": "HOLD-C-16",
+        "prompt_sha256": "20dc0419af5d13980a5ae5d4aad94c44aa72c949952f886d2bb120bedd961893",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "CONJECTURE",
+        "family": "C",
+        "id": "HOLD-C-17",
+        "prompt_sha256": "84f781439dda20d21606b2d6eba4d049d3e2857cf6c5f0e5de5f7087fcdd5a87",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "C",
+        "id": "HOLD-C-18",
+        "prompt_sha256": "b97ea328f515c47b5daa06e862d7e54ee4739b2eb647ce5d8de574c63d822cda",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "CONJECTURE",
+        "family": "C",
+        "id": "HOLD-C-19",
+        "prompt_sha256": "091b193854c09345f145440f5e8edd8ff20abab17777587d9288cfde51c41743",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "C",
+        "id": "HOLD-C-20",
+        "prompt_sha256": "e4b975ec51ce8beb7886bb91dedabbbad98ba61b3eabd36f2b40c1a56798cd2e",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "CONJECTURE",
+        "family": "C",
+        "id": "HOLD-C-21",
+        "prompt_sha256": "f93c1da27d502fc2c450f5e3ad67e094ca052afb3bd671c4b8de708c0fbcdb93",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "C",
+        "id": "HOLD-C-22",
+        "prompt_sha256": "4d08cfac1740c031d680c0c7df1cc8e6c1ec6db056b56683b0bca706750af339",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "CONJECTURE",
+        "family": "C",
+        "id": "HOLD-C-23",
+        "prompt_sha256": "162c06f7b00ec3ad179e7c7930b0e824e5a35e8f6b4963f02b362a736bce0380",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "VERIFIED",
+        "family": "C",
+        "id": "HOLD-C-24",
+        "prompt_sha256": "d8ca5f342f9e8f86a0306daaea93411b8011ee4306c7c1b25ff5318b5a9d96a1",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-01",
+        "prompt_sha256": "5c5bd9677e44cf5b763f600628a8057cb495c0fa80898be5bcaa96a3105d1fa2",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-02",
+        "prompt_sha256": "64b5aeed892f765dfb151bb312959c75a8154be638f29d9a7597e1f492ec9bb2",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-03",
+        "prompt_sha256": "4c4a79ed4ce2a084d3e2e658f1191d500d06341215325d251f27fd21f961977c",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-04",
+        "prompt_sha256": "0a35d80076151d41896be96e9af027e50205e2b1339d4abc46e1cbf6d6eaaf40",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-05",
+        "prompt_sha256": "15a7546aff028faa695b1a09138bbc6da4f9ae84545f15de906b6a4d0d3fe307",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-06",
+        "prompt_sha256": "5e37fcb29cc617cea9c4496dc0dfef34ac91a3c85873121c16b5e4d51e31cc1e",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-07",
+        "prompt_sha256": "c2fce720956b1997b8441bf8eff638040dad161ae63a265a22be34c5c5fc2ec3",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-08",
+        "prompt_sha256": "3fd457179854090d7a2319407ad7dd060e95767cc2c846dce2c5e693b3ffbf80",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-09",
+        "prompt_sha256": "23d173f77643155d841adc8913278d8a19518c80f68d47837687c912f0d39174",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-10",
+        "prompt_sha256": "dcafc7299731d2b0b919286be7d66a1133656ca56aa340e7f3777f6da14b324a",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-11",
+        "prompt_sha256": "72a876de87ffe7a5f20eb7591537e108dd3397dd0ccb13501bba412e188a47f4",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-12",
+        "prompt_sha256": "d23fcd4ae45db66c03a457514a5001f074d7fbb932de21edb8558a8f81c3b276",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-13",
+        "prompt_sha256": "b8da9848140c932056ec21c354afdf81d9efec4fff26a3d507768773ef7625d1",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-14",
+        "prompt_sha256": "99c9c797805ddc476a613e0df49909e7e5a34f8e5add9b58d5073e593fda0a1e",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-15",
+        "prompt_sha256": "eb4c3490bcd80f76d5aa062783b968cdb0139e855cfdab95ff693d639c5cc388",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-16",
+        "prompt_sha256": "71a672d1f546c430edb255e819edbec9b002163f2c3dfd6b5efa32bb6639b12c",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-17",
+        "prompt_sha256": "ee44dc9436091beeb61c99c19a35cf1643239d296e3529c66004dba2fa1a1295",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-18",
+        "prompt_sha256": "a1784f47980aca7afd9f1412aaefccfa6b33df452f7d70557d278897e92f60e9",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-19",
+        "prompt_sha256": "3e54816fb6fbeb543c752c4604cde4a49f2b18a2c21055b043cd99e45019351d",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-20",
+        "prompt_sha256": "255db5641fcce6e81c76ce10746705708f6fcfcec251224b73dfb7513ee96ec5",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-21",
+        "prompt_sha256": "fbf924680999247294bb3abc6d49c683aeda5290d9fcf81926c474bb9e77466b",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-22",
+        "prompt_sha256": "181b04486becac09c27a076ee72ebb39105c52b6fdfcb80e3c8f9bdb538e5ecb",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-23",
+        "prompt_sha256": "b5a53374248bd456a185be1cadd0a8ed210b396b58f0426c3accf12a8f85010a",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      },
+      {
+        "expected_tier": "PROVEN",
+        "family": "D",
+        "id": "HOLD-D-24",
+        "prompt_sha256": "9adfd5acfcf04c2a5a7907d6b8a65e0589d8f07257454f65ab87cf40de1489ab",
+        "split": "private_holdout",
+        "zone": "formal_proof"
+      }
+    ]
+  },
+  "counts": {
+    "canaries_16": 16,
+    "canaries_by_category": {
+      "domain": 8,
+      "preservation": 8
+    },
+    "general_retention_100": 100,
+    "general_retention_by_domain": {
+      "coding": 35,
+      "math": 35,
+      "reasoning": 20,
+      "refusal": 10
+    },
+    "mixed_by_hazard": {
+      "H1": 5,
+      "H2": 5,
+      "H3": 4,
+      "H4": 4,
+      "H5": 4,
+      "H6": 4,
+      "H7": 4
+    },
+    "mixed_composition_30": 30,
+    "private_holdout": 96,
+    "private_holdout_by_family": {
+      "A": 24,
+      "B": 24,
+      "C": 24,
+      "D": 24
+    },
+    "total_vault_prompts": 242
+  },
+  "file_sha256": {
+    "canaries_16.jsonl": "d6aee4ba30f6a55f6f28f5aefb079be66f53c590cbb61f4a3c19a25d9f9daea8",
+    "general_retention_100.jsonl": "7a4dc93ad9b5f1df8b5149eb14b85f52027186ed4553b22a60c0338b49280f8c",
+    "mixed_composition_30.jsonl": "33effb059b4b1b41b94191fa477bd32ee5f70f6658c50966aa603205fa759465",
+    "private_holdout.jsonl": "4f5eac7fea63b5495896c23820180668d1e4d0a0a0a14297c63bf93419d989e3",
+    "warp_canaries_16.json": "b7d2b812662d63983da440c665ae02057497f1c2c4881c6784c08d058844323e",
+    "warp_canaries_multidomain.json": "b2e8f0006df3a3cb883b641785b77d774fd3171c2b7f0cda1b733c17ff1fb63a"
+  },
+  "schema": "mcproof-vault/public-holdout-commitment/v0.1",
+  "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
+}

@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC11\ndef WeakEdgeColor (cu cv : Nat) : Prop := cu \u2264 1 \u2227 cv \u2264 1\ndef checkEdge2Color (cu cv : Nat) : Bool := ((cu == 0) || (cu == 1)) && ((cv == 0) || (cv == 1)) && (cu != cv)\ntheorem monoZero_meets_weak : WeakEdgeColor 0 0 := by sorry\ntheorem properTwoColor_edge (cu cv : Nat) (h : checkEdge2Color cu cv = true) : (cu = 0 \u2228 cu = 1) \u2227 (cv = 0 \u2228 cv = 1) \u2227 cu \u2260 cv := by sorry\ntheorem monoZero_rejected : checkEdge2Color 0 0 = false := by sorry\nend PubAC11\n",
+  "family": "A",
+  "id": "PUB-A-C11",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC11.properTwoColor_edge",
+  "trap_kind": "weak_statement_vacuous_trap"
+}

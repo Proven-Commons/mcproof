@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C24",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC24\ndef stepLatch (aborted trip : Bool) : Bool := aborted || trip\ntheorem abortLatch_irreversible (aborted trip : Bool) (h : aborted = true) : stepLatch aborted trip = true := by sorry\nend PubDC24\n",
+    "module_title": "LatchTerminal",
+    "positive_lean": "namespace PubDC24\n\ndef stepLatch (aborted trip : Bool) : Bool := aborted || trip\n\ntheorem abortLatch_irreversible (aborted trip : Bool) (h : aborted = true) :\n    stepLatch aborted trip = true := by\n  unfold stepLatch\n  rw [h]\n  rfl\n\nend PubDC24\n",
+    "theorem_names": [
+      "PubDC24.abortLatch_irreversible"
+    ],
+    "verdict_sha": "ecd5051e7891e82d16ba6201c900fa70a3093098"
+  }
+}

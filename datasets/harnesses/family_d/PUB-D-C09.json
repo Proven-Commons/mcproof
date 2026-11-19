@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C09",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC09\ndef flipBit (c : Nat) : Nat := 1 - c\ntheorem flipColor_preserves_diff (c1 c2 : Nat) (h1 : c1 \u2264 1) (h2 : c2 \u2264 1) (hne : c1 \u2260 c2) : flipBit c1 \u2264 1 \u2227 flipBit c2 \u2264 1 \u2227 flipBit c1 \u2260 flipBit c2 := by sorry\nend PubDC09\n",
+    "module_title": "BipartiteFlip",
+    "positive_lean": "namespace PubDC09\n\ndef flipBit (c : Nat) : Nat := 1 - c\n\ntheorem flipColor_preserves_diff (c1 c2 : Nat) (h1 : c1 \u2264 1) (h2 : c2 \u2264 1) (hne : c1 \u2260 c2) :\n    flipBit c1 \u2264 1 \u2227 flipBit c2 \u2264 1 \u2227 flipBit c1 \u2260 flipBit c2 := by\n  unfold flipBit\n  omega\n\nend PubDC09\n",
+    "theorem_names": [
+      "PubDC09.flipColor_preserves_diff"
+    ],
+    "verdict_sha": "4f51b92a3020a43eca03eaf4e09f7b6914339861"
+  }
+}

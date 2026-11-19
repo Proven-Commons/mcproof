@@ -1,0 +1,31 @@
+{
+  "_meta": {
+    "gg.siliconcordat/mde": {
+      "checkpoint_fingerprint": {
+        "chat_template_sha256": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+        "config_sha256": "ddc63e1c717afa86c865bb5e01313d89d72bb53b97ad4a8a03ba8510c0621670",
+        "layout_sha256": "7dbccf0b2961776f1c45b032403ab9b4a59c84569d1e228c30147da20b2cdb08",
+        "model_id": "Qwen/Qwen3.5-4B",
+        "safetensors_provenance_sha256": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
+        "tokenizer_sha256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+        "weights_sha256": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64"
+      },
+      "rollback_state": "bypassed_to_w0",
+      "runtime_flags": {
+        "chat_template_args": "{\"enable_thinking\":false}",
+        "ctx_checkpoints": 0,
+        "ctx_size": 8192,
+        "kv_cache_type": "f16",
+        "llama_server_commit": "7fe450e19",
+        "lora_init_without_apply": true,
+        "quantization": "Q8_0",
+        "rope_args": "",
+        "swa_checkpoints": 0
+      },
+      "runtime_flags_sha256": "df1b49bd87c005bf9d30a5c9487f9328aa302053827e0781d6186517774a691d",
+      "slot_manifest_digest": "4c46b2b8ecc3bc403b815d3be0eebd744610f82b9e57c0af2253117c7fb5c84e",
+      "zone_hint": "formal_proof",
+      "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
+    }
+  }
+}

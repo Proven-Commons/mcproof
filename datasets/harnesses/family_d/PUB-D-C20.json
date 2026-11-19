@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C20",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC20\ndef promiseStep (promised req : Nat) : Nat := Nat.max promised req\ntheorem ballot_never_decreases (promised req : Nat) : promiseStep promised req \u2265 promised \u2227 promiseStep promised req \u2265 req := by sorry\nend PubDC20\n",
+    "module_title": "MonotonicBallot",
+    "positive_lean": "namespace PubDC20\n\ndef promiseStep (promised req : Nat) : Nat := Nat.max promised req\n\ntheorem ballot_never_decreases (promised req : Nat) :\n    promiseStep promised req \u2265 promised \u2227 promiseStep promised req \u2265 req := by\n  unfold promiseStep\n  simp only [Nat.max_def]\n  split <;> omega\n\nend PubDC20\n",
+    "theorem_names": [
+      "PubDC20.ballot_never_decreases"
+    ],
+    "verdict_sha": "5fdf29da757768d50ae9b0f252778bfc3461c06c"
+  }
+}

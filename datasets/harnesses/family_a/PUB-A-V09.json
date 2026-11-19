@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAV09\nstructure Vec3 where\n  x : Int\n  y : Int\n  z : Int\ndef add3 (u v : Vec3) : Vec3 := \u27e8u.x + v.x, u.y + v.y, u.z + v.z\u27e9\ndef dot3 (u v : Vec3) : Int := u.x * v.x + u.y * v.y + u.z * v.z\ntheorem dot3_comm (u v : Vec3) : dot3 u v = dot3 v u := by sorry\ntheorem dot3_bilinear (u v w : Vec3) : dot3 (add3 u v) w = dot3 u w + dot3 v w := by sorry\nend PubAV09\n",
+  "family": "A",
+  "id": "PUB-A-V09",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAV09.dot3_bilinear",
+  "trap_kind": "anti_bypass_algebra"
+}

@@ -1,0 +1,138 @@
+{
+  "checks": {
+    "canaries_16": {
+      "category_counts": {
+        "domain": 8,
+        "preservation": 8
+      },
+      "family_counts": {
+        "A": 2,
+        "B": 2,
+        "C": 2,
+        "D": 2,
+        "safety": 8
+      },
+      "ids": [
+        "CAN-PRES-01",
+        "CAN-PRES-02",
+        "CAN-PRES-03",
+        "CAN-PRES-04",
+        "CAN-PRES-05",
+        "CAN-PRES-06",
+        "CAN-PRES-07",
+        "CAN-PRES-08",
+        "CAN-FORM-A1",
+        "CAN-FORM-A2",
+        "CAN-FORM-B1",
+        "CAN-FORM-B2",
+        "CAN-FORM-C1",
+        "CAN-FORM-C2",
+        "CAN-FORM-D1",
+        "CAN-FORM-D2"
+      ],
+      "total": 16
+    },
+    "compile_split": {
+      "bad_sha256_count": 0,
+      "family_counts": {
+        "A": 24,
+        "B": 24,
+        "C": 24,
+        "D": 24
+      },
+      "missing_field_count": 0,
+      "total": 96,
+      "unique_ids": true,
+      "unique_prompts": true
+    },
+    "datasets_mde_integrity": {
+      "passed": true,
+      "report": {
+        "duplicate_paths": [],
+        "empty_manifest": false,
+        "files_verified": 294,
+        "malformed_lines": [],
+        "manifest": "SHA256SUMS",
+        "manifest_present": true,
+        "manifest_sha256": "be6eb537d0e2685831f6f920a857ceae6d774f74b3f352c3af7feb400498bd3c",
+        "mismatched_files": [],
+        "missing_files": [],
+        "ok": true,
+        "unconfined_paths": [],
+        "unlisted_files": []
+      },
+      "returncode": 0
+    },
+    "general_retention_100": {
+      "total": 100,
+      "unique_ids": true
+    },
+    "hybrid_k0": {
+      "kind_counts": {
+        "seeded_noise": 2048,
+        "y0_anchor": 24
+      },
+      "total": 2072
+    },
+    "mixed_composition_30": {
+      "total": 30,
+      "unique_ids": true
+    },
+    "private_holdout_split": {
+      "bad_sha256_count": 0,
+      "family_counts": {
+        "A": 24,
+        "B": 24,
+        "C": 24,
+        "D": 24
+      },
+      "missing_field_count": 0,
+      "total": 96,
+      "unique_ids": true,
+      "unique_prompts": true
+    },
+    "validation_split": {
+      "bad_sha256_count": 0,
+      "family_counts": {
+        "A": 12,
+        "B": 12,
+        "C": 12,
+        "D": 12
+      },
+      "missing_field_count": 0,
+      "total": 48,
+      "unique_ids": true,
+      "unique_prompts": true
+    },
+    "vault_mde_integrity": {
+      "passed": true,
+      "report": {
+        "duplicate_paths": [],
+        "empty_manifest": false,
+        "files_verified": 22,
+        "malformed_lines": [],
+        "manifest": "SHA256SUMS",
+        "manifest_present": true,
+        "manifest_sha256": "b14cf1efeedf7a7c8c15ed57e587c3d18087f557e6ff1807068c4e9c9ef6f6ee",
+        "mismatched_files": [],
+        "missing_files": [],
+        "ok": true,
+        "unconfined_paths": [],
+        "unlisted_files": []
+      },
+      "returncode": 0
+    },
+    "zero_overlap": {
+      "compile_vs_val_prompt_overlap": 0,
+      "high_similarity_pairs_count": 0,
+      "max_8word_shingle_jaccard": 0.031746,
+      "public_holdout_commitment_clean": true,
+      "public_vs_vault_exact_prompt_overlap": 0,
+      "public_vs_vault_id_overlap": 0,
+      "public_vs_vault_theorem_name_overlap": [],
+      "vault_leaks_in_public_count": 0
+    }
+  },
+  "defects": [],
+  "overall_passed": true
+}

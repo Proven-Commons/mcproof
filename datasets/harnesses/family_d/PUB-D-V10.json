@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-V10",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDV10\ndef swapPeers (p : Nat \u00d7 Nat) : Nat \u00d7 Nat := (p.2, p.1)\ntheorem swap_conserves_sum (p : Nat \u00d7 Nat) : (swapPeers p).1 + (swapPeers p).2 = p.1 + p.2 := by sorry\nend PubDV10\n",
+    "module_title": "TokenPairSwap",
+    "positive_lean": "namespace PubDV10\n\ndef swapPeers (p : Nat \u00d7 Nat) : Nat \u00d7 Nat := (p.2, p.1)\n\ntheorem swap_conserves_sum (p : Nat \u00d7 Nat) : (swapPeers p).1 + (swapPeers p).2 = p.1 + p.2 := by\n  unfold swapPeers\n  omega\n\nend PubDV10\n",
+    "theorem_names": [
+      "PubDV10.swap_conserves_sum"
+    ],
+    "verdict_sha": "76a0f69049cd159073cad875fa9de6a32cf1e274"
+  }
+}

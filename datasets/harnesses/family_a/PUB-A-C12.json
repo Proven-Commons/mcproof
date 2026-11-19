@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC12\ninductive TreeTrace\n  | root : TreeTrace\n  | attachLeaf : TreeTrace \u2192 TreeTrace\ndef numVertices : TreeTrace \u2192 Nat\n  | .root => 1\n  | .attachLeaf t => numVertices t + 1\ndef numEdges : TreeTrace \u2192 Nat\n  | .root => 0\n  | .attachLeaf t => numEdges t + 1\ntheorem tree_vertices_eq_edges_add_one (t : TreeTrace) : numVertices t = numEdges t + 1 := by sorry\nend PubAC12\n",
+  "family": "A",
+  "id": "PUB-A-C12",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC12.tree_vertices_eq_edges_add_one",
+  "trap_kind": "anti_bypass_induction"
+}

@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C06",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC06\ntheorem dvd_diff_of_quot_eq (m q1 q2 r : Nat) (hle : q2 \u2264 q1) : (m * q1 + r) - (m * q2 + r) = m * (q1 - q2) := by sorry\nend PubDC06\n",
+    "module_title": "DivSubSelf",
+    "positive_lean": "namespace PubDC06\n\ntheorem dvd_diff_of_quot_eq (m q1 q2 r : Nat) (hle : q2 \u2264 q1) :\n    (m * q1 + r) - (m * q2 + r) = m * (q1 - q2) := by\n  rw [Nat.mul_sub_left_distrib]\n  have hmul : m * q2 \u2264 m * q1 := Nat.mul_le_mul_left m hle\n  omega\n\nend PubDC06\n",
+    "theorem_names": [
+      "PubDC06.dvd_diff_of_quot_eq"
+    ],
+    "verdict_sha": "7e2e97147e1cd7b02eb2634f6c5d5fcea190a872"
+  }
+}

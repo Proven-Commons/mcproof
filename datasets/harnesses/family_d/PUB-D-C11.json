@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C11",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC11\ntheorem partition_count_sum (p : Nat \u2192 Bool) (xs : List Nat) : (xs.filter p).length + (xs.filter (fun x => !p x)).length = xs.length := by sorry\nend PubDC11\n",
+    "module_title": "FilterPart",
+    "positive_lean": "namespace PubDC11\n\ntheorem partition_count_sum (p : Nat \u2192 Bool) (xs : List Nat) :\n    (xs.filter p).length + (xs.filter (fun x => !p x)).length = xs.length := by\n  induction xs with\n  | nil => rfl\n  | cons x rest ih =>\n    cases hp : p x <;> simp [List.filter, hp] <;> omega\n\nend PubDC11\n",
+    "theorem_names": [
+      "PubDC11.partition_count_sum"
+    ],
+    "verdict_sha": "bb593d6d36a7d99fb58c520f8ad8425c5a6b70df"
+  }
+}

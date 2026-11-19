@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C22",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC22\nstructure Flow where\n  win : Nat\n  credits : Nat\n  inflight : Nat\ndef flowInv (f : Flow) : Prop := f.credits + f.inflight = f.win\ndef onSend (f : Flow) : Flow := if f.credits > 0 then \u27e8f.win, f.credits - 1, f.inflight + 1\u27e9 else f\ndef onAck (f : Flow) : Flow := if f.inflight > 0 then \u27e8f.win, f.credits + 1, f.inflight - 1\u27e9 else f\ntheorem credit_conservation (f : Flow) (h : flowInv f) : flowInv (onSend f) \u2227 flowInv (onAck f) \u2227 (onSend f).inflight \u2264 f.win := by sorry\nend PubDC22\n",
+    "module_title": "CreditFlow",
+    "positive_lean": "namespace PubDC22\n\nstructure Flow where\n  win : Nat\n  credits : Nat\n  inflight : Nat\n\ndef flowInv (f : Flow) : Prop := f.credits + f.inflight = f.win\ndef onSend (f : Flow) : Flow := if f.credits > 0 then \u27e8f.win, f.credits - 1, f.inflight + 1\u27e9 else f\ndef onAck (f : Flow) : Flow := if f.inflight > 0 then \u27e8f.win, f.credits + 1, f.inflight - 1\u27e9 else f\n\ntheorem credit_conservation (f : Flow) (h : flowInv f) :\n    flowInv (onSend f) \u2227 flowInv (onAck f) \u2227 (onSend f).inflight \u2264 f.win := by\n  refine \u27e8?_, ?_, ?_\u27e9\n  \u00b7 unfold onSend; split <;> (simp only [flowInv] at *; omega)\n  \u00b7 unfold onAck; split <;> (simp only [flowInv] at *; omega)\n  \u00b7 unfold onSend; split <;> (simp only [flowInv] at *; omega)\n\nend PubDC22\n",
+    "theorem_names": [
+      "PubDC22.credit_conservation"
+    ],
+    "verdict_sha": "133061b41c0feb319e0108ff6a2d708d21efc5d1"
+  }
+}

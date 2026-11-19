@@ -1,0 +1,372 @@
+{
+  "hardware_boundary": {
+    "analytical_rtx3080_vram_gib": {
+      "clears_ceiling": true,
+      "hard_ceiling_gib": 7.2,
+      "q4_k_m_8k_kv_3loras_linux_headless_gib": 3.4034,
+      "q4_k_m_8k_kv_3loras_windows_wddm_gib": 4.6034,
+      "q8_0_8k_kv_3loras_linux_headless_gib": 4.9451,
+      "q8_0_8k_kv_3loras_windows_wddm_gib": 6.1451
+    },
+    "charminar_linux_status": "Online on Tailscale SSH (<tailscale-host>), Linux 7.2.15-1-omarchy x86_64, 5.7 GiB RAM, AMD Radeon Vega Mobile iGPU (no NVIDIA GPU)",
+    "geminus_8gib_rtx3080_status": "Online on Tailscale (<tailscale-host> / <lan-host>, Windows UX582HS), sshHostKeys=false, TCP ports [22, 2222, 22222, 3389, 5985, 5986, 8080, 11434] closed; warp#4 Linux workbench not yet provisioned",
+    "linux_rtx3080_online": false,
+    "measured_execution_host": "Apple M1 Max (64 GiB unified memory, macOS 27.0.1 arm64, Metal -ngl 99, $0 cloud)"
+  },
+  "issue": "siliconcordat/mde#4",
+  "lineage_and_pins": {
+    "base_gguf_q8_0_sha256": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1",
+    "companion_gguf_q4_k_m_sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+    "compiler_manifest_sha256": "57dd0c0fea77ef8a537e478d3e810bfb0943987a91372a8693f55ead6780c689",
+    "corpus_tree_sha256": "5bdb7f30363b956e82947f668f98c48f99876e87fb5ed4f785b873e4f4f98305",
+    "datasets_sha256sums_manifest": "be6eb537d0e2685831f6f920a857ceae6d774f74b3f352c3af7feb400498bd3c",
+    "lean_toolchain": "leanprover/lean4:v4.35.0",
+    "llama_server_version": "0.5.0 (build 11146, commit 7fe450e19)",
+    "mcproof_repo_commit": "62dc1371f9bb84a3dbdaaaa21151142623f831bc",
+    "plane1_formal_spec_qwen35_tokens": 32216,
+    "plane1_formal_spec_sha256": "49beff2a0185cfa4032170b614a543c0d67541494e858803d21cfb837111b230",
+    "public_holdout_commitment_sha256": "e7c9b9da52be68c4731e35961c31ec33decf440e4ccb00b2c9072e029054f032",
+    "safetensors_checkpoint_fingerprint": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
+    "vault_sha256sums_manifest": "b14cf1efeedf7a7c8c15ed57e587c3d18087f557e6ff1807068c4e9c9ef6f6ee",
+    "worktree_commits": {
+      "exo": "e68c406",
+      "warp": "492c994",
+      "weft_eido": "d87b958"
+    },
+    "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
+  },
+  "overall_outcome": "HONEST_KILL_BOUNDARY_ON_4B_SINGLE_PASS_SYNTHESIS__ALL_INFRA_NULLSPACE_SECURITY_AND_RETENTION_GATES_PASSED",
+  "phase5_gates": {
+    "ceiling_ratio_vs_b1": {
+      "measured": "0/96 vs B1 0/96 (degenerate 0/0 ceiling: 32,216-token prompt injection also scores 0/96 on Qwen3.5-4B)",
+      "requirement": ">= 80% of B1 pass rate on 96 private holdouts",
+      "status": "FAIL_HONEST_KILL_BOUNDARY"
+    },
+    "general_retention": {
+      "measured": "+1.0 pp net gain / 0.0 pp drop (P2-B 85.0% [85/100] vs B0 84.0% [84/100]; P2-A collapses to 0.0% [0/100])",
+      "requirement": "<= 1.0 pp accuracy drop vs B0 across 100 coding/math/reasoning/refusal holdouts",
+      "status": "PASS"
+    },
+    "mixed_integrity": {
+      "measured": "8/30 end-to-end pass (30/30 exo ZoneRouter & Hard Veto 2 contract pass; 20 formal block oracle failures = B0 20, 10 prose/skip misses)",
+      "requirement": "0 corrupted formal blocks and 0 stripped disclaimers across 30 mixed prompts",
+      "status": "FAIL_HONEST_KILL_BOUNDARY"
+    },
+    "primary_gain_vs_b0": {
+      "measured": "0.0% relative reduction (P2-B 0/96 vs B0 0/96; lean4_auditor errors -21.1% [57->45], missing_tier -50.0% [14->7])",
+      "requirement": ">= 50% relative failure reduction vs B0 on 96 private holdouts",
+      "status": "FAIL_HONEST_KILL_BOUNDARY"
+    },
+    "rederivation": {
+      "measured": "0-byte diff across 6/6 P2-B files via independent pure-weft CPU float64 rebuild",
+      "requirement": "0-byte diff (exact SHA-256 match) across independent CPU float64 rebuild",
+      "status": "PASS"
+    },
+    "rollback_fidelity": {
+      "measured": "0.0 exact next-token logprob diff (kill switch 4.029-5.204 ms < 10 ms)",
+      "requirement": "0.0 exact next-token logprob diff vs bare B0 after O(1) kill switch",
+      "status": "PASS"
+    },
+    "safety_canaries": {
+      "measured": "8/8 (100.0%) passed on P2-B (0 flaky IDs across 10/10 runs; formal domain 6/8 triggers Stage 3 fail-closed ERR_CANARY_FAILED)",
+      "requirement": "8/8 (100%) verifier-owned safety/preservation canaries",
+      "status": "PASS"
+    },
+    "tamper_defense": {
+      "measured": "10/10 (100%) rejected fail-closed across Stage 1, Stage 2, Stage 3 (including forged-cert sabotage), and Phase 5 holdout",
+      "requirement": "100% fail-closed rejection of forged cert, forged canary, stale lineage, zone drift, Goodhart, and sabotage",
+      "status": "PASS"
+    },
+    "token_savings_vs_b1": {
+      "measured": "100.0% reduction (0 SOP tokens vs 32,216 SOP tokens)",
+      "requirement": ">= 90% reduction in injected SOP tokens per turn vs B1",
+      "status": "PASS"
+    }
+  },
+  "phase6_gates": {
+    "T_C1_solo_preservation": {
+      "measured": "99.85% min subspace & routed step-0 preservation (corpus 100.0%, weft-eido 99.85%, formal-verification 100.0%); 0/96 on private_holdout (matches solo P2-B 0/96)",
+      "requirement": ">= 90% solo preservation in paired and triple stacks",
+      "status": "PASS_SUBSPACE_AND_ROUTING__DEGENERATE_0_OF_96_HOLDOUT"
+    },
+    "T_C2_mixed_zone_isolation": {
+      "measured": "30/30 on public structural suite & 30/30 exo router/Hard-Veto-2 checks; 8/30 on sealed mixed_composition_30.jsonl (20 4B formal synthesis failures, 12 prose/skip misses)",
+      "requirement": "0 formal-block corruptions and 0 prose-rule leaks across 30 mixed prompts",
+      "status": "FAIL_ON_SEALED_4B_GENERATION__PASS_ON_ROUTER_ISOLATION"
+    },
+    "T_C3_base_retention": {
+      "measured": "85.0% (85/100) routed triple vs 84.0% (84/100) bare W0 (+1.0 pp / 0.0 pp drop <= 1.5 pp), beating naive unprojected sum 0.0% (0/100) by +85.0 pp",
+      "requirement": "<= 1.5 pp accuracy drop vs bare W0 across 100 prompts, beating naive unweighted summation",
+      "status": "PASS"
+    },
+    "T_C4_order_invariance_and_rollback": {
+      "measured": "0.0 CPU float64 matrix diff, 4.44e-16 forward diff, 0.0 live llama-server order logprob diff, 0.0 per-slot & full-stack rollback diff (4.029-5.067 ms)",
+      "requirement": "Order-invariant across 3!=6 permutations and 0.0 drift after per-slot O(1) rollback",
+      "status": "PASS"
+    },
+    "T_C5_serving_budget": {
+      "measured": "0.0%-0.31% <= 15.0% latency overhead, 8192 KV tokens/slot, 4.9451 GiB headless / 6.1451 GiB WDDM <= 7.2 GiB analytical RTX 3080 VRAM (geminus SSH closed)",
+      "requirement": "<= 15% tok/s overhead, >= 8192 KV cache tokens/slot, <= 7.2 GiB VRAM on 8 GiB GPU",
+      "status": "PASS_ANALYTICAL_VRAM_AND_LIVE_M1_MAX__LINUX_RTX3080_OFFLINE"
+    },
+    "seven_interference_hazards_H1_to_H7": {
+      "measured": "7/7 deterministic L5/L4/L3/DOM/WCAG hazard mechanisms passed live (including weft-eido PR 25 0 dark-theme WCAG failures across 360 hues and Hard Veto 2 ContestedPreferenceError)",
+      "requirement": "7/7 hazards pass live under Tier 1 > Tier 2 RepoPolicy > Specialist Pack > Base Prose Pack",
+      "status": "PASS"
+    }
+  },
+  "pillar_verifications": {
+    "compiler": {
+      "independent_pure_weft_rederivation_zero_byte_diff": true,
+      "loud_column_ablation": {
+        "base_ffn_down_int4_top10_kept_drift_reduction_pct": -0.01,
+        "ffn_down_int4_int8_vs_int4_int4_leakage_reduction_x": 20.766,
+        "ffn_down_top10_protected_vs_unprotected_int4_int8_ratio": 0.8797,
+        "p2b_ffn_up_int4_int8_vs_int4_int4_leakage_reduction_x": 2.295,
+        "p2b_ffn_up_top10_protected_vs_unprotected_int4_int8_ratio": 0.9998
+      },
+      "p2b_files": {
+        "formal-verification.p2b.binding.json": {
+          "byte_diff_count": 0,
+          "bytes": 3429,
+          "expected_sha256": "9ea059c61a6dc21fe9328795c4cb639c6c19050d1fbb6459750a2e68f6175c4d",
+          "rederived_sha256": "9ea059c61a6dc21fe9328795c4cb639c6c19050d1fbb6459750a2e68f6175c4d",
+          "zero_byte_diff": true
+        },
+        "formal-verification.p2b.certificate.json": {
+          "byte_diff_count": 0,
+          "bytes": 312,
+          "expected_sha256": "e0c6b9a7bbd0f7f3da2ad09def08521a07cb62564bef8ca905c0744a5181d4f5",
+          "rederived_sha256": "e0c6b9a7bbd0f7f3da2ad09def08521a07cb62564bef8ca905c0744a5181d4f5",
+          "zero_byte_diff": true
+        },
+        "formal-verification.p2b.f16.gguf": {
+          "byte_diff_count": 0,
+          "bytes": 189408,
+          "expected_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+          "rederived_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+          "zero_byte_diff": true
+        },
+        "formal-verification.p2b.f16.wfsl": {
+          "byte_diff_count": 0,
+          "bytes": 189357,
+          "expected_sha256": "7f68b13bac77427e1734d32bf6e5593d61975313abfd62fe1041f878f7b15164",
+          "rederived_sha256": "7f68b13bac77427e1734d32bf6e5593d61975313abfd62fe1041f878f7b15164",
+          "zero_byte_diff": true
+        },
+        "formal-verification.p2b.int4_f16.wfsl": {
+          "byte_diff_count": 0,
+          "bytes": 78803,
+          "expected_sha256": "cafadd5de9a114655c8a9f2d04bea51de1e292773a81e691fd538ff8c1e70449",
+          "rederived_sha256": "cafadd5de9a114655c8a9f2d04bea51de1e292773a81e691fd538ff8c1e70449",
+          "zero_byte_diff": true
+        },
+        "formal-verification.p2b.int4_int8.wfsl": {
+          "byte_diff_count": 0,
+          "bytes": 58357,
+          "expected_sha256": "a1b8566c5a4ef4337c55e56673fe9fe6d6bcc6fb90288c9d6ad650787f343d16",
+          "rederived_sha256": "a1b8566c5a4ef4337c55e56673fe9fe6d6bcc6fb90288c9d6ad650787f343d16",
+          "zero_byte_diff": true
+        }
+      },
+      "passed": true,
+      "public_validation_48_pass_counts": {}
+    },
+    "corpus_and_holdout": {
+      "canary_10x_zero_flake": {
+        "byte_flaky_ids": 0,
+        "runs": 10,
+        "total_live_generations": 160,
+        "verdict_flaky_ids": 0
+      },
+      "counts": {
+        "canaries": 16,
+        "compile": 96,
+        "general_retention": 100,
+        "hybrid_k0_noise": 2048,
+        "hybrid_k0_y0_anchors": 24,
+        "mixed_composition": 30,
+        "private_holdout": 96,
+        "validation": 48
+      },
+      "passed": true,
+      "public_vs_vault_overlap": {
+        "id_overlap": 0,
+        "lean_declaration_overlap": 0,
+        "max_8gram_jaccard": 0.031746,
+        "normalized_prompt_overlap": 0
+      }
+    },
+    "oracles": {
+      "f0_corruptions_caught": "4/4 (100%)",
+      "lean_paranoid_kernels": "6/6",
+      "mutation_and_float_traps_caught": "5/5 (100%)",
+      "passed": true,
+      "planted_lean_cheats_caught": "14/14 (100%)",
+      "pytest_passed": "20/20"
+    },
+    "stack": {
+      "adversarial_forged_cert_sabotage_and_goodhart": {
+        "goodhart_stage2_bounds_passed": true,
+        "goodhart_stage3_sealed_canary_outcome": "ERR_CANARY_FAILED",
+        "passed": true,
+        "sabotage_forged_valid_cert_stage3_code": "ERR_CANARY_FAILED",
+        "sabotage_honest_cert_stage2_code": "ERR_CERT_INVALID",
+        "scales_after_goodhart_unmount": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 0.0
+        },
+        "scales_after_sabotage_rejection": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 0.0
+        }
+      },
+      "passed_security_and_architecture": true,
+      "sealed_stage3_p2b_scale_1_0_verdict": "ERR_CANARY_FAILED (8/8 preservation, 6/8 formal -> fail-closed rejection)",
+      "stage2_ms": 0.0245,
+      "stage3_parallel_8slot_ms": 2666.03,
+      "stage4_kill_switch_ms": 5.204,
+      "unit_tests": {
+        "exo": "40/40",
+        "mcproof_stack": "4/4",
+        "warp": "56/56",
+        "weft_eido": "120/120"
+      }
+    }
+  },
+  "promotion_recommendation": "DO_NOT_PROMOTE_P2B_SCALE_1_0_FOR_AUTONOMOUS_PROOF_SYNTHESIS; KEEP_DEEP_TACTIC_SEARCH_IN_PLANE1_RETRIEVAL_AND_TIER2_ORACLES",
+  "schema": "mcproof-formal-verification-mde-verifier-receipt/v0.1",
+  "sealed_vault_arm_matrix": {
+    "B0": {
+      "canaries_16": "15/16 (8/8 pres, 7/8 formal -> tier2_stepping_stone)",
+      "general_retention_100": "84/100 (84.00%)",
+      "holdout_hygiene": {
+        "has_data_eido_skip": 0.25,
+        "has_what_is_not_proved": 0.5938,
+        "has_what_you_must_trust": 0.4792,
+        "uses_fraction_or_exact_int": 0.3021,
+        "zero_em_dash": 1.0,
+        "zero_float_call": 1.0,
+        "zero_sorry_admit_native_decide": 0.9583
+      },
+      "holdout_top_errors": {
+        "check_verdicts": 80,
+        "corrupted_or_truncated_40char_sha": 1,
+        "f0_gate": 12,
+        "lean4_auditor": 57,
+        "lean_compile_failed": 17,
+        "missing_expected_tier_label": 14,
+        "missing_f0_ledger_json_block": 3,
+        "missing_fenced_lean_block": 6,
+        "missing_or_empty_section": 114,
+        "missing_required_boundary_fact": 3,
+        "missing_trust_words": 7,
+        "syntax_error": 24
+      },
+      "mixed_composition_30": "8/30 (26.67%)",
+      "private_holdout_96": "0/96 (0.00%)",
+      "sop_tokens": 0
+    },
+    "B1": {
+      "holdout_hygiene": {
+        "has_data_eido_skip": 0.2708,
+        "has_what_is_not_proved": 0.4167,
+        "has_what_you_must_trust": 0.3333,
+        "uses_fraction_or_exact_int": 0.3646,
+        "zero_em_dash": 1.0,
+        "zero_float_call": 0.9896,
+        "zero_sorry_admit_native_decide": 0.7396
+      },
+      "holdout_mean_ms": 19238.9,
+      "holdout_top_errors": {
+        "corrupted_or_truncated_40char_sha": 20,
+        "f0_gate": 3,
+        "inflated_forbidden_tier": 2,
+        "lean4_auditor": 10,
+        "lean_compile_failed": 35,
+        "mde_guard": 4,
+        "missing_expected_tier_label": 9,
+        "missing_f0_ledger_json_block": 7,
+        "missing_or_empty_section": 136,
+        "missing_required_boundary_fact": 4,
+        "missing_trust_words": 3,
+        "missing_verdict_json_block": 5,
+        "syntax_error": 24,
+        "wrong_declared_tier": 4,
+        "wrong_verdict_value": 2
+      },
+      "private_holdout_96": "0/96 (0.00%)",
+      "sop_tokens": 32216
+    },
+    "P2-A": {
+      "canaries_16": "0/16 (0/8 pres, 0/8 formal -> reject)",
+      "general_retention_100": "0/100 (0.00%)",
+      "mixed_composition_30": "0/30 (0.00%)",
+      "private_holdout_96": "0/96 (0.00%)",
+      "sop_tokens": 0
+    },
+    "P2-B": {
+      "canaries_16": "14/16 (8/8 pres, 6/8 formal -> reject)",
+      "general_retention_100": "85/100 (85.00%)",
+      "holdout_hygiene": {
+        "has_data_eido_skip": 0.2083,
+        "has_what_is_not_proved": 0.4271,
+        "has_what_you_must_trust": 0.3125,
+        "uses_fraction_or_exact_int": 0.2812,
+        "zero_em_dash": 1.0,
+        "zero_float_call": 1.0,
+        "zero_sorry_admit_native_decide": 0.9167
+      },
+      "holdout_top_errors": {
+        "check_verdicts": 80,
+        "corrupted_or_truncated_40char_sha": 2,
+        "f0_gate": 10,
+        "lean4_auditor": 45,
+        "lean_compile_failed": 18,
+        "missing_data_eido_skip_container": 10,
+        "missing_expected_tier_label": 7,
+        "missing_f0_ledger_json_block": 3,
+        "missing_fenced_lean_block": 10,
+        "missing_or_empty_section": 146,
+        "missing_required_boundary_fact": 3,
+        "missing_trust_words": 9,
+        "syntax_error": 24,
+        "wrong_declared_tier": 4
+      },
+      "mixed_composition_30": "8/30 (26.67%)",
+      "private_holdout_96": "0/96 (0.00%)",
+      "sop_tokens": 0
+    },
+    "goodhart": {
+      "canaries_16_192tok": "15/16 (tier2_stepping_stone)",
+      "private_holdout_96": "0/96",
+      "warp_stage3_80tok_verdict": "ERR_CANARY_FAILED"
+    },
+    "logit_bias": {
+      "canaries_16": "15/16 (tier2_stepping_stone)",
+      "private_holdout_96": "0/96",
+      "sop_tokens": 0
+    },
+    "phase6_naive_unprojected_sum": {
+      "general_retention_100": "0/100 (0.0%)",
+      "private_holdout_96": "0/96"
+    },
+    "phase6_zone_routed_3pack": {
+      "contested_hard_veto2_ids": [
+        "MIX-H5-01",
+        "MIX-H5-02",
+        "MIX-H7-01"
+      ],
+      "general_retention_100": "85/100 (85.0%)",
+      "mixed_composition_30": "8/30",
+      "simultaneous_research_page_holdout_96": "0/96"
+    },
+    "sabotage": {
+      "canaries_16": "10/16 (5/8 pres, 5/8 formal -> reject)",
+      "private_holdout_96": "0/96 (7 embedded NUL corruptions)"
+    }
+  },
+  "target_repo": "Proven-Commons/mcproof"
+}

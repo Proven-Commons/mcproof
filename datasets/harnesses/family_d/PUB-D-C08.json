@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C08",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC08\ndef choose1 : Nat \u2192 Nat\n  | 0 => 0\n  | n + 1 => 1 + choose1 n\ntheorem choose_one_right (n : Nat) : choose1 n = n := by sorry\nend PubDC08\n",
+    "module_title": "BinomOne",
+    "positive_lean": "namespace PubDC08\n\ndef choose1 : Nat \u2192 Nat\n  | 0 => 0\n  | n + 1 => 1 + choose1 n\n\ntheorem choose_one_right (n : Nat) : choose1 n = n := by\n  induction n with\n  | zero => rfl\n  | succ m ih =>\n    simp only [choose1, ih]\n    omega\n\nend PubDC08\n",
+    "theorem_names": [
+      "PubDC08.choose_one_right"
+    ],
+    "verdict_sha": "d8b67bc35b36f8ee5590d7ad7afd6d74b660560a"
+  }
+}

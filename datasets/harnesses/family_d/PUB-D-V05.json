@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-V05",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDV05\ntheorem map_preserves_card (f : Nat \u2192 Nat) (xs : List Nat) : (xs.map f).length = xs.length := by sorry\nend PubDV05\n",
+    "module_title": "MapBijectionLen",
+    "positive_lean": "namespace PubDV05\n\ntheorem map_preserves_card (f : Nat \u2192 Nat) (xs : List Nat) : (xs.map f).length = xs.length := by\n  simp\n\nend PubDV05\n",
+    "theorem_names": [
+      "PubDV05.map_preserves_card"
+    ],
+    "verdict_sha": "b84871e677614ba8c9ed35406d080ee42237a4e9"
+  }
+}

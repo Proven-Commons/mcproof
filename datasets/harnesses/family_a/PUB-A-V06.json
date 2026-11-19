@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAV06\ndef sublists : List Nat \u2192 List (List Nat)\n  | [] => [[]]\n  | x :: xs => let ps := sublists xs; ps ++ ps.map (x :: \u00b7)\ntheorem sublists_length_pow2 (xs : List Nat) : (sublists xs).length = 2 ^ xs.length := by sorry\nend PubAV06\n",
+  "family": "A",
+  "id": "PUB-A-V06",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAV06.sublists_length_pow2",
+  "trap_kind": "anti_bypass_induction"
+}

@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAV05\ndef isStrictInc3 : List Nat \u2192 Bool\n  | [a, b, c] => (a < b) && (b < c)\n  | _ => false\ntheorem vacuous_empty_nonempty : \u00ac (\u2203 xs : List Nat, xs = [] \u2227 xs.length > 0) := by sorry\ntheorem strictPair_nonvacuous (xs : List Nat) (h : isStrictInc3 xs = true) : \u2203 a b c, xs = [a, b, c] \u2227 a < c := by sorry\ntheorem strictInc3_witness : isStrictInc3 [2, 5, 9] = true := by sorry\nend PubAV05\n",
+  "family": "A",
+  "id": "PUB-A-V05",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAV05.strictPair_nonvacuous",
+  "trap_kind": "weak_statement_vacuous_trap"
+}

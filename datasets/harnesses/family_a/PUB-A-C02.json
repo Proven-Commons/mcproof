@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC02\ndef WeakModInv (m a x : Nat) : Prop := m > 1 \u2192 (a * x) % m \u2264 m\ndef zeroInv (_m _a : Nat) : Nat := 0\ndef checkModInv (m a x : Nat) : Bool := (m > 1) && ((a * x) % m == 1)\ntheorem zeroInv_meets_weak (m a : Nat) : WeakModInv m a (zeroInv m a) := by sorry\ntheorem checkModInv_sound (m a x : Nat) (h : checkModInv m a x = true) : m > 1 \u2227 (a * x) % m = 1 := by sorry\ntheorem checkModInv_witness : checkModInv 7 3 5 = true := by sorry\nend PubAC02\n",
+  "family": "A",
+  "id": "PUB-A-C02",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC02.checkModInv_sound",
+  "trap_kind": "weak_statement_vacuous_trap"
+}

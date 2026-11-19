@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C01",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC01\ntheorem mod_add_multiple_cancel (a m q : Nat) : (a + m * q) % m = a % m := by sorry\nend PubDC01\n",
+    "module_title": "ModAddZero",
+    "positive_lean": "namespace PubDC01\n\ntheorem mod_add_multiple_cancel (a m q : Nat) : (a + m * q) % m = a % m := by\n  induction q with\n  | zero => simp\n  | succ k ih =>\n    rw [Nat.mul_succ, \u2190 Nat.add_assoc, Nat.add_mod_right, ih]\n\nend PubDC01\n",
+    "theorem_names": [
+      "PubDC01.mod_add_multiple_cancel"
+    ],
+    "verdict_sha": "3db679d4d44863ebc0198f098f9ffcf147434021"
+  }
+}

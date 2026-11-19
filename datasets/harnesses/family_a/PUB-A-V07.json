@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAV07\ndef imax (a b : Int) : Int := if a \u2265 b then a else b\ndef imin (a b : Int) : Int := if a \u2264 b then a else b\ntheorem interval_inter_nonempty (a1 b1 a2 b2 : Int) : (imax a1 a2 \u2264 imin b1 b2) \u2194 (\u2203 x : Int, (a1 \u2264 x \u2227 x \u2264 b1) \u2227 (a2 \u2264 x \u2227 x \u2264 b2)) := by sorry\nend PubAV07\n",
+  "family": "A",
+  "id": "PUB-A-V07",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAV07.interval_inter_nonempty",
+  "trap_kind": "anti_bypass_algebra"
+}

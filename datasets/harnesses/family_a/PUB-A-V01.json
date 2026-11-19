@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAV01\ndef sumOdd : Nat \u2192 Nat\n  | 0 => 0\n  | n + 1 => sumOdd n + (2 * n + 1)\ntheorem sumOdd_eq_sq (n : Nat) : sumOdd n = n * n := by sorry\nend PubAV01\n",
+  "family": "A",
+  "id": "PUB-A-V01",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAV01.sumOdd_eq_sq",
+  "trap_kind": "anti_bypass_induction"
+}

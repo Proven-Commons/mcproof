@@ -1,0 +1,10 @@
+{
+  "max_frob_sq_den": 100,
+  "max_frob_sq_num": 7520,
+  "max_leakage_den": 1000,
+  "max_leakage_num": 173711,
+  "max_safety_dot_sq_den": 10000,
+  "max_safety_dot_sq_num": 10,
+  "max_spectral_sq_den": 100,
+  "max_spectral_sq_num": 7520
+}

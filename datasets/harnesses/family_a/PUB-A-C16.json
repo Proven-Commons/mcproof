@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC16\ntheorem cramer2_offdiag_zero (a b c d : Int) : a * (-b) + b * a = 0 \u2227 c * d + d * (-c) = 0 := by sorry\ntheorem cramer2_diag_eq (a b c d : Int) : a * d + b * (-c) = d * a + (-b) * c := by sorry\nend PubAC16\n",
+  "family": "A",
+  "id": "PUB-A-C16",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC16.cramer2_offdiag_zero",
+  "trap_kind": "anti_bypass_algebra"
+}

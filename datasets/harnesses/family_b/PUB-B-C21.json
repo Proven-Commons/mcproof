@@ -1,0 +1,297 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    n = inst['num_nodes']\n    vmap = {v['node']: v['vote'] for v in inst['votes']}\n    yc = sum(1 for i in range(n) if vmap.get(i) == 'YES')\n    dec = 'COMMIT' if (not inst['timeout'] and yc == n and len(vmap) == n) else 'ABORT'\n    return {'decision': dec, 'node_states': [dec] * n, 'yes_count': yc}\n",
+  "id": "PUB-B-C21",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "num_nodes": 3,
+          "timeout": false,
+          "votes": [
+            {
+              "node": 0,
+              "vote": "YES"
+            },
+            {
+              "node": 1,
+              "vote": "YES"
+            }
+          ]
+        },
+        {
+          "decision": "COMMIT",
+          "node_states": [
+            "COMMIT",
+            "COMMIT",
+            "COMMIT"
+          ],
+          "yes_count": 2
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c21_mut_1"
+    },
+    {
+      "args": [
+        {
+          "num_nodes": 3,
+          "timeout": true,
+          "votes": [
+            {
+              "node": 0,
+              "vote": "YES"
+            },
+            {
+              "node": 1,
+              "vote": "YES"
+            },
+            {
+              "node": 2,
+              "vote": "YES"
+            }
+          ]
+        },
+        {
+          "decision": "COMMIT",
+          "node_states": [
+            "COMMIT",
+            "COMMIT",
+            "COMMIT"
+          ],
+          "yes_count": 3
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c21_mut_2"
+    },
+    {
+      "args": [
+        {
+          "num_nodes": 2,
+          "timeout": false,
+          "votes": [
+            {
+              "node": 0,
+              "vote": "YES"
+            },
+            {
+              "node": 1,
+              "vote": "NO"
+            }
+          ]
+        },
+        {
+          "decision": "ABORT",
+          "node_states": [
+            "COMMIT",
+            "ABORT"
+          ],
+          "yes_count": 1
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c21_mut_3"
+    },
+    {
+      "args": [
+        {
+          "num_nodes": 2,
+          "timeout": false,
+          "votes": [
+            {
+              "node": 0,
+              "vote": "YES"
+            },
+            {
+              "node": 0,
+              "vote": "YES"
+            }
+          ]
+        },
+        {
+          "decision": "COMMIT",
+          "node_states": [
+            "COMMIT",
+            "COMMIT"
+          ],
+          "yes_count": 2
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c21_mut_4"
+    },
+    {
+      "args": [
+        {
+          "num_nodes": 3,
+          "timeout": false,
+          "votes": [
+            {
+              "node": 0,
+              "vote": "YES"
+            },
+            {
+              "node": 1,
+              "vote": "YES"
+            },
+            {
+              "node": 2,
+              "vote": "YES"
+            }
+          ]
+        },
+        {
+          "decision": "ABORT",
+          "node_states": [
+            "ABORT",
+            "ABORT",
+            "ABORT"
+          ],
+          "yes_count": 3
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c21_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "num_nodes": 3,
+          "timeout": false,
+          "votes": [
+            {
+              "node": 0,
+              "vote": "YES"
+            },
+            {
+              "node": 1,
+              "vote": "YES"
+            },
+            {
+              "node": 2,
+              "vote": "YES"
+            }
+          ]
+        },
+        {
+          "decision": "COMMIT",
+          "node_states": [
+            "COMMIT",
+            "COMMIT",
+            "COMMIT"
+          ],
+          "yes_count": 3
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "num_nodes": 3,
+          "timeout": false,
+          "votes": [
+            {
+              "node": 0,
+              "vote": "YES"
+            },
+            {
+              "node": 1,
+              "vote": "YES"
+            }
+          ]
+        },
+        {
+          "decision": "ABORT",
+          "node_states": [
+            "ABORT",
+            "ABORT",
+            "ABORT"
+          ],
+          "yes_count": 2
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "num_nodes": 3,
+          "timeout": true,
+          "votes": [
+            {
+              "node": 0,
+              "vote": "YES"
+            },
+            {
+              "node": 1,
+              "vote": "YES"
+            },
+            {
+              "node": 2,
+              "vote": "YES"
+            }
+          ]
+        },
+        {
+          "decision": "ABORT",
+          "node_states": [
+            "ABORT",
+            "ABORT",
+            "ABORT"
+          ],
+          "yes_count": 3
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "num_nodes": 2,
+          "timeout": false,
+          "votes": [
+            {
+              "node": 0,
+              "vote": "YES"
+            },
+            {
+              "node": 1,
+              "vote": "NO"
+            }
+          ]
+        },
+        {
+          "decision": "ABORT",
+          "node_states": [
+            "ABORT",
+            "ABORT"
+          ],
+          "yes_count": 1
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "num_nodes": 1,
+          "timeout": true,
+          "votes": []
+        },
+        {
+          "decision": "ABORT",
+          "node_states": [
+            "ABORT"
+          ],
+          "yes_count": 0
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

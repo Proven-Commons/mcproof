@@ -1,0 +1,10 @@
+name: bar
+
+on:
+  push:
+  pull_request:
+  pull_request_review:
+
+jobs:
+  bar:
+    uses: Proven-Commons/mission/.github/workflows/verified-bar.yml@main

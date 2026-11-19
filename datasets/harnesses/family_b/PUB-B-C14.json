@@ -1,0 +1,341 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "from fractions import Fraction\ndef propose_cert(inst: dict) -> dict:\n    A, b = inst['A'], inst['b']\n    m, n = len(A), len(A[0])\n    for c0 in range(-4, 5):\n        for c1 in range(-4, 5):\n            y = [Fraction(c0 if i == 0 else c1, 1) for i in range(m)]\n            if sum(y[i] * b[i] for i in range(m)) < 0 and all(sum(y[i] * A[i][j] for i in range(m)) >= 0 for j in range(n)):\n                return {'y': [[v.numerator, v.denominator] for v in y]}\n    raise ValueError('no small Farkas witness')\n",
+  "id": "PUB-B-C14",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "b": [
+            2,
+            3
+          ]
+        },
+        {
+          "y": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c14_mut_1"
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "b": [
+            2,
+            3
+          ]
+        },
+        {
+          "y": [
+            [
+              -2,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c14_mut_2"
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              4
+            ]
+          ],
+          "b": [
+            5,
+            9
+          ]
+        },
+        {
+          "y": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c14_mut_3"
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "b": [
+            2,
+            3
+          ]
+        },
+        {
+          "y": [
+            [
+              2,
+              2
+            ],
+            [
+              -1,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c14_mut_4"
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              0,
+              1
+            ],
+            [
+              0,
+              1,
+              1
+            ]
+          ],
+          "b": [
+            -1,
+            2
+          ]
+        },
+        {
+          "y": [
+            [
+              1,
+              -1
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c14_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ],
+          "b": [
+            2,
+            3
+          ]
+        },
+        {
+          "y": [
+            [
+              1,
+              1
+            ],
+            [
+              -1,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              4
+            ]
+          ],
+          "b": [
+            5,
+            9
+          ]
+        },
+        {
+          "y": [
+            [
+              -4,
+              1
+            ],
+            [
+              2,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              0,
+              1
+            ],
+            [
+              0,
+              1,
+              1
+            ]
+          ],
+          "b": [
+            -1,
+            2
+          ]
+        },
+        {
+          "y": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              2,
+              3
+            ],
+            [
+              -1,
+              -1
+            ]
+          ],
+          "b": [
+            1,
+            -1
+          ]
+        },
+        {
+          "y": [
+            [
+              1,
+              1
+            ],
+            [
+              2,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              1,
+              1
+            ]
+          ],
+          "b": [
+            -2
+          ]
+        },
+        {
+          "y": [
+            [
+              1,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

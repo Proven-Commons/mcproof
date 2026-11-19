@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-V11",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDV11\ntheorem strict_maj_sum_gt (n q1 q2 : Nat) (h1 : 2 * q1 > n) (h2 : 2 * q2 > n) : q1 + q2 > n := by sorry\nend PubDV11\n",
+    "module_title": "QuorumMaj",
+    "positive_lean": "namespace PubDV11\n\ntheorem strict_maj_sum_gt (n q1 q2 : Nat) (h1 : 2 * q1 > n) (h2 : 2 * q2 > n) : q1 + q2 > n := by\n  omega\n\nend PubDV11\n",
+    "theorem_names": [
+      "PubDV11.strict_maj_sum_gt"
+    ],
+    "verdict_sha": "72a4f7516ab09f4a63d810bfaeb3d282afe21956"
+  }
+}

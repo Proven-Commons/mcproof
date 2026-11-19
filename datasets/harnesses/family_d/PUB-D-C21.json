@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C21",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC21\ndef checkFence (minToken writeToken : Nat) : Bool := writeToken \u2265 minToken\ntheorem fence_write_sound (minToken writeToken : Nat) (h : checkFence minToken writeToken = true) : writeToken \u2265 minToken := by sorry\nend PubDC21\n",
+    "module_title": "EpochFence",
+    "positive_lean": "namespace PubDC21\n\ndef checkFence (minToken writeToken : Nat) : Bool := writeToken \u2265 minToken\n\ntheorem fence_write_sound (minToken writeToken : Nat)\n    (h : checkFence minToken writeToken = true) : writeToken \u2265 minToken := by\n  unfold checkFence at h\n  simp only [decide_eq_true_eq] at h\n  exact h\n\nend PubDC21\n",
+    "theorem_names": [
+      "PubDC21.fence_write_sound"
+    ],
+    "verdict_sha": "060ab6a523594607c1a5e63774f0d037e3efb8bf"
+  }
+}

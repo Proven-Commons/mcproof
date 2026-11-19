@@ -1,0 +1,14 @@
+{
+  "expected_tier": "CONJECTURE",
+  "family": "C",
+  "id": "PUB-C-C09",
+  "oracle_type": "verdict_audit",
+  "spec_meta": {
+    "expected_axioms": [
+      "propext"
+    ],
+    "expected_verdict": "weaker",
+    "source_commit": "f26136f9722272284ca1cf08a8163596c49ee69d",
+    "verdict_id": "audit-comb-pigeon-vacuous"
+  }
+}

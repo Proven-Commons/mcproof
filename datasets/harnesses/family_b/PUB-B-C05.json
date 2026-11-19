@@ -1,0 +1,290 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    a, b, c, lo, hi = inst['a'], inst['b'], inst['c'], inst['x_lo'], inst['x_hi']\n    r0, r1, s0, s1, t0, t1 = a, b, 1, 0, 0, 1\n    while r1:\n        q = r0 // r1\n        r0, r1, s0, s1, t0, t1 = r1, r0 - q * r1, s1, s0 - q * s1, t1, t0 - q * t1\n    sols = []\n    for x in range(lo, hi + 1):\n        rem = c - a * x\n        if rem % b == 0:\n            sols.append([x, rem // b])\n    return {'gcd': r0, 'bezout_u': s0, 'bezout_v': t0, 'solutions': sols}\n",
+  "id": "PUB-B-C05",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "a": 6,
+          "b": 9,
+          "c": 15,
+          "x_hi": 10,
+          "x_lo": -10
+        },
+        {
+          "bezout_u": -1,
+          "bezout_v": 1,
+          "gcd": 3,
+          "solutions": []
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c05_mut_1"
+    },
+    {
+      "args": [
+        {
+          "a": 6,
+          "b": 9,
+          "c": 7,
+          "x_hi": 10,
+          "x_lo": -10
+        },
+        {
+          "bezout_u": 0,
+          "bezout_v": 0,
+          "gcd": 1,
+          "solutions": []
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c05_mut_2"
+    },
+    {
+      "args": [
+        {
+          "a": 4,
+          "b": 7,
+          "c": 1,
+          "x_hi": 20,
+          "x_lo": 0
+        },
+        {
+          "bezout_u": 2,
+          "bezout_v": -1,
+          "gcd": 1,
+          "solutions": [
+            [
+              2,
+              -1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c05_mut_3"
+    },
+    {
+      "args": [
+        {
+          "a": 10,
+          "b": 15,
+          "c": 25,
+          "x_hi": 5,
+          "x_lo": -5
+        },
+        {
+          "bezout_u": -1,
+          "bezout_v": 1,
+          "gcd": 5,
+          "solutions": [
+            [
+              -2,
+              3
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              4,
+              0
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c05_mut_4"
+    },
+    {
+      "args": [
+        {
+          "a": 4,
+          "b": 7,
+          "c": 1,
+          "x_hi": 20,
+          "x_lo": 0
+        },
+        {
+          "bezout_u": 2,
+          "bezout_v": -1,
+          "gcd": 1,
+          "solutions": [
+            [
+              9,
+              -5
+            ],
+            [
+              2,
+              -1
+            ],
+            [
+              16,
+              -9
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c05_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "a": 6,
+          "b": 9,
+          "c": 15,
+          "x_hi": 10,
+          "x_lo": -10
+        },
+        {
+          "bezout_u": -1,
+          "bezout_v": 1,
+          "gcd": 3,
+          "solutions": [
+            [
+              -8,
+              7
+            ],
+            [
+              -5,
+              5
+            ],
+            [
+              -2,
+              3
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              4,
+              -1
+            ],
+            [
+              7,
+              -3
+            ],
+            [
+              10,
+              -5
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 6,
+          "b": 9,
+          "c": 7,
+          "x_hi": 10,
+          "x_lo": -10
+        },
+        {
+          "bezout_u": -1,
+          "bezout_v": 1,
+          "gcd": 3,
+          "solutions": []
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 4,
+          "b": 7,
+          "c": 1,
+          "x_hi": 20,
+          "x_lo": 0
+        },
+        {
+          "bezout_u": 2,
+          "bezout_v": -1,
+          "gcd": 1,
+          "solutions": [
+            [
+              2,
+              -1
+            ],
+            [
+              9,
+              -5
+            ],
+            [
+              16,
+              -9
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 10,
+          "b": 15,
+          "c": 25,
+          "x_hi": 5,
+          "x_lo": -5
+        },
+        {
+          "bezout_u": -1,
+          "bezout_v": 1,
+          "gcd": 5,
+          "solutions": [
+            [
+              -5,
+              5
+            ],
+            [
+              -2,
+              3
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              4,
+              -1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 8,
+          "b": 5,
+          "c": 3,
+          "x_hi": 3,
+          "x_lo": 1
+        },
+        {
+          "bezout_u": 2,
+          "bezout_v": -3,
+          "gcd": 1,
+          "solutions": [
+            [
+              1,
+              -1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}
