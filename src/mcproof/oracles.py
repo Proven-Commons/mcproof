@@ -16,6 +16,7 @@ from typing import Any, Mapping, Sequence
 from .lean_harness import verify_lean4_project_comparator, verify_lean4_source
 from .lineage import canonical_json_bytes, verify_lineage_manifest
 from .mutation import (
+    audit_exact_checker_ast,
     run_candidate_python_confined,
     run_checker_mutation_suite,
     run_f0_gate_and_corruptions,
@@ -168,10 +169,11 @@ def run_lean4_oracle(
             timeout_sec=timeout_sec,
         )
 
+    status_str = "PROVEN" if res.passed else ("INCOMPLETE_HOST_LIMIT" if res.host_resource_exhausted else "REJECTED")
     return OracleReceipt.create(
         oracle="lean4",
         passed=res.passed,
-        epistemic_status="PROVEN" if res.passed else "REJECTED",
+        epistemic_status=status_str,
         checks=res.to_dict(),
         findings=res.findings,
     )
@@ -294,6 +296,7 @@ def run_checker_oracle(
     planted_mutations: Sequence[Mapping[str, Any]] | None = None,
     strict_exact_math: bool = True,
     force_cargo_run: bool = False,
+    allow_static_lint_only: bool = False,
 ) -> OracleReceipt:
     """Audit a Python exact-math checker with soko checker_auditor, mde guard --code-audit, python3 -O -B -W error, and >= 80% mutation kill floor."""
     checker_mod = _load_dep_module("soko", "soko_mcp/checker_auditor.py", "soko_checker_auditor")
@@ -337,14 +340,48 @@ def run_checker_oracle(
                 "message": str(f["detail"]),
             })
 
-    # Explicitly scan for `float(` calls in exact-math checkers (in addition to float literals & `/`)
-    if strict_exact_math and re.search(r"\bfloat\s*\(", checker_source):
-        findings.append({
-            "rule": "FLOAT_COERCION_CALL",
-            "line": 1,
-            "message": "explicit float(...) coercion forbidden in exact int/Fraction checker",
-        })
+    # Fail-closed pure-math AST import/builtin/float/negative-pow allowlist (closes NEON-C1 & NEON-D1)
+    ast_allowlist_findings = audit_exact_checker_ast(checker_source, strict_exact_math=strict_exact_math)
+    seen_rules_lines = {(f.get("rule"), f.get("line", 0)) for f in findings}
+    for af in ast_allowlist_findings:
+        key = (af.get("rule"), af.get("line", 0))
+        if key not in seen_rules_lines:
+            seen_rules_lines.add(key)
+            findings.append(af)
 
+    if strict_exact_math and re.search(r"\bfloat\s*\(", checker_source):
+        if not any(f.get("rule") == "FLOAT_COERCION_CALL" for f in findings):
+            findings.append({
+                "rule": "FLOAT_COERCION_CALL",
+                "line": 1,
+                "message": "explicit float(...) coercion forbidden in exact int/Fraction checker",
+            })
+
+    _SMOKE_GUARD_SCRIPT = (
+        "import bisect, collections, copy, dataclasses, decimal, enum, fractions, functools, "
+        "heapq, itertools, math, numbers, operator, pathlib, re, string, sys, typing, builtins as _b; "
+        "_AL = frozenset({'__future__','bisect','collections','copy','dataclasses','decimal','enum',"
+        "'fractions','functools','heapq','itertools','math','numbers','operator','re','string','typing'}); "
+        "_co = _b.compile(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'), sys.argv[1], 'exec'); "
+        "_m = type(sys)('cand_smoke_mod'); sys.modules['cand_smoke_mod'] = _m; "
+        "_oi = _b.__import__; _sb = dict(_b.__dict__); "
+        "_sb['__import__'] = lambda n, g=None, l=None, f=(), lv=0: (_ for _ in ()).throw(ImportError(n)) "
+        "if (lv and lv > 0) or str(n).split('.')[0] not in _AL else _oi(n, g, l, f, lv); "
+        "[_sb.pop(k, None) for k in ('open','eval','exec','compile','input','breakpoint')]; "
+        "_m.__dict__['__builtins__'] = _sb; "
+        "sys.addaudithook(lambda ev, _a: (_ for _ in ()).throw(PermissionError(ev)) "
+        "if ev in ('open','os.system','os.mkdir','os.remove','os.unlink','os.rmdir','os.rename') "
+        "or ev.startswith(('subprocess.','socket.')) else None); "
+        "_b.exec(_co, _m.__dict__)"
+    )
+
+    non_exec_blocking_rules = {
+        f["rule"]
+        for f in findings
+        if f["rule"] not in ("VACUOUS_CONSTANT_TRUE_RETURN", "bare_assert", "IDENTICAL_ALPHA_SKELETON")
+    }
+
+    strict_import_ok = False
     with tempfile.TemporaryDirectory(prefix="mcproof_chk_") as tmp_str:
         tmp_py = Path(tmp_str) / "checker.py"
         tmp_py.write_text(checker_source, encoding="utf-8")
@@ -355,24 +392,29 @@ def run_checker_oracle(
                 "line": f.get("line", 0),
                 "message": f["message"],
             })
+            if f["rule"] != "bare_assert":
+                non_exec_blocking_rules.add(f["rule"])
 
-        # Verify module imports cleanly under confined `python3 -I -O -B -W error`
-        smoke_proc, _, _ = run_candidate_python_confined(
-            ["-c", "import runpy, sys; runpy.run_path(sys.argv[1])", str(tmp_py)],
-            writable_dir=Path(tmp_str),
-            timeout_sec=30,
-            sandbox_mode="auto",
-        )
-        strict_import_ok = smoke_proc is not None and smoke_proc.returncode == 0
-        if not strict_import_ok:
-            err_msg = "" if smoke_proc is None else (smoke_proc.stderr or smoke_proc.stdout).strip()[:240]
-            findings.append({
-                "rule": "STRICT_PYTHON_IMPORT_ERROR",
-                "message": f"failed under `python3 -I -O -B -W error`: {err_msg}",
-            })
+        # Never execute untrusted candidate Python when security/float/syntax static audit failed,
+        # or when static-lint-only mode already rejected the candidate (NEON-C1).
+        allow_exec = (len(non_exec_blocking_rules) == 0) and (bool(valid_cases) or len(findings) == 0)
+        if allow_exec:
+            smoke_proc, _, _ = run_candidate_python_confined(
+                ["-c", _SMOKE_GUARD_SCRIPT, str(tmp_py)],
+                writable_dir=Path(tmp_str),
+                timeout_sec=30,
+                sandbox_mode="auto",
+            )
+            strict_import_ok = smoke_proc is not None and smoke_proc.returncode == 0
+            if not strict_import_ok:
+                err_msg = "" if smoke_proc is None else (smoke_proc.stderr or smoke_proc.stdout).strip()[:240]
+                findings.append({
+                    "rule": "STRICT_PYTHON_IMPORT_ERROR",
+                    "message": f"failed under `python3 -I -O -B -W error`: {err_msg}",
+                })
 
     mut_dict: dict[str, Any] | None = None
-    if valid_cases:
+    if valid_cases and len(non_exec_blocking_rules) == 0:
         mut_rep = run_checker_mutation_suite(
             checker_source,
             entry_fn=entry_fn,
@@ -382,6 +424,10 @@ def run_checker_oracle(
         mut_dict = mut_rep.to_dict()
         mut_passed = mut_rep.passed
         findings.extend(mut_rep.findings)
+    elif valid_cases:
+        mut_passed = False
+    elif allow_static_lint_only:
+        mut_passed = True
     else:
         findings.append({
             "rule": "MISSING_VALID_CASES",
@@ -396,10 +442,11 @@ def run_checker_oracle(
         and mut_passed
         and len(findings) == 0
     )
+    ok_tier = "LINT_PASS" if (not valid_cases and allow_static_lint_only) else "VERIFIED"
     return OracleReceipt.create(
         oracle="exact_checker",
         passed=passed,
-        epistemic_status="VERIFIED" if passed else "REJECTED",
+        epistemic_status=ok_tier if passed else "REJECTED",
         checks={
             "soko_checker_audit": dual_rep,
             "mde_code_audit_passed": mde_rep.passed,

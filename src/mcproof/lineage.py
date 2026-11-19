@@ -46,6 +46,8 @@ TRACKED_PLANE1_RELPATHS: tuple[str, ...] = (
     "lean/lakefile.toml",
     "lean/comparator.json",
     "lean/Mcproof.lean",
+    "lean/Mcproof/TransitionBounds.lean",
+    "lean/Mcproof/AdapterBounds.lean",
     "lean/Mcproof/Spec.lean",
     "lean/Mcproof/Proofs.lean",
 )

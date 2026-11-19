@@ -162,6 +162,7 @@ def test_vendored_prose_gate_runs_without_home_directory_scripts(
     md_files = [
         r_root / "README.md",
         r_root / "docs" / "CONTINUITY.md",
+        r_root / "docs" / "CROSS_POLLINATION.md",
         r_root / "spec" / "plane1_formal_spec.md",
         r_root / "lean" / "README.md",
         r_root / "lean" / "SPEC.md",

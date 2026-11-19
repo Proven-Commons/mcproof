@@ -178,14 +178,46 @@ def main() -> int:
     verified_hashes["p2b.certificate_file"] = sha256_file(cert_file)
     verified_hashes["p2b.binding_canonical"] = bind_obj.sha256()
     verified_hashes["p2b.binding_file"] = sha256_file(bind_file)
-    bind_res = verify_binding(
-        bind_obj,
-        checkpoint_dir=st_dir,
-        runtime_flags=weft_flags,
-        plane1_root=PLANE1_ROOT,
-        expected_factor_digest=p2b_cert.factor_digest,
-        expected_certificate_sha256=p2b_cert.sha256(),
-    )
+    v01_snap = ART_DIR / "p2b" / "v01_plane1_snapshot"
+    if v01_snap.is_dir():
+        import shutil as _shutil
+        import tempfile as _tempfile
+        with _tempfile.TemporaryDirectory(prefix="mcproof_v01_p1_") as _td:
+            _v01_root = Path(_td)
+            for _sub in ("spec", "schemas", "lean"):
+                _shutil.copytree(PLANE1_ROOT / _sub, _v01_root / _sub, ignore=_shutil.ignore_patterns(".lake"))
+            for _ov in v01_snap.rglob("*"):
+                if _ov.is_file():
+                    _rel = _ov.relative_to(v01_snap)
+                    (_v01_root / _rel).parent.mkdir(parents=True, exist_ok=True)
+                    _shutil.copy2(_ov, _v01_root / _rel)
+            bind_res = verify_binding(
+                bind_obj,
+                checkpoint_dir=st_dir,
+                runtime_flags=weft_flags,
+                plane1_root=_v01_root,
+                expected_factor_digest=p2b_cert.factor_digest,
+                expected_certificate_sha256=p2b_cert.sha256(),
+            )
+        live_v02_bind = verify_binding(
+            bind_obj,
+            checkpoint_dir=st_dir,
+            runtime_flags=weft_flags,
+            plane1_root=PLANE1_ROOT,
+            expected_factor_digest=p2b_cert.factor_digest,
+            expected_certificate_sha256=p2b_cert.sha256(),
+        )
+        if live_v02_bind.ok or "stale_lineage" not in live_v02_bind.problems:
+            defects.append("expected Hard Veto 2 stale_lineage when checking v0.1 P2-B binding against v0.2 Plane 1")
+    else:
+        bind_res = verify_binding(
+            bind_obj,
+            checkpoint_dir=st_dir,
+            runtime_flags=weft_flags,
+            plane1_root=PLANE1_ROOT,
+            expected_factor_digest=p2b_cert.factor_digest,
+            expected_certificate_sha256=p2b_cert.sha256(),
+        )
     if not bind_res.ok:
         defects.append(f"verify_binding_failed:{bind_res.problems}")
 

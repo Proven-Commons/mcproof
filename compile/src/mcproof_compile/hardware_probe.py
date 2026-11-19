@@ -331,37 +331,47 @@ def compute_rtx3080_vram_fit(
     gguf_bytes: int,
     *,
     ctx_tokens: int = 8192,
+    n_slots: int = 1,
     n_loras: int = 3,
     lora_rank: int = 8,
     d_in: int = 2560,
     d_out: int = 9216,
+    windows_wddm_desktop_gib: float = 1.20,
 ) -> dict[str, Any]:
     """Analytical VRAM projection for Qwen3.5-4B on an 8 GiB RTX 3080 Laptop GPU (not live NVML).
 
     Qwen3.5-4B has 32 layers total: 8 full-attention GQA layers (4 KV heads, head_dim=256)
-    and 24 Gated DeltaNet linear-attention layers (fixed recurrent state independent of ctx).
+    and 24 Gated DeltaNet linear-attention layers (fixed per-slot recurrent state independent of ctx).
+    Under `-np 8 -c 65536` (`kv_unified=false`), KV and DeltaNet state scale with `n_slots = 8`,
+    while NVIDIA Optimus (`Intel iGPU` driving panels) yields `windows_wddm_desktop_gib = 0.0`.
     """
+    slots = max(1, int(n_slots))
     gib = float(1024**3)
     weights_gib = gguf_bytes / gib
-    kv_f16_bytes = 8 * 2 * 4 * 256 * ctx_tokens * 2
-    ssm_state_bytes = 24 * (32 * 128 * 128 * 4 + 9216 * 4 * 4)
+    kv_per_slot_bytes = 8 * 2 * 4 * 256 * ctx_tokens * 2
+    ssm_per_slot_bytes = 24 * (32 * 128 * 128 * 4 + 9216 * 4 * 4)
+    kv_f16_bytes = slots * kv_per_slot_bytes
+    ssm_state_bytes = slots * ssm_per_slot_bytes
     lora_bytes = n_loras * (d_out * lora_rank + lora_rank * d_in) * 2
-    cuda_compute_overhead_gib = 0.55
-    windows_wddm_desktop_gib = 1.20
+    cuda_compute_overhead_gib = 0.30 if slots >= 8 else 0.55
     total_gib = weights_gib + (kv_f16_bytes + ssm_state_bytes + lora_bytes) / gib + cuda_compute_overhead_gib
-    total_windows_gib = total_gib + windows_wddm_desktop_gib
+    total_windows_gib = total_gib + float(windows_wddm_desktop_gib)
+    np8_optimus_gib = weights_gib + (8 * (kv_per_slot_bytes + ssm_per_slot_bytes) + lora_bytes) / gib + 0.30
     return {
         "measurement_kind": "analytical_projection_not_live_nvml",
+        "n_slots": slots,
         "model_weights_gib": round(weights_gib, 4),
         "kv_cache_8k_f16_gib": round(kv_f16_bytes / gib, 4),
         "deltanet_recurrent_state_gib": round(ssm_state_bytes / gib, 4),
         "three_f16_rank8_loras_gib": round(lora_bytes / gib, 6),
         "cuda_context_and_compute_overhead_gib": cuda_compute_overhead_gib,
         "estimated_total_vram_gib": round(total_gib, 4),
-        "windows_wddm_desktop_overhead_gib": windows_wddm_desktop_gib,
+        "estimated_np8_optimus_zero_display_vram_gib": round(np8_optimus_gib, 4),
+        "windows_wddm_desktop_overhead_gib": float(windows_wddm_desktop_gib),
         "estimated_total_vram_windows_wddm_gib": round(total_windows_gib, 4),
         "rtx3080_budget_gib": 7.2,
         "fits_8gib_rtx3080_budget": total_gib <= 7.2,
+        "fits_8gib_rtx3080_np8_optimus_budget": np8_optimus_gib <= 7.2,
         "fits_8gib_rtx3080_windows_wddm_budget": total_windows_gib <= 7.2,
     }
 

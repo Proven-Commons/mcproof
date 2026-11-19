@@ -10,13 +10,17 @@ import pytest
 
 from mcproof.lean_harness import (
     BAR_FORBIDDEN_RULES,
-     _lean_env,
+    _lean_env,
     audit_weak_statements,
+    classify_host_resource_failure,
     lint_lean4_source,
     parse_comparator_stdout,
+    scrub_challenge_artifacts,
     verify_lean4_project_comparator,
     verify_lean4_source,
+    verify_pinned_lean_defs,
 )
+from mcproof.oracles import run_lean4_oracle
 from mcproof.paths import repo_root
 
 from helpers import expect_eq, expect_false, expect_in, expect_true, requires_dep, requires_lean
@@ -124,7 +128,7 @@ def test_reference_lean_project_passes_six_kernel_comparator() -> None:
     res = verify_lean4_project_comparator(repo_root() / "lean", allow_unsandboxed=not has_bwrap)
     expect_true(res.passed, f"reference lean project failed: {res.findings}")
     expect_eq(len(res.paranoid_kernels_run), 6, "all 6 bundled Lean 4.35.0 kernels must accept")
-    expect_eq(len(res.theorems_checked), 8, "all 8 theorems in comparator.json must be checked")
+    expect_eq(len(res.theorems_checked), 29, "all 29 theorems in comparator.json must be checked")
     expect_eq(len(res.sorry_declarations), 0, "zero sorry declarations allowed in Mcproof.Proofs")
     expect_eq(len(res.nonstandard_axioms), 0, "zero non-standard axioms allowed")
     expect_eq(res.challenge_sorry_whitelisted_module, "Mcproof.Spec")
@@ -256,3 +260,54 @@ theorem both_ways (p : Prop) (h1 : p) (h2 : ¬ p) : False := h2 h1
     res3 = lint_lean4_source(contradictory)
     expect_false(res3["passed"], "contradictory P and Not P binders must fail")
     expect_in("VACUOUS_CONTRADICTORY_HYPOTHESES", {f["rule"] for f in res3["findings"]})
+
+    taut_hyp = """
+theorem circular_gap (gap : Int) (h : 0 < gap) : 0 < gap := h
+"""
+    res4 = lint_lean4_source(taut_hyp)
+    expect_false(res4["passed"], "circular binder premise matching conclusion must fail")
+    expect_in("VACUOUS_TAUTOLOGICAL_HYPOTHESIS", {f["rule"] for f in res4["findings"]})
+
+
+def test_pinned_def_mutation_challenge_scrub_and_host_limit_pure(tmp_path: Path) -> None:
+    prompt_lean = """
+def targetClamp (x : Nat) : Nat :=
+  if x > 10 then 10 else x
+"""
+    forged_cand = """
+def targetClamp (_x : Nat) : Nat := 10
+
+theorem targetClamp_le_ten (x : Nat) : targetClamp x ≤ 10 := by
+  omega
+"""
+    honest_cand = """
+def targetClamp (x : Nat) : Nat :=
+  if x > 10 then 10 else x
+
+theorem targetClamp_le_ten (x : Nat) : targetClamp x ≤ 10 := by
+  unfold targetClamp
+  split <;> omega
+"""
+    expect_in("TARGET_DEF_BODY_MUTATED", {f["rule"] for f in verify_pinned_lean_defs(prompt_lean, forged_cand)})
+    expect_eq(verify_pinned_lean_defs(prompt_lean, honest_cand), [])
+
+    expect_true(classify_host_resource_failure(137, "") is not None)
+    expect_true(classify_host_resource_failure(1, "error: excessive memory consumption") is not None)
+    expect_true(classify_host_resource_failure(1, "type mismatch at application") is None)
+
+    fake_proj = tmp_path / "proj"
+    olean_dir = fake_proj / ".lake" / "build" / "lib" / "lean" / "Mcproof"
+    olean_dir.mkdir(parents=True)
+    stale_olean = olean_dir / "Spec.olean"
+    stale_olean.write_bytes(b"stale")
+    removed = scrub_challenge_artifacts(fake_proj, "Mcproof.Spec")
+    expect_false(stale_olean.exists(), "Spec.olean must be unlinked")
+    expect_eq(removed, [".lake/build/lib/lean/Mcproof/Spec.olean"])
+
+
+@requires_dep("soko")
+@requires_lean()
+def test_lean_timeout_maps_to_incomplete_host_limit() -> None:
+    t_rec = run_lean4_oracle("theorem quick_ok : 1 + 1 = 2 := rfl", timeout_sec=0)
+    expect_false(t_rec.passed, "zero-second timeout must fail")
+    expect_eq(t_rec.epistemic_status, "INCOMPLETE_HOST_LIMIT", "timeout must map to INCOMPLETE_HOST_LIMIT")
