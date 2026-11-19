@@ -110,7 +110,7 @@ Public `validation.jsonl` (`48` items, `compile/artifacts/evaluation/validation_
 | --- | --- | --- | --- |
 | Phase 5 Primary gain | `>= 50%` relative failure drop vs `B0` | `0.0%` on `96` private holdouts (`0/96` vs `0/96`), `-4.55%` on `48` public validation items (`2/48` vs `4/48`) | **FAIL (Honest Kill Boundary)** |
 | Phase 5 Ceiling ratio | `>= 80%` of `B1` pass rate | `0/96` vs `B1` `0/96` on private holdout, `25.0%` (`2/48` vs `8/48`) on public validation | **FAIL (Honest Kill Boundary)** |
-| Phase 5 Injected SOP tokens | `>= 90%` drop vs `B1` | `0` injected SOP tokens on `P2-B` vs `32,216` `Qwen3.5` tokens on `B1`; `compile/artifacts/evaluation/validation_scorecard.json` records `b1_prefix_cache_parity_verified` on a 3-item prefix probe | **PASS (zero SOP tokens on P2-B; public validation efficacy still FAIL)** |
+| Phase 5 Injected SOP tokens | `>= 90%` drop vs `B1` | `0` injected SOP tokens on `P2-B` vs `32,216` `Qwen3.5` tokens on `B1`. `compile/artifacts/evaluation/validation_scorecard.json` records `b1_prefix_cache_parity_verified` on a 3-item prefix probe. | **PASS (zero SOP tokens on P2-B, public validation efficacy still FAIL)** |
 | Phase 5 Safety canaries | `8/8` (`100%`) mandatory, `0` flakes | `8/8` (`100.0%`) passed on `P2-B`, `0` flaky IDs across `10/10` runs (`160` generations) | **PASS** |
 | Phase 5 General retention | `<= 1.0 pp` drop vs `B0` on `100` holdouts | `0.0 pp` drop (`+1.0 pp` net: `P2-B` `85.0%` vs `B0` `84.0%`, `P2-A` `0.0%`) | **PASS** |
 | Phase 5 Mixed integrity | `0` formal corruptions & `0` prose leaks across `30` items | `8/30` sealed `4B` end-to-end (`30/30` `exo` router + public structural suite) | **FAIL (Honest Kill Boundary)** |
