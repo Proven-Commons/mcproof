@@ -21,6 +21,17 @@ import urllib.request
 
 import numpy as np
 
+def resolve_siliconcordat_root(lab_root: Path) -> Path:
+    """Locate the read-only `siliconcordat/*` checkout (flat clone or mcproof-lab layout)."""
+    override = os.environ.get("SILICONCORDAT_ROOT")
+    if override:
+        return Path(override).expanduser().resolve()
+    flat_sibling = lab_root / "siliconcordat"
+    if flat_sibling.is_dir():
+        return flat_sibling.resolve()
+    return (lab_root.parent / "siliconcordat").resolve()
+
+
 STACK_ROOT = Path(__file__).resolve().parents[2]
 if (STACK_ROOT.parent / "spec" / "lineage.json").is_file():
     MCPROOF_REPO_ROOT = STACK_ROOT.parent
@@ -28,7 +39,7 @@ if (STACK_ROOT.parent / "spec" / "lineage.json").is_file():
 else:
     LAB_ROOT = STACK_ROOT.parent
     MCPROOF_REPO_ROOT = LAB_ROOT / "repo"
-SILICONCORDAT_ROOT = LAB_ROOT.parent / "siliconcordat"
+SILICONCORDAT_ROOT = resolve_siliconcordat_root(LAB_ROOT)
 
 DOMAIN_TO_LLAMA_ID: dict[str, int] = {
     "corpus": 0,

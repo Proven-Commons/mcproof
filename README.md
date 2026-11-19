@@ -61,7 +61,7 @@ Tests that require optional external binaries (`lean`, `lake`, `mde`, `llama-ser
 
 ### 2. Full Tier 2 Oracle and Stack Bootstrap
 
-Clone all `10` SHA-pinned Plane 1 upstream repositories plus the `4` `siliconcordat/*` sibling stacks, build `mde`, and install Lean `v4.35.0`:
+Clone all `10` SHA-pinned Plane 1 upstream repositories plus the `4` `siliconcordat/*` sibling stacks, build `mde`, and install Lean `v4.35.0`. Building `siliconcordat/mde` requires **Rust `>= 1.85`** (Cargo `edition2024`) or a **nightly** toolchain (`rustup toolchain install stable` on a recent release, or `cargo +nightly build`).
 
 ```sh
 ./bin/bootstrap-deps --with-siliconcordat
