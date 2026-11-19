@@ -645,6 +645,15 @@
       "relative_failure_reduction": 0.0,
       "total": 96
     },
+    "public_validation_48_efficacy": {
+      "b0_passed": 4,
+      "control_ordering_summary": "P2-A 0/48 [0.00%] < P2-B 2/48 [4.17%] < B0 4/48 [8.33%] = goodhart 4/48 [8.33%] < constant logit_bias 6/48 [12.50%] < B1 8/48 [16.67%]",
+      "efficacy_verdict": "REJECTED_NEGATIVE_EFFICACY",
+      "p2b_passed": 2,
+      "p2b_relative_failure_reduction_vs_b0": -1.0,
+      "passed": false,
+      "total": 48
+    },
     "rollback_fidelity": {
       "kill_switch_elapsed_ms": 5.528,
       "passed": true,

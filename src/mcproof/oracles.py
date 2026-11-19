@@ -839,6 +839,17 @@ def grade_family_completion(
         )
 
     if fam == "B":
+        if not valid_cases:
+            return OracleReceipt.create(
+                oracle="family_b_checker",
+                passed=False,
+                epistemic_status="REJECTED",
+                checks={"valid_cases_total": 0, "mutation_suite": None},
+                findings=[{
+                    "rule": "MISSING_VALID_CASES",
+                    "message": "Family B requires fixture valid_cases for the >=80% mutation kill-floor evaluation",
+                }],
+            )
         py_blocks = extract_fenced_blocks(completion_text, ("python", "py"))
         py_src = py_blocks[-1] if py_blocks else completion_text
         gen_src = generator_source

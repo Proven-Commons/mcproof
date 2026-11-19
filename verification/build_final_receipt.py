@@ -270,6 +270,23 @@ def main() -> int:
     gate_primary_gain_passed = rel_fail_reduction >= 0.50
     gate_ceiling_passed = (b1_holdout_p > 0) and ((p2b_holdout_p * 5) >= (b1_holdout_p * 4))
 
+    val_sc = comp_manifest["validation_scorecard"]
+    val_head = (
+        comp_manifest.get("validation_efficacy_headline")
+        or val_sc.get("phase5_preview_on_public_validation")
+        or val_sc
+    )
+    p2b_rel_public = float(
+        val_head.get(
+            "p2b_relative_failure_reduction_vs_b0",
+            val_sc.get("p2b_relative_failure_reduction_vs_b0", -1.0),
+        )
+    )
+    efficacy_verdict = str(val_head.get("efficacy_verdict", val_sc.get("efficacy_verdict", "")))
+    public_validation_efficacy_passed = (
+        efficacy_verdict != "REJECTED_NEGATIVE_EFFICACY" and p2b_rel_public > 0.0
+    )
+
     b1_sop_tokens = int(b1["plane1_spec_qwen35_tokens"])
     p2b_sop_tokens = 0
     gate_sop_zero_tokens = p2b_sop_tokens == 0 and b1_sop_tokens > 0
@@ -342,8 +359,6 @@ def main() -> int:
     naive_ret_pct = float(p6_naive["general_retention"]["accuracy_pct"])
     sealed_tc3_passed = ((b0_ret_pct - routed_ret_pct) <= 1.5) and (routed_ret_pct > naive_ret_pct)
 
-    # Public validation scorecard (48 items)
-    val_sc = comp_manifest["validation_scorecard"]
     val_arms = {
         k: {
             "passed": int(v.get("passed", v.get("passed_count", 0))),
@@ -361,6 +376,7 @@ def main() -> int:
         and compiler["overall_passed"]
         and gate_rederive_passed
         and gate_primary_gain_passed
+        and public_validation_efficacy_passed
         and gate_ceiling_passed
         and gate_strict_16_canaries_passed
         and gate_retention_passed
@@ -440,7 +456,7 @@ def main() -> int:
             },
             "compiler": {
                 "structural_and_rederivation_passed": bool(compiler["overall_passed"] and gate_rederive_passed),
-                "efficacy_passed": bool(val_sc.get("p2b_relative_failure_reduction_vs_b0", -1.0) > 0.0),
+                "efficacy_passed": public_validation_efficacy_passed,
                 "independent_zero_weft_rederivation_zero_byte_diff": gate_rederive_passed,
                 "independent_rederivation_files_checked": int(rederive["files_checked_count"]),
                 "p2b_files": rederive["files"],
@@ -535,6 +551,17 @@ def main() -> int:
                 "b0_passed": b0_holdout_p,
                 "total": p2b_holdout_t,
                 "relative_failure_reduction": rel_fail_reduction,
+            },
+            "public_validation_48_efficacy": {
+                "passed": public_validation_efficacy_passed,
+                "efficacy_verdict": efficacy_verdict,
+                "p2b_relative_failure_reduction_vs_b0": p2b_rel_public,
+                "control_ordering_summary": val_head.get(
+                    "control_ordering_summary", val_sc.get("control_ordering_summary")
+                ),
+                "p2b_passed": int(val_sc["arms"]["P2-B"]["passed"]),
+                "b0_passed": int(val_sc["arms"]["B0"]["passed"]),
+                "total": int(val_sc.get("n_prompts", 48)),
             },
             "ceiling_ratio_vs_b1": {
                 "passed": gate_ceiling_passed,
