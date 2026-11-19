@@ -24,6 +24,9 @@
         }
       },
       "failure_rate": 0.9167,
+      "grading_paths_used": {
+        "datasets_grade_item_script": 48
+      },
       "mean_elapsed_ms": 64538.8,
       "pass_rate": 0.0833,
       "passed": 4,
@@ -77,6 +80,9 @@
         }
       },
       "failure_rate": 0.8333,
+      "grading_paths_used": {
+        "datasets_grade_item_script": 48
+      },
       "mean_elapsed_ms": 18758.7,
       "pass_rate": 0.1667,
       "passed": 8,
@@ -130,6 +136,9 @@
         }
       },
       "failure_rate": 1.0,
+      "grading_paths_used": {
+        "datasets_grade_item_script": 48
+      },
       "mean_elapsed_ms": 104773.1,
       "pass_rate": 0.0,
       "passed": 0,
@@ -180,6 +189,9 @@
         }
       },
       "failure_rate": 0.9583,
+      "grading_paths_used": {
+        "datasets_grade_item_script": 48
+      },
       "mean_elapsed_ms": 52834.8,
       "pass_rate": 0.0417,
       "passed": 2,
@@ -233,6 +245,9 @@
         }
       },
       "failure_rate": 0.9167,
+      "grading_paths_used": {
+        "datasets_grade_item_script": 48
+      },
       "mean_elapsed_ms": 41027.8,
       "pass_rate": 0.0833,
       "passed": 4,
@@ -286,6 +301,9 @@
         }
       },
       "failure_rate": 0.875,
+      "grading_paths_used": {
+        "datasets_grade_item_script": 48
+      },
       "mean_elapsed_ms": 35650.3,
       "pass_rate": 0.125,
       "passed": 6,
@@ -317,18 +335,29 @@
     }
   },
   "b1_prefix_cache_parity_verified": true,
+  "b1_prefix_cache_tested_items": 3,
+  "b1_sop_tokens_injected": 32216,
+  "control_ordering_summary": "P2-A 0/48 [0.00%] < P2-B 2/48 [4.17%] < B0 4/48 [8.33%] = goodhart 4/48 [8.33%] < constant logit_bias 6/48 [12.50%] < B1 8/48 [16.67%]",
   "decoding": {
     "max_tokens": 1024,
     "seed": 42,
     "temperature": 0.0,
     "top_p": 1.0
   },
+  "efficacy_verdict": "REJECTED_NEGATIVE_EFFICACY",
+  "grading_paths_used": {
+    "datasets_grade_item_script": 288
+  },
   "n_prompts": 48,
   "p2b_lora_scale": 1.0,
+  "p2b_sop_tokens_injected": 0,
   "phase5_preview_on_public_validation": {
-    "p2b_ceiling_ratio_vs_b1": 0.2501,
-    "p2b_relative_failure_reduction_vs_b0": -0.0454,
-    "p2b_sop_token_savings_ratio": 1.0
+    "b1_sop_tokens_injected": 32216,
+    "control_ordering_summary": "P2-A 0/48 [0.00%] < P2-B 2/48 [4.17%] < B0 4/48 [8.33%] = goodhart 4/48 [8.33%] < constant logit_bias 6/48 [12.50%] < B1 8/48 [16.67%]",
+    "efficacy_verdict": "REJECTED_NEGATIVE_EFFICACY",
+    "p2b_ceiling_ratio_vs_b1": 0.25,
+    "p2b_relative_failure_reduction_vs_b0": -0.045455,
+    "p2b_sop_tokens_injected": 0
   },
   "plane1_spec_tokens_qwen35": 32216,
   "safety_preservation_smoke": {
@@ -417,6 +446,6 @@
       "total": 3
     }
   },
-  "schema": "mcproof-validation-evaluation/v0.1",
+  "schema": "mcproof-validation-evaluation/v0.2",
   "split": "validation"
 }

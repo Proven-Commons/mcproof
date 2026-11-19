@@ -16,15 +16,32 @@ from typing import Any, Mapping, Sequence
 from .lean_harness import verify_lean4_project_comparator, verify_lean4_source
 from .lineage import canonical_json_bytes, verify_lineage_manifest
 from .mutation import (
+    run_candidate_python_confined,
     run_checker_mutation_suite,
     run_f0_gate_and_corruptions,
     run_python_strict,
 )
 from .paths import check_prose_script, dep_repo, repo_root, siliconcordat_mde_root
 
-ALLOWED_CLAIM_TIERS: frozenset[str] = frozenset({"PROVEN", "VERIFIED", "KNOWN", "CONJECTURE", "REFUSED"})
+TIER_PRECEDENCE: tuple[str, ...] = ("REFUSED", "CONJECTURE", "KNOWN", "VERIFIED", "PROVEN")
+ALLOWED_CLAIM_TIERS: frozenset[str] = frozenset(TIER_PRECEDENCE)
+VERDICT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 SHA40_RE = re.compile(r"\b[0-9a-fA-F]{40}\b")
 FENCED_BLOCK_RE = re.compile(r"```([A-Za-z0-9_+-]*)\n(.*?)```", re.DOTALL)
+
+
+def sanitize_verdict_id(raw_id: Any) -> str | None:
+    """Validate untrusted Family C verdict IDs, rejecting separators, drive colons, and `..` on all platforms."""
+    if not isinstance(raw_id, str) or not raw_id:
+        return None
+    if "/" in raw_id or "\\" in raw_id or ":" in raw_id or ".." in raw_id:
+        return None
+    vid = Path(raw_id).name
+    if vid != raw_id or ".." in vid:
+        return None
+    if not VERDICT_ID_RE.fullmatch(vid):
+        return None
+    return vid
 
 
 @dataclass(frozen=True)
@@ -118,6 +135,7 @@ def run_lean4_oracle(
     strict_init_only: bool = True,
     check_vacuous: bool = True,
     require_theorem: bool = True,
+    allow_unsandboxed: bool = False,
     timeout_sec: int = 180,
 ) -> OracleReceipt:
     """Run Lean 4 compiler, soko lean4_auditor, Proven-Commons escape-hatch lint, WeakStatement check, and kernel axiom check."""
@@ -126,6 +144,7 @@ def run_lean4_oracle(
         res = verify_lean4_project_comparator(
             proj,
             strict_init_only=strict_init_only,
+            allow_unsandboxed=allow_unsandboxed,
             timeout_sec=timeout_sec,
         )
     else:
@@ -337,17 +356,22 @@ def run_checker_oracle(
                 "message": f["message"],
             })
 
-        # Verify module imports cleanly under `python3 -O -B -W error` even when valid_cases is empty
-        smoke_proc = run_python_strict(["-c", f"import runpy; runpy.run_path({str(tmp_py)!r})"], cwd=Path(tmp_str))
-        strict_import_ok = smoke_proc.returncode == 0
+        # Verify module imports cleanly under confined `python3 -I -O -B -W error`
+        smoke_proc, _, _ = run_candidate_python_confined(
+            ["-c", "import runpy, sys; runpy.run_path(sys.argv[1])", str(tmp_py)],
+            writable_dir=Path(tmp_str),
+            timeout_sec=30,
+            sandbox_mode="auto",
+        )
+        strict_import_ok = smoke_proc is not None and smoke_proc.returncode == 0
         if not strict_import_ok:
+            err_msg = "" if smoke_proc is None else (smoke_proc.stderr or smoke_proc.stdout).strip()[:240]
             findings.append({
                 "rule": "STRICT_PYTHON_IMPORT_ERROR",
-                "message": f"failed under `python3 -O -B -W error`: {(smoke_proc.stderr or smoke_proc.stdout).strip()[:240]}",
+                "message": f"failed under `python3 -I -O -B -W error`: {err_msg}",
             })
 
     mut_dict: dict[str, Any] | None = None
-    mut_passed = True
     if valid_cases:
         mut_rep = run_checker_mutation_suite(
             checker_source,
@@ -358,6 +382,12 @@ def run_checker_oracle(
         mut_dict = mut_rep.to_dict()
         mut_passed = mut_rep.passed
         findings.extend(mut_rep.findings)
+    else:
+        findings.append({
+            "rule": "MISSING_VALID_CASES",
+            "message": "mutation kill floor cannot be evaluated without valid_cases fixtures",
+        })
+        mut_passed = False
 
     passed = (
         dual_rep.get("verdict") == "PASS"
@@ -583,17 +613,16 @@ def run_claim_hygiene_oracle(
     )
     declared_tier = tier_match.group(1).upper() if tier_match else None
     if declared_tier is None:
-        # Check standalone bold/code tier markers
-        found_tiers = [t for t in ALLOWED_CLAIM_TIERS if re.search(rf"\b{t}\b", markdown_text)]
+        # Deterministic least-inflationary precedence across processes and PYTHONHASHSEED values
+        found_tiers = [t for t in TIER_PRECEDENCE if re.search(rf"\b{t}\b", markdown_text)]
         if len(found_tiers) == 1:
             declared_tier = found_tiers[0]
         elif not found_tiers:
             findings.append({
                 "rule": "MISSING_CLAIM_TIER_LABEL",
-                "message": f"document must declare an explicit claim tier from {sorted(ALLOWED_CLAIM_TIERS)}",
+                "message": f"document must declare an explicit claim tier from {list(TIER_PRECEDENCE)}",
             })
         else:
-            # Prefer explicit non-PROVEN conservative tier when discussing multiple tiers unless PROVEN is claimed as headline
             declared_tier = found_tiers[0]
 
     if declared_tier is not None and declared_tier not in ALLOWED_CLAIM_TIERS:
@@ -666,14 +695,15 @@ def run_prose_and_mixed_zone_oracle(
     require_data_eido_skip: bool = False,
     verify_embedded_lean: bool = True,
     verify_verdict_shas: bool = False,
+    prose_script_override: str | Path | None = None,
 ) -> OracleReceipt:
-    """Check prose gates (`check-prose.py` + `--dupes`) alongside mixed-zone formal block protections."""
-    prose_script = check_prose_script()
+    """Check prose gates (`prose_gate.py` + `--dupes`) alongside mixed-zone formal block protections."""
+    prose_script = check_prose_script(prose_script_override)
     findings: list[dict[str, Any]] = []
 
     prose_view = _strip_data_eido_skip_regions(markdown_text)
     with tempfile.TemporaryDirectory(prefix="mcproof_prose_") as tmp_str:
-        doc_path = Path(tmp_str) / Path(label).name
+        doc_path = Path(tmp_str) / (Path(label).name or "document.md")
         doc_path.write_text(prose_view, encoding="utf-8")
 
         p_check = subprocess.run(
@@ -684,11 +714,15 @@ def run_prose_and_mixed_zone_oracle(
             check=False,
         )
         if p_check.returncode != 0:
+            before_p = len(findings)
             for ln in (p_check.stdout or "").splitlines():
                 if ln.startswith("  "):
                     findings.append({"rule": "PROSE_GATE_VIOLATION", "message": ln.strip()})
-            if not findings:
-                findings.append({"rule": "PROSE_GATE_VIOLATION", "message": p_check.stdout.strip()[:240]})
+            if len(findings) == before_p:
+                findings.append({
+                    "rule": "PROSE_GATE_VIOLATION",
+                    "message": ((p_check.stdout or "") + "\n" + (p_check.stderr or "")).strip()[:240],
+                })
 
         d_check = subprocess.run(
             [sys.executable, str(prose_script), "--dupes", str(doc_path)],
@@ -698,9 +732,15 @@ def run_prose_and_mixed_zone_oracle(
             check=False,
         )
         if d_check.returncode != 0:
+            before_d = len(findings)
             for ln in (d_check.stdout or "").splitlines():
                 if ln.startswith("  "):
                     findings.append({"rule": "PROSE_DUPES_VIOLATION", "message": ln.strip()})
+            if len(findings) == before_d:
+                findings.append({
+                    "rule": "PROSE_DUPES_VIOLATION",
+                    "message": ((d_check.stdout or "") + "\n" + (d_check.stderr or "")).strip()[:240],
+                })
 
     # Strip fenced blocks and inline backticks before checking outcome forecasts (matches mde guard & check-prose.py)
     stripped_prose_lines: list[str] = []
@@ -828,9 +868,23 @@ def grade_family_completion(
             try:
                 parsed = json.loads(jb)
                 if isinstance(parsed, dict) and "verdict" in parsed and "source_commit" in parsed:
+                    raw_id = parsed.get("id", "verdict_01")
+                    vid = sanitize_verdict_id(raw_id)
+                    if vid is None:
+                        extra_findings.append({
+                            "rule": "INVALID_VERDICT_ID",
+                            "message": f"unsafe verdict id {raw_id!r}",
+                        })
+                        continue
                     with tempfile.TemporaryDirectory(prefix="mcproof_famc_") as td:
-                        vid = str(parsed.get("id", "verdict_01"))
-                        vf = Path(td) / f"{vid}.json"
+                        td_resolved = Path(td).resolve()
+                        vf = (td_resolved / f"{vid}.json").resolve()
+                        if not vf.is_relative_to(td_resolved) or vf.parent != td_resolved:
+                            extra_findings.append({
+                                "rule": "INVALID_VERDICT_ID",
+                                "message": f"verdict path escaped temp directory for id {raw_id!r}",
+                            })
+                            continue
                         vf.write_text(jb, encoding="utf-8")
                         v_rep = run_verdicts_oracle(vf)
                         if not v_rep.passed:
@@ -892,7 +946,7 @@ def grade_family_completion(
 
 # 7. Full Reference Selftest --------------------------------------------------
 
-def run_all_reference_selftests() -> OracleReceipt:
+def run_all_reference_selftests(*, allow_unsandboxed: bool = False) -> OracleReceipt:
     """Verify all pinned Tier 2 oracles and Plane 1 lineage end to end."""
     sub_results: dict[str, Any] = {}
     findings: list[dict[str, Any]] = []
@@ -929,7 +983,7 @@ def run_all_reference_selftests() -> OracleReceipt:
     sub_results["mde_code_audit"] = mde_rep.to_dict()
     findings.extend(mde_rep.findings)
 
-    lean_rep = run_lean4_oracle(repo_root() / "lean", is_project_dir=True)
+    lean_rep = run_lean4_oracle(repo_root() / "lean", is_project_dir=True, allow_unsandboxed=allow_unsandboxed)
     sub_results["lean_comparator_paranoid"] = lean_rep.to_dict()
     findings.extend(lean_rep.findings)
 

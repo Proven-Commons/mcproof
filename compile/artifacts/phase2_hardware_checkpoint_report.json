@@ -1,26 +1,180 @@
 {
   "linux_workbench_probe": {
-    "execution_host_boundary": "Executed on local 64 GiB Apple M1 Max (Darwin arm64, Metal + CPU float64, $0 cloud). Tailscale peer charminar (<tailscale-host>) is a 5.7 GiB AMD Vega iGPU Linux node without NVIDIA GPU; Tailscale peer geminus (<tailscale-host>, Windows UX582HS 8 GiB RTX 3080) is online on Tailscale with SSH/WinRM/llama-server ports closed (Linux workbench per siliconcordat/warp#4 not yet provisioned). Both Q8_0 and Q4_K_M GGUF checkpoints are staged locally with verified <= 7.2 GiB VRAM budgets.",
-    "linux_gpu_hosts": {
-      "charminar_nvidia_rtx3080": false
-    },
     "linux_rtx3080_online": false,
-    "mac_control_plane_ips": {
-      "divan_bus_mac_self": true
+    "measured_host_facts": {
+      "linux_rtx3080_online": false,
+      "peer_port_probes": {
+        "charminar": {
+          "port_open_map": {
+            "11434": false,
+            "22": true,
+            "2222": false,
+            "22222": false,
+            "3389": false,
+            "445": false,
+            "5985": false,
+            "5986": false,
+            "8080": false
+          },
+          "ports_probed": [
+            22,
+            445,
+            2222,
+            22222,
+            3389,
+            5985,
+            5986,
+            8080,
+            11434
+          ],
+          "probed_closed_ports": [
+            445,
+            2222,
+            22222,
+            3389,
+            5985,
+            5986,
+            8080,
+            11434
+          ],
+          "probed_open_ports": [
+            22
+          ],
+          "tailscale_ip": "<tailscale-host>",
+          "tailscale_online": true,
+          "tailscale_os": "linux",
+          "tailscale_ssh_keys_published": true
+        },
+        "geminus": {
+          "port_open_map": {
+            "11434": false,
+            "22": false,
+            "2222": false,
+            "22222": false,
+            "3389": false,
+            "445": true,
+            "5985": false,
+            "5986": false,
+            "8080": false
+          },
+          "ports_probed": [
+            22,
+            445,
+            2222,
+            22222,
+            3389,
+            5985,
+            5986,
+            8080,
+            11434
+          ],
+          "probed_closed_ports": [
+            22,
+            2222,
+            22222,
+            3389,
+            5985,
+            5986,
+            8080,
+            11434
+          ],
+          "probed_open_ports": [
+            445
+          ],
+          "tailscale_ip": "<tailscale-host>",
+          "tailscale_online": true,
+          "tailscale_os": "windows",
+          "tailscale_ssh_keys_published": false
+        }
+      },
+      "tailscale_peers": {
+        "charminar": {
+          "online": true,
+          "os": "linux",
+          "ssh_host_keys_published": true,
+          "tailscale_ips": [
+            "<tailscale-host>",
+            "<tailscale-ipv6>"
+          ]
+        },
+        "geminus": {
+          "online": true,
+          "os": "windows",
+          "ssh_host_keys_published": false,
+          "tailscale_ips": [
+            "<tailscale-host>",
+            "<tailscale-ipv6>"
+          ]
+        }
+      },
+      "tailscale_status": "Running",
+      "ux582hs_rtx3080_provisioned": false
     },
-    "peer_hardware_probes": {
+    "peer_port_probes": {
       "charminar": {
-        "gpu": "AMD Picasso/Raven 2 Radeon Vega Mobile Series (iGPU)",
-        "llama_server_available": false,
-        "nvidia_smi_available": false,
-        "os_kernel": "Linux 7.2.15-1-omarchy x86_64",
-        "ram_gib": 5.7,
-        "tailscale_ip": "<tailscale-host>"
+        "port_open_map": {
+          "11434": false,
+          "22": true,
+          "2222": false,
+          "22222": false,
+          "3389": false,
+          "445": false,
+          "5985": false,
+          "5986": false,
+          "8080": false
+        },
+        "ports_probed": [
+          22,
+          445,
+          2222,
+          22222,
+          3389,
+          5985,
+          5986,
+          8080,
+          11434
+        ],
+        "probed_closed_ports": [
+          445,
+          2222,
+          22222,
+          3389,
+          5985,
+          5986,
+          8080,
+          11434
+        ],
+        "probed_open_ports": [
+          22
+        ],
+        "tailscale_ip": "<tailscale-host>",
+        "tailscale_online": true,
+        "tailscale_os": "linux",
+        "tailscale_ssh_keys_published": true
       },
       "geminus": {
-        "hardware_class": "ASUS ZenBook Pro Duo UX582HS (8 GiB RTX 3080 Laptop GPU)",
-        "lan_ip": "<lan-host>",
-        "os": "windows",
+        "port_open_map": {
+          "11434": false,
+          "22": false,
+          "2222": false,
+          "22222": false,
+          "3389": false,
+          "445": true,
+          "5985": false,
+          "5986": false,
+          "8080": false
+        },
+        "ports_probed": [
+          22,
+          445,
+          2222,
+          22222,
+          3389,
+          5985,
+          5986,
+          8080,
+          11434
+        ],
         "probed_closed_ports": [
           22,
           2222,
@@ -31,17 +185,24 @@
           8080,
           11434
         ],
+        "probed_open_ports": [
+          445
+        ],
         "tailscale_ip": "<tailscale-host>",
-        "tailscale_online": false,
-        "tailscale_ssh_enabled": false,
-        "tcp_port_22_ssh_open": false,
-        "tcp_port_445_smb_open": false,
-        "tcp_port_8080_llama_open": false
+        "tailscale_online": true,
+        "tailscale_os": "windows",
+        "tailscale_ssh_keys_published": false
+      }
+    },
+    "static_reference_notes": {
+      "cloud_policy_note": "Zero paid cloud compute policy enforced by operator configuration.",
+      "peer_inventory_notes": {
+        "charminar": "Operator inventory note (not probed via SSH here): x86_64 Linux node with AMD Radeon Vega Mobile iGPU and 5.7 GiB RAM; no NVIDIA RTX 3080 GPU.",
+        "geminus": "Operator inventory note (not probed via SSH here): ASUS ZenBook Pro Duo UX582HS with 8 GiB NVIDIA RTX 3080 Laptop GPU; Linux workbench provisioning tracked in siliconcordat/warp#4."
       }
     },
     "tailscale_peers": {
       "charminar": {
-        "cur_addr": "",
         "online": true,
         "os": "linux",
         "ssh_host_keys_published": true,
@@ -51,19 +212,8 @@
         ]
       },
       "geminus": {
-        "cur_addr": "",
-        "online": false,
+        "online": true,
         "os": "windows",
-        "ssh_host_keys_published": false,
-        "tailscale_ips": [
-          "<tailscale-host>",
-          "<tailscale-ipv6>"
-        ]
-      },
-      "macos-peer": {
-        "cur_addr": "",
-        "online": false,
-        "os": "macOS",
         "ssh_host_keys_published": false,
         "tailscale_ips": [
           "<tailscale-host>",
@@ -78,22 +228,223 @@
     "available": true,
     "binary": "/opt/homebrew/bin/llama-server",
     "commit": "7fe450e19",
+    "returncode": 0,
     "version_line": "version: 0.5.0 (build 11146, commit 7fe450e19)"
   },
   "local_host": {
     "cpu_brand": "Apple M1 Max",
     "machine": "arm64",
-    "paid_cloud_spend_usd": 0.0,
-    "platform": "macOS-27.0.1-arm64-arm-64bit",
-    "python_version": "3.12.15",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "python_version": "3.14.6",
     "unified_ram_gib": 64.0
+  },
+  "measured_host_facts": {
+    "checkpoint_digests": {
+      "gguf_filename": "Qwen3.5-4B-Q8_0.gguf",
+      "gguf_geometry": {
+        "architecture": "qwen35",
+        "block_count": 32,
+        "embedding_length": 2560,
+        "feed_forward_length": 9216,
+        "model_name": "Qwen3.5-4B",
+        "n_tensors": 426,
+        "tensors": {
+          "blk.0.ffn_down.weight": {
+            "ggml_ne": [
+              9216,
+              2560
+            ],
+            "ggml_type": 8,
+            "numpy_shape": [
+              2560,
+              9216
+            ],
+            "rel_offset": 708874240
+          },
+          "blk.31.ffn_down.weight": {
+            "ggml_ne": [
+              9216,
+              2560
+            ],
+            "ggml_type": 8,
+            "numpy_shape": [
+              2560,
+              9216
+            ],
+            "rel_offset": 4396222464
+          },
+          "blk.31.ffn_gate.weight": {
+            "ggml_ne": [
+              2560,
+              9216
+            ],
+            "ggml_type": 8,
+            "numpy_shape": [
+              9216,
+              2560
+            ],
+            "rel_offset": 4421289984
+          },
+          "blk.31.ffn_up.weight": {
+            "ggml_ne": [
+              2560,
+              9216
+            ],
+            "ggml_type": 8,
+            "numpy_shape": [
+              9216,
+              2560
+            ],
+            "rel_offset": 4446357504
+          }
+        }
+      },
+      "gguf_sha256": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1",
+      "gguf_size_bytes": 4482403488,
+      "model_id": "Qwen/Qwen3.5-4B",
+      "safetensors_identity": {
+        "config": {
+          "config.json": "ddc63e1c717afa86c865bb5e01313d89d72bb53b97ad4a8a03ba8510c0621670"
+        },
+        "fingerprint": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
+        "layout_sha256": "7dbccf0b2961776f1c45b032403ab9b4a59c84569d1e228c30147da20b2cdb08",
+        "n_tensors": 738,
+        "tokenizer": {
+          "chat_template.jinja": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+          "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+          "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+          "tokenizer_config.json": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
+          "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+        }
+      }
+    },
+    "llama_server": {
+      "available": true,
+      "binary": "/opt/homebrew/bin/llama-server",
+      "commit": "7fe450e19",
+      "returncode": 0,
+      "version_line": "version: 0.5.0 (build 11146, commit 7fe450e19)"
+    },
+    "local_host": {
+      "cpu_brand": "Apple M1 Max",
+      "machine": "arm64",
+      "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+      "python_version": "3.14.6",
+      "unified_ram_gib": 64.0
+    },
+    "tailscale_workbench_probe": {
+      "linux_rtx3080_online": false,
+      "peer_port_probes": {
+        "charminar": {
+          "port_open_map": {
+            "11434": false,
+            "22": true,
+            "2222": false,
+            "22222": false,
+            "3389": false,
+            "445": false,
+            "5985": false,
+            "5986": false,
+            "8080": false
+          },
+          "ports_probed": [
+            22,
+            445,
+            2222,
+            22222,
+            3389,
+            5985,
+            5986,
+            8080,
+            11434
+          ],
+          "probed_closed_ports": [
+            445,
+            2222,
+            22222,
+            3389,
+            5985,
+            5986,
+            8080,
+            11434
+          ],
+          "probed_open_ports": [
+            22
+          ],
+          "tailscale_ip": "<tailscale-host>",
+          "tailscale_online": true,
+          "tailscale_os": "linux",
+          "tailscale_ssh_keys_published": true
+        },
+        "geminus": {
+          "port_open_map": {
+            "11434": false,
+            "22": false,
+            "2222": false,
+            "22222": false,
+            "3389": false,
+            "445": true,
+            "5985": false,
+            "5986": false,
+            "8080": false
+          },
+          "ports_probed": [
+            22,
+            445,
+            2222,
+            22222,
+            3389,
+            5985,
+            5986,
+            8080,
+            11434
+          ],
+          "probed_closed_ports": [
+            22,
+            2222,
+            22222,
+            3389,
+            5985,
+            5986,
+            8080,
+            11434
+          ],
+          "probed_open_ports": [
+            445
+          ],
+          "tailscale_ip": "<tailscale-host>",
+          "tailscale_online": true,
+          "tailscale_os": "windows",
+          "tailscale_ssh_keys_published": false
+        }
+      },
+      "tailscale_peers": {
+        "charminar": {
+          "online": true,
+          "os": "linux",
+          "ssh_host_keys_published": true,
+          "tailscale_ips": [
+            "<tailscale-host>",
+            "<tailscale-ipv6>"
+          ]
+        },
+        "geminus": {
+          "online": true,
+          "os": "windows",
+          "ssh_host_keys_published": false,
+          "tailscale_ips": [
+            "<tailscale-host>",
+            "<tailscale-ipv6>"
+          ]
+        }
+      },
+      "tailscale_status": "Running",
+      "ux582hs_rtx3080_provisioned": false
+    }
   },
   "pinned_checkpoint": {
     "companion_q4_k_m_gguf": {
-      "gguf_filename": "Qwen3.5-4B-Q4_K_M.gguf",
-      "gguf_sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
-      "gguf_size_bytes": 2740937888,
-      "rtx3080_8gib_vram_fit": {
+      "analytical_rtx3080_8gib_vram_projection": {
         "cuda_context_and_compute_overhead_gib": 0.55,
         "deltanet_recurrent_state_gib": 0.0502,
         "estimated_total_vram_gib": 3.4034,
@@ -101,11 +452,15 @@
         "fits_8gib_rtx3080_budget": true,
         "fits_8gib_rtx3080_windows_wddm_budget": true,
         "kv_cache_8k_f16_gib": 0.25,
+        "measurement_kind": "analytical_projection_not_live_nvml",
         "model_weights_gib": 2.5527,
         "rtx3080_budget_gib": 7.2,
         "three_f16_rank8_loras_gib": 0.000526,
         "windows_wddm_desktop_overhead_gib": 1.2
-      }
+      },
+      "gguf_filename": "Qwen3.5-4B-Q4_K_M.gguf",
+      "gguf_sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+      "gguf_size_bytes": 2740937888
     },
     "gguf_filename": "Qwen3.5-4B-Q8_0.gguf",
     "gguf_geometry": {
@@ -184,10 +539,6 @@
         "tokenizer_config.json": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
         "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
       }
-    },
-    "secondary_checkpoint_notes": {
-      "LiquidAI/LFM3-1.7B": "Public safetensors (3.22 GiB), model_type='lfm3' not yet supported in llama-server 0.5.0 build 11146 (supports lfm2/lfm2moe).",
-      "Llama-3.2-3B-Instruct": "Public open weights + Q8_0 GGUF (3.19 GiB), model_type='llama' natively supported in llama-server 0.5.0."
     }
   },
   "rtx3080_8gib_vram_fit": {
@@ -198,10 +549,38 @@
     "fits_8gib_rtx3080_budget": true,
     "fits_8gib_rtx3080_windows_wddm_budget": true,
     "kv_cache_8k_f16_gib": 0.25,
+    "measurement_kind": "analytical_projection_not_live_nvml",
     "model_weights_gib": 4.1746,
     "rtx3080_budget_gib": 7.2,
     "three_f16_rank8_loras_gib": 0.000526,
     "windows_wddm_desktop_overhead_gib": 1.2
   },
-  "schema": "mcproof-phase2-discovery/v0.1"
+  "schema": "mcproof-phase2-discovery/v0.2",
+  "static_reference_notes": {
+    "analytical_rtx3080_8gib_vram_projection": {
+      "cuda_context_and_compute_overhead_gib": 0.55,
+      "deltanet_recurrent_state_gib": 0.0502,
+      "estimated_total_vram_gib": 5.0253,
+      "estimated_total_vram_windows_wddm_gib": 6.2253,
+      "fits_8gib_rtx3080_budget": true,
+      "fits_8gib_rtx3080_windows_wddm_budget": true,
+      "kv_cache_8k_f16_gib": 0.25,
+      "measurement_kind": "analytical_projection_not_live_nvml",
+      "model_weights_gib": 4.1746,
+      "rtx3080_budget_gib": 7.2,
+      "three_f16_rank8_loras_gib": 0.000526,
+      "windows_wddm_desktop_overhead_gib": 1.2
+    },
+    "secondary_checkpoint_notes": {
+      "LiquidAI/LFM3-1.7B": "Public safetensors (3.22 GiB); model_type='lfm3' unsupported by llama-server 0.5.0 build 11146.",
+      "Llama-3.2-3B-Instruct": "Public open weights + Q8_0 GGUF (3.19 GiB); model_type='llama' supported by llama-server 0.5.0."
+    },
+    "workbench_notes": {
+      "cloud_policy_note": "Zero paid cloud compute policy enforced by operator configuration.",
+      "peer_inventory_notes": {
+        "charminar": "Operator inventory note (not probed via SSH here): x86_64 Linux node with AMD Radeon Vega Mobile iGPU and 5.7 GiB RAM; no NVIDIA RTX 3080 GPU.",
+        "geminus": "Operator inventory note (not probed via SSH here): ASUS ZenBook Pro Duo UX582HS with 8 GiB NVIDIA RTX 3080 Laptop GPU; Linux workbench provisioning tracked in siliconcordat/warp#4."
+      }
+    }
+  }
 }

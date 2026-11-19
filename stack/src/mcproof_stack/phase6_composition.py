@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import copy
 import itertools
 import json
-import math
 from pathlib import Path
 import re
 import statistics
@@ -20,15 +18,17 @@ from .runtime import (
     DOMAIN_TO_LLAMA_ID,
     LiveLlamaProcess,
     StackPaths,
+    assert_nonempty_completion_probs,
     build_checkpoint_and_weft_suite,
     ensure,
     load_canary_suite,
     max_logprob_diff,
+    sanitize_receipt_paths,
+    stamp_bundle_checkpoint,
     step0_logprob_shift,
 )
 
 EM_DASH = "\u2014"
-_SHA40_RE = re.compile(r"\b[0-9a-f]{40}\b")
 _FENCE_LINE_RE = re.compile(r"^\s*```")
 
 
@@ -91,6 +91,304 @@ def _check_formal_clean(text: str, *, forbid_float: bool = False, required_sha40
     return issues
 
 
+def parse_and_validate_grader_process(
+    returncode: int,
+    stdout: str,
+    stderr: str,
+    *,
+    grader_name: str,
+    required_int_keys: Sequence[str] = (),
+    any_of_int_keys: Sequence[tuple[str, ...]] = (),
+) -> tuple[bool, dict[str, Any]]:
+    """Validate an external grader subprocess execution.
+
+    - Raises `RuntimeError` if `returncode not in (0, 1)`, stdout is empty/invalid JSON, or schema keys are invalid.
+    - Returns `(returncode == 0, parsed_json)`: `returncode == 1` yields `False` so gate verdict is `False`.
+    """
+    if returncode not in (0, 1):
+        detail = (stderr or stdout or "").strip()[:300]
+        raise RuntimeError(f"{grader_name} failed with unexpected exit code {returncode}: {detail}")
+    raw_out = (stdout or "").strip()
+    if not raw_out:
+        raise RuntimeError(f"{grader_name} exited {returncode} with empty JSON stdout")
+    try:
+        parsed = json.loads(raw_out)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"{grader_name} returned invalid JSON: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise RuntimeError(f"{grader_name} output must be a JSON object")
+
+    for req_k in required_int_keys:
+        val = parsed.get(req_k)
+        if type(val) is not int or val < 0:
+            raise RuntimeError(f"{grader_name} JSON missing non-negative integer field {req_k!r}")
+
+    for group in any_of_int_keys:
+        if not any(type(parsed.get(k)) is int and int(parsed[k]) >= 0 for k in group):
+            raise RuntimeError(f"{grader_name} JSON missing required integer field (expected one of {group})")
+
+    return (returncode == 0), parsed
+
+
+def reconcile_mixed_grader_result(
+    *,
+    internal_formal_corruptions: int,
+    internal_prose_leaks: int,
+    returncode: int,
+    stdout: str,
+    stderr: str = "",
+) -> dict[str, Any]:
+    """Combine external mixed-grader verdict with authoritative `max(internal, external)` corruption counts."""
+    exit_ok, payload = parse_and_validate_grader_process(
+        returncode,
+        stdout,
+        stderr,
+        grader_name="mixed_grader",
+        any_of_int_keys=(
+            ("corrupted_formal_blocks", "formal_block_corruptions"),
+            ("prose_or_zone_leaks", "prose_rule_leaks"),
+        ),
+    )
+    if "total_passed" in payload and "total_count" in payload:
+        tp = payload["total_passed"]
+        tc = payload["total_count"]
+        if type(tp) is not int or type(tc) is not int or tp < 0 or tc <= 0 or tp > tc:
+            raise RuntimeError("mixed_grader JSON has invalid total_passed / total_count integers")
+
+    ext_formal = int(
+        payload["corrupted_formal_blocks"]
+        if "corrupted_formal_blocks" in payload
+        else payload["formal_block_corruptions"]
+    )
+    ext_prose = int(
+        payload["prose_or_zone_leaks"]
+        if "prose_or_zone_leaks" in payload
+        else payload["prose_rule_leaks"]
+    )
+    ext_bool_ok = True
+    for flag_key in ("passed", "phase6_tc2_isolation_gate"):
+        if flag_key in payload:
+            if type(payload[flag_key]) is not bool:
+                raise RuntimeError(f"mixed_grader JSON field {flag_key!r} must be a boolean")
+            ext_bool_ok = ext_bool_ok and bool(payload[flag_key])
+
+    effective_formal = max(int(internal_formal_corruptions), ext_formal)
+    effective_prose = max(int(internal_prose_leaks), ext_prose)
+    gate_passed = bool(exit_ok and ext_bool_ok and effective_formal == 0 and effective_prose == 0)
+    return {
+        "passed": gate_passed,
+        "formal_block_corruptions": effective_formal,
+        "prose_rule_leaks": effective_prose,
+        "internal_formal_block_corruptions": int(internal_formal_corruptions),
+        "external_formal_block_corruptions": ext_formal,
+        "internal_prose_rule_leaks": int(internal_prose_leaks),
+        "external_prose_rule_leaks": ext_prose,
+        "external_grader_returncode": int(returncode),
+    }
+
+
+def compute_live_step0_retention_pct(*, solo_shift: float, drift_from_solo: float) -> float:
+    """Compute live behavioral step-0 retention strictly from measured logprob shifts (never CPU subspace)."""
+    if solo_shift <= 0.0:
+        return 0.0
+    raw = (1.0 - (float(drift_from_solo) / float(solo_shift))) * 100.0
+    return max(0.0, min(100.0, raw))
+
+
+def compute_shared_subspace_diagnostic(
+    layer_factors_a: Mapping[str, tuple[np.ndarray, np.ndarray]],
+    layer_factors_b: Mapping[str, tuple[np.ndarray, np.ndarray]],
+    *,
+    key_a: str = "weft_eido_pct",
+    key_b: str = "formal_verification_pct",
+) -> dict[str, Any]:
+    """Compute diagnostic-only CPU linear subspace alignment on shared tensors (or None if disjoint)."""
+    shared_tensors = sorted(set(layer_factors_a.keys()) & set(layer_factors_b.keys()))
+    if not shared_tensors:
+        return {
+            "diagnostic_only": True,
+            "status": "not_applicable_disjoint_tensors",
+            "shared_tensors": [],
+            key_a: None,
+            key_b: None,
+        }
+    a_rets: list[float] = []
+    b_rets: list[float] = []
+    for t_sh in shared_tensors:
+        b_a, a_a = layer_factors_a[t_sh]
+        b_b, a_b = layer_factors_b[t_sh]
+        d_a = b_a @ a_a
+        d_b = b_b @ a_b
+        d_ab = d_a + d_b
+        _, _, vh_a = np.linalg.svd(a_a, full_matrices=False)
+        _, _, vh_b = np.linalg.svd(a_b, full_matrices=False)
+        k_a = vh_a.T
+        k_b = vh_b.T
+        a_solo_out = d_a @ k_a
+        b_solo_out = d_b @ k_b
+        a_sim_out = d_ab @ k_a
+        b_sim_out = d_ab @ k_b
+        a_rets.append(
+            float(np.sum(a_sim_out * a_solo_out) / max(float(np.sum(a_solo_out * a_solo_out)), 1e-12)) * 100.0
+        )
+        b_rets.append(
+            float(np.sum(b_sim_out * b_solo_out) / max(float(np.sum(b_solo_out * b_solo_out)), 1e-12)) * 100.0
+        )
+    return {
+        "diagnostic_only": True,
+        "status": "shared_tensors_evaluated",
+        "shared_tensors": shared_tensors,
+        key_a: round(min(a_rets), 2),
+        key_b: round(min(b_rets), 2),
+    }
+
+
+def compute_latency_overhead_metrics(
+    w0_tok_per_s_samples: Sequence[float],
+    stack_tok_per_s_samples: Sequence[float],
+    *,
+    max_allowed_overhead_pct: float = 15.0,
+    anomaly_floor_pct: float = -5.0,
+) -> dict[str, Any]:
+    """Compute signed throughput overhead on a matched instance and flag negative-overhead anomalies."""
+    if not w0_tok_per_s_samples or not stack_tok_per_s_samples:
+        raise ValueError("throughput sample lists must be non-empty")
+    w0_med = float(statistics.median(w0_tok_per_s_samples))
+    stack_med = float(statistics.median(stack_tok_per_s_samples))
+    if w0_med <= 0.0 or stack_med <= 0.0:
+        raise ValueError(f"median throughput must be positive (w0={w0_med}, stack={stack_med})")
+    overhead_pct = ((w0_med - stack_med) / w0_med) * 100.0
+    benchmark_anomaly = bool(overhead_pct < anomaly_floor_pct)
+    gate_passed = bool((not benchmark_anomaly) and (overhead_pct <= max_allowed_overhead_pct))
+    return {
+        "w0_median_tok_per_s": round(w0_med, 2),
+        "triple_lora_median_tok_per_s": round(stack_med, 2),
+        "w0_samples_tok_per_s": [round(float(x), 2) for x in w0_tok_per_s_samples],
+        "triple_lora_samples_tok_per_s": [round(float(x), 2) for x in stack_tok_per_s_samples],
+        "latency_overhead_pct": round(overhead_pct, 2),
+        "max_allowed_overhead_pct": float(max_allowed_overhead_pct),
+        "anomaly_floor_pct": float(anomaly_floor_pct),
+        "benchmark_anomaly": benchmark_anomaly,
+        "overhead_gate_passed": gate_passed,
+    }
+
+
+def extract_verified_slot_n_ctx(raw_slots: Any) -> int | None:
+    """Extract verified integer `n_ctx` from `GET /slots` response (`raw_slots[0]`); return None if missing."""
+    if not isinstance(raw_slots, list) or len(raw_slots) == 0:
+        return None
+    first = raw_slots[0]
+    if not isinstance(first, Mapping) or "n_ctx" not in first:
+        return None
+    val = first["n_ctx"]
+    if type(val) is not int or val <= 0:
+        return None
+    return int(val)
+
+
+def compute_analytical_vram_projection_gib(
+    *,
+    base_gguf_bytes: int,
+    lora_total_bytes: int,
+    kv_ctx_tokens: int,
+    kv_cache_type: str,
+    geometry: Mapping[str, Any],
+    config_json_path: Path | None = None,
+    companion_q4_gguf_path: Path | None = None,
+) -> dict[str, Any]:
+    """Compute analytical 8 GiB GPU VRAM projection (explicitly labeled non-NVML, reading `config.json` layers)."""
+    gib = float(1024**3)
+    layer_source = "gguf_header_geometry"
+    n_full_attn = int(geometry.get("block_count", 32))
+    n_linear_attn = 0
+    n_kv_heads = 4
+    head_dim = 256
+    lin_v_heads = 32
+    lin_k_dim = 128
+    lin_v_dim = 128
+    lin_conv = 4
+    inter_size = int(geometry.get("feed_forward_length", 9216))
+
+    if config_json_path is not None and config_json_path.is_file():
+        cfg_raw = json.loads(config_json_path.read_text(encoding="utf-8"))
+        tcfg = cfg_raw.get("text_config") if isinstance(cfg_raw.get("text_config"), Mapping) else cfg_raw
+        if isinstance(tcfg, Mapping):
+            layer_source = "config.json"
+            ltypes = tcfg.get("layer_types")
+            if isinstance(ltypes, list) and len(ltypes) > 0:
+                n_full_attn = sum(1 for lt in ltypes if lt == "full_attention")
+                n_linear_attn = sum(1 for lt in ltypes if lt != "full_attention")
+            elif type(tcfg.get("num_hidden_layers")) is int:
+                n_full_attn = int(tcfg["num_hidden_layers"])
+                n_linear_attn = 0
+            if type(tcfg.get("num_key_value_heads")) is int:
+                n_kv_heads = int(tcfg["num_key_value_heads"])
+            if type(tcfg.get("head_dim")) is int:
+                head_dim = int(tcfg["head_dim"])
+            elif type(tcfg.get("hidden_size")) is int and type(tcfg.get("num_attention_heads")) is int:
+                head_dim = int(tcfg["hidden_size"]) // max(1, int(tcfg["num_attention_heads"]))
+            if type(tcfg.get("linear_num_value_heads")) is int:
+                lin_v_heads = int(tcfg["linear_num_value_heads"])
+            if type(tcfg.get("linear_key_head_dim")) is int:
+                lin_k_dim = int(tcfg["linear_key_head_dim"])
+            if type(tcfg.get("linear_value_head_dim")) is int:
+                lin_v_dim = int(tcfg["linear_value_head_dim"])
+            if type(tcfg.get("linear_conv_kernel_dim")) is int:
+                lin_conv = int(tcfg["linear_conv_kernel_dim"])
+            if type(tcfg.get("intermediate_size")) is int:
+                inter_size = int(tcfg["intermediate_size"])
+
+    bytes_per_kv_elem = 2.0 if kv_cache_type.lower() == "f16" else 1.0625
+    kv_bytes = float(n_full_attn * 2 * n_kv_heads * head_dim * int(kv_ctx_tokens)) * bytes_per_kv_elem
+    ssm_bytes = (
+        float(n_linear_attn * (lin_v_heads * lin_k_dim * lin_v_dim * 4 + inter_size * lin_conv * 4))
+        if n_linear_attn > 0
+        else 0.0
+    )
+    cuda_scratch_allowance_gib = 0.50
+    base_gib = float(base_gguf_bytes) / gib
+    kv_gib = kv_bytes / gib
+    ssm_gib = ssm_bytes / gib
+    lora_gib = float(lora_total_bytes) / gib
+    lora_mib = float(lora_total_bytes) / float(1024**2)
+
+    projected_headless_gib = base_gib + kv_gib + ssm_gib + lora_gib + cuda_scratch_allowance_gib
+    windows_wddm_allowance_gib = 1.20
+    projected_wddm_gib = projected_headless_gib + windows_wddm_allowance_gib
+
+    companion_q4_headless_gib: float | None = None
+    companion_q4_wddm_gib: float | None = None
+    if companion_q4_gguf_path is not None and companion_q4_gguf_path.is_file():
+        q4_base_gib = float(companion_q4_gguf_path.stat().st_size) / gib
+        q4_headless = q4_base_gib + kv_gib + ssm_gib + lora_gib + cuda_scratch_allowance_gib
+        companion_q4_headless_gib = round(q4_headless, 4)
+        companion_q4_wddm_gib = round(q4_headless + windows_wddm_allowance_gib, 4)
+
+    return {
+        "vram_measurement_kind": "analytical_projection_not_nvml",
+        "layer_count_source": layer_source,
+        "full_attention_layers": n_full_attn,
+        "linear_attention_ssm_layers": n_linear_attn,
+        "num_key_value_heads": n_kv_heads,
+        "head_dim": head_dim,
+        "base_gguf_gib": round(base_gib, 4),
+        "kv_cache_dtype": kv_cache_type,
+        "kv_cache_per_slot_gib": round(kv_gib, 4),
+        "ssm_recurrent_state_per_slot_gib": round(ssm_gib, 4),
+        "three_f16_loras_mib": round(lora_mib, 3),
+        "cuda_compute_scratch_allowance_gib": cuda_scratch_allowance_gib,
+        "analytical_vram_projection_gib": round(projected_headless_gib, 4),
+        "analytical_windows_wddm_projection_gib": round(projected_wddm_gib, 4),
+        "companion_q4_k_m_headless_projection_gib": companion_q4_headless_gib,
+        "companion_q4_k_m_windows_wddm_projection_gib": companion_q4_wddm_gib,
+        "hard_vram_ceiling_gib": 7.2,
+        "rtx_3080_host_note": (
+            "Analytical byte-formula projection only (no NVIDIA NVML GPU attached to M1 Max execution host; "
+            "Tailscale peer geminus SSH/RPC ports closed, charminar is AMD Radeon Vega Mobile iGPU)."
+        ),
+    }
+
+
 def _run_node_json(weft_eido_root: Path, js_code: str) -> Any:
     proc = subprocess.run(
         ["node", "--input-type=module", "-e", js_code],
@@ -109,23 +407,24 @@ def _mount_for_decision(
     decision: Any,
     compiled_map: Mapping[str, Mapping[str, Any]],
     *,
-    model_id: str,
+    ckpt: Any,
     lineage_dict: Mapping[str, Any],
     runtime_flags_sha256: str,
     zone_manifest_id: str,
 ) -> dict[str, Any]:
     from exo.bridge import build_warp_bundles_for_route
 
-    bundles = build_warp_bundles_for_route(
+    raw_bundles = build_warp_bundles_for_route(
         decision,
         compiled_map,
-        model_id=model_id,
+        model_id=ckpt.model_id,
         source_lineage=lineage_dict,
         runtime_flags_sha256=runtime_flags_sha256,
         zone_manifest_id=zone_manifest_id,
     )
-    if not bundles:
+    if not raw_bundles:
         return bridge.unmount(reason=f"zero_scale_zone:{decision.zone}")
+    bundles = [stamp_bundle_checkpoint(b, ckpt) for b in raw_bundles]
     return bridge.mount_stack(bundles, zone_manifest_id=zone_manifest_id)
 
 
@@ -136,12 +435,13 @@ def run_seven_hazards_live(
     bridge: Any,
     router: Any,
     compiled_map: Mapping[str, Mapping[str, Any]],
-    model_id: str,
+    ckpt: Any,
     lineage_dict: Mapping[str, Any],
     runtime_flags_sha256: str,
     zone_manifest_id: str,
 ) -> dict[str, Any]:
     """Verify all 7 cross-domain interference hazards live across mde, exo, weft-eido, warp, and llama-server."""
+    from exo.bridge import build_warp_adapter_bundle
     from exo.client import WarpLoadError
     from exo.policy import (
         RepoPolicy,
@@ -153,6 +453,7 @@ def run_seven_hazards_live(
     )
     from exo.router import ContestedPreferenceError, RouteRequest
 
+    _ = work_dir
     all_domains = ("corpus", "weft-eido", "formal-verification")
     hazards: dict[str, dict[str, Any]] = {}
 
@@ -178,7 +479,7 @@ def run_seven_hazards_live(
         bridge,
         dec_h1,
         compiled_map,
-        model_id=model_id,
+        ckpt=ckpt,
         lineage_dict=lineage_dict,
         runtime_flags_sha256=runtime_flags_sha256,
         zone_manifest_id=zone_manifest_id,
@@ -257,7 +558,6 @@ def run_seven_hazards_live(
     ensure(dec_f0.constraints.claim_vocabulary == "foundation0", "wrong foundation0 vocab")
     ensure(dec_pc.constraints.claim_vocabulary == "proven_commons", "wrong proven_commons vocab")
 
-    # Verify Tier 2 policy enforcement catches mixed checker + result commit and missing DCO outside weights!
     f0_violations = validate_change_against_policy(
         pol_f0,
         commit_message="Update bound and gate together",
@@ -340,31 +640,21 @@ def run_seven_hazards_live(
         contested_key = exc.conflict_key
     ensure(contested_key == "html_delivery", f"H5 failed to escalate contested html_delivery: {contested_key!r}")
 
-    # Also verify warp-modeld Stage 1 rejects contested_heads over RPC (ERR_CONTESTED_LINEAGE)!
-    contested_bundle = copy.deepcopy(
-        {
-            "bundles": [
-                {
-                    **compiled_map["weft-eido"],
-                }
-            ]
-        }
-    )
-    _ = contested_bundle  # build via exo.bridge with contested_heads
-    from exo.bridge import build_warp_adapter_bundle
-
-    bad_contested_bundle = build_warp_adapter_bundle(
-        adapter_id="mde:weft-eido",
-        domain="weft-eido",
-        llama_adapter_id=compiled_map["weft-eido"]["llama_adapter_id"],
-        weft_manifest=compiled_map["weft-eido"]["weft_manifest"],
-        weft_certificate=compiled_map["weft-eido"]["weft_certificate"],
-        gguf_sha256=compiled_map["weft-eido"]["gguf_sha256"],
-        model_id=model_id,
-        source_lineage={**lineage_dict, "contested_heads": ["html_delivery:corpus_vs_weft_eido"]},
-        runtime_flags_sha256=runtime_flags_sha256,
-        adapter_path=compiled_map["weft-eido"]["adapter_path"],
-        zone_manifest_id=zone_manifest_id,
+    bad_contested_bundle = stamp_bundle_checkpoint(
+        build_warp_adapter_bundle(
+            adapter_id="mde:weft-eido",
+            domain="weft-eido",
+            llama_adapter_id=compiled_map["weft-eido"]["llama_adapter_id"],
+            weft_manifest=compiled_map["weft-eido"]["weft_manifest"],
+            weft_certificate=compiled_map["weft-eido"]["weft_certificate"],
+            gguf_sha256=compiled_map["weft-eido"]["gguf_sha256"],
+            model_id=ckpt.model_id,
+            source_lineage={**lineage_dict, "contested_heads": ["html_delivery:corpus_vs_weft_eido"]},
+            runtime_flags_sha256=runtime_flags_sha256,
+            adapter_path=compiled_map["weft-eido"]["adapter_path"],
+            zone_manifest_id=zone_manifest_id,
+        ),
+        ckpt,
     )
     warp_contested_code = ""
     try:
@@ -373,7 +663,6 @@ def run_seven_hazards_live(
         warp_contested_code = str(exc.code)
     ensure(warp_contested_code == "ERR_CONTESTED_LINEAGE", f"expected ERR_CONTESTED_LINEAGE, got {warp_contested_code}")
 
-    # Resolve cleanly via Plane 1 human precedence_overrides["html_delivery"] = "weft-eido"
     resolved_pol = RepoPolicy(
         **{**pol_eido.to_dict(), "precedence_overrides": {"html_delivery": "weft-eido"}}
     )
@@ -390,13 +679,12 @@ def run_seven_hazards_live(
         bridge,
         dec_h5,
         compiled_map,
-        model_id=model_id,
+        ckpt=ckpt,
         lineage_dict=lineage_dict,
         runtime_flags_sha256=runtime_flags_sha256,
         zone_manifest_id=zone_manifest_id,
     )
 
-    # Execute PR #25 360-hue WCAG contrast audit live via Node!
     contrast_audit = _run_node_json(
         paths.weft_eido_root,
         (
@@ -449,12 +737,11 @@ def run_seven_hazards_live(
     ensure(dec_h6.constraints.require_certificate_binding is True, "H6 require_certificate_binding must be True")
     ensure(dec_h6.constraints.require_illustrative_tag is True, "H6 require_illustrative_tag must be True")
 
-    # Mount BOTH weft-eido (id=1) AND formal-verification (id=2) simultaneously on warp-modeld + llama-server!
     h6_mount = _mount_for_decision(
         bridge,
         dec_h6,
         compiled_map,
-        model_id=model_id,
+        ckpt=ckpt,
         lineage_dict=lineage_dict,
         runtime_flags_sha256=runtime_flags_sha256,
         zone_manifest_id=zone_manifest_id,
@@ -518,8 +805,6 @@ def run_seven_hazards_live(
     )
     ensure(dec_h7_ok.constraints.enforce_data_eido_skip is True, "H7 enforce_data_eido_skip must be True")
 
-    # Prove with real weft-eido `parseHtml` DOM extractor that unmarked formal claims get extracted
-    # for condensing, while `data-eido-skip` protects formal theorem & disclaimer blocks 100%!
     h7_dom_check = _run_node_json(
         paths.weft_eido_root,
         (
@@ -557,7 +842,6 @@ def run_seven_hazards_live(
 def _build_public_mixed_30_prompts() -> list[dict[str, Any]]:
     """30 deterministic public (non-vault `PUB-MIX-`) mixed-zone prompts testing T-C2."""
     prompts: list[dict[str, Any]] = []
-    # 10 prose + Lean formal_proof prompts
     for i in range(1, 11):
         k = i + 1
         prompts.append(
@@ -573,7 +857,6 @@ def _build_public_mixed_30_prompts() -> list[dict[str, Any]]:
                 "require_not_proved": True,
             }
         )
-    # 10 exact-math Python code + prose prompts (zero float, zero sorry)
     for i in range(11, 21):
         a, b = i, i + 3
         prompts.append(
@@ -588,7 +871,6 @@ def _build_public_mixed_30_prompts() -> list[dict[str, Any]]:
                 "require_not_proved": False,
             }
         )
-    # 5 research_page simultaneous weft-eido + formal-verification prompts with 40-char SHA & data-eido-skip
     sha40 = "77b9a1c64ed66d17bf75cc29be1b22ef262e5610"
     for i in range(21, 26):
         prompts.append(
@@ -608,7 +890,6 @@ def _build_public_mixed_30_prompts() -> list[dict[str, Any]]:
                 "require_data_eido_skip": True,
             }
         )
-    # 5 pure prose status notes (corpus = 1.0) verifying zero AI-tell / em-dash / forecast leaks
     for i in range(26, 31):
         prompts.append(
             {
@@ -626,7 +907,7 @@ def _build_public_mixed_30_prompts() -> list[dict[str, Any]]:
 
 
 def _build_public_retention_prompts() -> list[dict[str, Any]]:
-    """25 deterministic public coding/math/refusal prompts for @stack T-C3 smoke check (non-vault)."""
+    """25 deterministic public coding/math/refusal prompts for T-C3 smoke check (non-vault)."""
     items: list[dict[str, Any]] = []
     pairs = [
         ("14 * 15", "210"),
@@ -723,6 +1004,7 @@ def run_phase6_composition(
     t_start = time.perf_counter()
     paths.inject_sys_path()
 
+    from exo.bridge import build_warp_adapter_bundle
     from exo.client import WarpUnixBridge
     from exo.ledger import AppendOnlyLedger
     from exo.policy import RepoPolicy, corpus_repo_policy, foundation0_repo_policy, weft_eido_repo_policy
@@ -742,7 +1024,6 @@ def run_phase6_composition(
     zone_manifest_dict = json.loads(paths.zone_manifest_path.read_text(encoding="utf-8"))
     zone_manifest_id = str(zone_manifest_dict["manifest_id"])
 
-    # Verify full 120-test weft-eido suite (including PR #25 contrast.test.mjs) passes in worktree!
     eido_test_proc = subprocess.run(
         ["npm", "test"],
         cwd=str(paths.weft_eido_root),
@@ -764,29 +1045,14 @@ def run_phase6_composition(
             zone_manifest_id=zone_manifest_id,
             compiler_manifest_path=comp_manifest,
             formal_gguf_override=fv_override,
+            ctx_size=int(ctx_size),
         )
         ckpt = suite_env["checkpoint"]
         warp_flags = suite_env["warp_flags"]
-        if int(ctx_size) != warp_flags.ctx_size:
-            from warp_modeld.fingerprint import RuntimeFlags as WarpRuntimeFlags
-
-            warp_flags = WarpRuntimeFlags(
-                llama_server_commit=warp_flags.llama_server_commit,
-                quantization=warp_flags.quantization,
-                ctx_size=int(ctx_size),
-                kv_cache_type=warp_flags.kv_cache_type,
-                ctx_checkpoints=0,
-                swa_checkpoints=0,
-                lora_init_without_apply=True,
-                rope_args=warp_flags.rope_args,
-                chat_template_args=warp_flags.chat_template_args,
-            )
         lineage = suite_env["lineage"]
         artifacts = suite_env["artifacts"]
         geom = suite_env["geometry"]
 
-        # Build an un-projected naive adapter (llama_adapter_id=3, finite in F16 without K0 nullspace projection)
-        # to measure T-C3 retention vs naive unweighted summation!
         rng_naive = np.random.default_rng(77701)
         d_out, d_in = geom["target_shape"]
         b_naive = rng_naive.standard_normal((d_out, 8)).astype(np.float64) * 1.6
@@ -800,7 +1066,7 @@ def run_phase6_composition(
             extra_metadata={"weft.control": "naive_unweighted_unprojected_sum"},
         )
 
-        # Pure Base W0 server run for T-C4 exact logprob reference + T-C5 pure base tok/s baseline
+        # Pure Base W0 server run (with matched parallel_slots & ctx_size) ONLY for T-C4 exact logprob reference
         t_c4_prompt = "State the exact product 19 * 23 = "
         bench_prompt = (
             "Explain in four clear sentences how deterministic syntax-tree byte spans, "
@@ -814,7 +1080,7 @@ def run_phase6_composition(
             slot_save_dir=work_dir / "slots_pure_w0",
             ctx_size=ctx_size,
             n_gpu_layers=n_gpu_layers,
-            parallel_slots=1,
+            parallel_slots=parallel_slots,
             kv_cache_type=warp_flags.kv_cache_type,
         ) as pure_llama:
             pure_client = LlamaServerClient(pure_llama.base_url, timeout_seconds=45.0, require_localhost=True)
@@ -829,34 +1095,12 @@ def run_phase6_composition(
                 cache_prompt=False,
                 id_slot=0,
             )
-            # Warmup + 3 timed runs for T-C5 Bare W0 tok/s
-            pure_client.erase_slot(0)
-            _ = pure_client.completion(bench_prompt, lora=[], temperature=0.0, top_p=1.0, seed=42, n_predict=64, cache_prompt=False, id_slot=0)
-            w0_tok_s_samples: list[float] = []
-            for _ in range(3):
-                pure_client.erase_slot(0)
-                t0 = time.perf_counter()
-                r_b = pure_client.completion(
-                    bench_prompt,
-                    lora=[],
-                    temperature=0.0,
-                    top_p=1.0,
-                    seed=42,
-                    n_predict=96,
-                    cache_prompt=False,
-                    id_slot=0,
-                )
-                wall_s = time.perf_counter() - t0
-                timings = r_b.get("timings") or {}
-                pred_per_s = float(timings.get("predicted_per_second") or (96.0 / max(wall_s, 1e-6)))
-                w0_tok_s_samples.append(pred_per_s)
             w0_rss_mib = pure_llama.rss_mib
 
         pure_probs = pure_ref["completion_probabilities"]
+        assert_nonempty_completion_probs(pure_probs, label="pure_probs")
         pure_text = str(pure_ref["content"])
-        w0_median_tok_s = float(statistics.median(w0_tok_s_samples))
 
-        # Launch simultaneous 3-pack MDE llama-server (+ slot 3 naive control at scale 0.0)
         ordered_ggufs = (
             artifacts["corpus"].gguf_path,
             artifacts["weft-eido"].gguf_path,
@@ -891,7 +1135,13 @@ def run_phase6_composition(
             canary_suite, _ = load_canary_suite(paths, eff_canary_file, min_preservation=8)
 
             canary_runner_override = (
-                ExternalCommandCanaryRunner(llama_client, canary_cmd, canary_slot_id=0, timeout_seconds=30.0)
+                ExternalCommandCanaryRunner(
+                    llama_client,
+                    canary_cmd,
+                    canary_slot_id=0,
+                    timeout_seconds=30.0,
+                    min_preservation=8,
+                )
                 if canary_cmd
                 else None
             )
@@ -932,7 +1182,7 @@ def run_phase6_composition(
                     bridge=bridge,
                     router=router,
                     compiled_map=compiled_map,
-                    model_id=ckpt.model_id,
+                    ckpt=ckpt,
                     lineage_dict=lineage.to_dict(),
                     runtime_flags_sha256=warp_flags.canonical_digest(),
                     zone_manifest_id=zone_manifest_id,
@@ -941,7 +1191,6 @@ def run_phase6_composition(
                 # ----------------------------------------------------------
                 # 2. T-C4: CPU float64 & Live llama-server Order Invariance + Per-Slot O(1) Rollback
                 # ----------------------------------------------------------
-                # 2a. CPU float64 composition across all 3! = 6 permutations grouped by target tensor
                 perm_names = list(itertools.permutations(("corpus", "weft-eido", "formal-verification")))
                 all_touched_tensors = sorted(
                     {t_name for dom in ("corpus", "weft-eido", "formal-verification") for t_name in artifacts[dom].layer_factors}
@@ -1010,7 +1259,6 @@ def run_phase6_composition(
                             f"float64 arena slot rollback left non-zero output on {t_name}",
                         )
 
-                # 2b. Live llama-server C++ multi-LoRA order invariance & per-slot O(1) selective rollback
                 bridge.unmount(reason="prepare_tc4_live_order_test")
                 llama_orderings = [
                     [{"id": 0, "scale": 1.0}, {"id": 1, "scale": 1.0}, {"id": 2, "scale": 1.0}],
@@ -1018,7 +1266,7 @@ def run_phase6_composition(
                     [{"id": 1, "scale": 1.0}, {"id": 2, "scale": 1.0}, {"id": 0, "scale": 1.0}],
                 ]
                 order_probs: list[list[dict[str, Any]]] = []
-                for lora_spec in llama_orderings:
+                for idx_ord, lora_spec in enumerate(llama_orderings):
                     llama_client.erase_slot(0)
                     r_ord = llama_client.completion(
                         t_c4_prompt,
@@ -1027,18 +1275,19 @@ def run_phase6_composition(
                         top_p=1.0,
                         seed=42,
                         n_predict=12,
-                        n_probs=5,
+                        n_probs=20,
                         cache_prompt=False,
                         id_slot=0,
                     )
-                    order_probs.append(r_ord["completion_probabilities"])
+                    probs_ord = r_ord["completion_probabilities"]
+                    assert_nonempty_completion_probs(probs_ord, label=f"order_probs[{idx_ord}]")
+                    order_probs.append(probs_ord)
                 live_order_max_logprob_diff = max(
                     max_logprob_diff(order_probs[0], order_probs[1]),
                     max_logprob_diff(order_probs[0], order_probs[2]),
                 )
                 ensure(live_order_max_logprob_diff == 0.0, f"live order diff > 0: {live_order_max_logprob_diff}")
 
-                # Selective single-slot rollback: [1.0, 0.0, 1.0] -> disable slot 0 -> [0.0, 0.0, 1.0] matches solo slot 2!
                 llama_client.erase_slot(0)
                 solo_fv = llama_client.completion(
                     t_c4_prompt,
@@ -1047,10 +1296,13 @@ def run_phase6_composition(
                     top_p=1.0,
                     seed=42,
                     n_predict=12,
-                    n_probs=5,
+                    n_probs=20,
                     cache_prompt=False,
                     id_slot=0,
                 )
+                solo_fv_probs = solo_fv["completion_probabilities"]
+                assert_nonempty_completion_probs(solo_fv_probs, label="solo_fv_probs")
+
                 llama_client.erase_slot(0)
                 _ = llama_client.completion(
                     t_c4_prompt,
@@ -1059,11 +1311,10 @@ def run_phase6_composition(
                     top_p=1.0,
                     seed=42,
                     n_predict=12,
-                    n_probs=5,
+                    n_probs=20,
                     cache_prompt=False,
                     id_slot=0,
                 )
-                # Drop slot 0 in O(1) and erase KV/DeltaNet state, keeping slot 2 at 1.0
                 llama_client.erase_slot(0)
                 selective_fv = llama_client.completion(
                     t_c4_prompt,
@@ -1072,42 +1323,32 @@ def run_phase6_composition(
                     top_p=1.0,
                     seed=42,
                     n_predict=12,
-                    n_probs=5,
+                    n_probs=20,
                     cache_prompt=False,
                     id_slot=0,
                 )
-                selective_slot_rb_diff = max_logprob_diff(
-                    selective_fv["completion_probabilities"], solo_fv["completion_probabilities"]
-                )
+                selective_fv_probs = selective_fv["completion_probabilities"]
+                assert_nonempty_completion_probs(selective_fv_probs, label="selective_fv_probs")
+                selective_slot_rb_diff = max_logprob_diff(selective_fv_probs, solo_fv_probs)
                 ensure(selective_slot_rb_diff == 0.0, f"selective slot rollback diff: {selective_slot_rb_diff}")
 
-                # Full stack mount of all 3 adapters via warp-modeld + O(1) unmount rollback to W0
-                triple_bundles = [
-                    {
-                        **bridge_bundle,
-                    }
-                    for bridge_bundle in (
-                        # Use exo.bridge to build all 3 bundles cleanly
-                        []
-                    )
-                ]
-                _ = triple_bundles
-                from exo.bridge import build_warp_adapter_bundle
-
                 all_three_bundles = [
-                    build_warp_adapter_bundle(
-                        adapter_id=compiled_map[dom]["adapter_id"],
-                        domain=dom,
-                        llama_adapter_id=compiled_map[dom]["llama_adapter_id"],
-                        weft_manifest=compiled_map[dom]["weft_manifest"],
-                        weft_certificate=compiled_map[dom]["weft_certificate"],
-                        gguf_sha256=compiled_map[dom]["gguf_sha256"],
-                        model_id=ckpt.model_id,
-                        source_lineage=lineage.to_dict(),
-                        runtime_flags_sha256=warp_flags.canonical_digest(),
-                        scale=1.0,
-                        adapter_path=compiled_map[dom]["adapter_path"],
-                        zone_manifest_id=zone_manifest_id,
+                    stamp_bundle_checkpoint(
+                        build_warp_adapter_bundle(
+                            adapter_id=compiled_map[dom]["adapter_id"],
+                            domain=dom,
+                            llama_adapter_id=compiled_map[dom]["llama_adapter_id"],
+                            weft_manifest=compiled_map[dom]["weft_manifest"],
+                            weft_certificate=compiled_map[dom]["weft_certificate"],
+                            gguf_sha256=compiled_map[dom]["gguf_sha256"],
+                            model_id=ckpt.model_id,
+                            source_lineage=lineage.to_dict(),
+                            runtime_flags_sha256=warp_flags.canonical_digest(),
+                            scale=1.0,
+                            adapter_path=compiled_map[dom]["adapter_path"],
+                            zone_manifest_id=zone_manifest_id,
+                        ),
+                        ckpt,
                     )
                     for dom in ("corpus", "weft-eido", "formal-verification")
                 ]
@@ -1124,9 +1365,9 @@ def run_phase6_composition(
                     n_probs=20,
                     zone_manifest_id=zone_manifest_id,
                 )
-                tc4_full_rb_diff = max_logprob_diff(
-                    tc4_post_rb["response"]["completion_probabilities"], pure_probs
-                )
+                tc4_post_rb_probs = tc4_post_rb["response"]["completion_probabilities"]
+                assert_nonempty_completion_probs(tc4_post_rb_probs, label="tc4_post_rb_probs")
+                tc4_full_rb_diff = max_logprob_diff(tc4_post_rb_probs, pure_probs)
                 ensure(
                     tc4_post_rb["response"]["content"] == pure_text and tc4_full_rb_diff == 0.0,
                     f"T-C4 full rollback diff > 0: {tc4_full_rb_diff}",
@@ -1158,8 +1399,8 @@ def run_phase6_composition(
                     mixed_prompts = _build_public_mixed_30_prompts()
                     mixed_source = "public_non_vault_30"
 
-                formal_corruptions = 0
-                prose_leaks = 0
+                internal_formal_corruptions = 0
+                internal_prose_leaks = 0
                 contested_escalations = 0
                 mixed_details: list[dict[str, Any]] = []
                 mixed_response_rows: list[dict[str, Any]] = []
@@ -1235,7 +1476,6 @@ def run_phase6_composition(
                             )
                         )
                     except ContestedPreferenceError as exc:
-                        # Hard Veto 2: fail-closed escalation without silent auto-override!
                         bridge.unmount(reason=f"hard_veto2_contested:{exc.conflict_key}")
                         current_scales_mounted = {}
                         contested_escalations += 1
@@ -1268,7 +1508,7 @@ def run_phase6_composition(
                             bridge,
                             dec,
                             compiled_map,
-                            model_id=ckpt.model_id,
+                            ckpt=ckpt,
                             lineage_dict=lineage.to_dict(),
                             runtime_flags_sha256=warp_flags.canonical_digest(),
                             zone_manifest_id=zone_manifest_id,
@@ -1298,9 +1538,9 @@ def run_phase6_composition(
                     p_issues = _check_prose_clean(reply)
 
                     if f_issues:
-                        formal_corruptions += 1
+                        internal_formal_corruptions += 1
                     if p_issues:
-                        prose_leaks += 1
+                        internal_prose_leaks += 1
                     mixed_response_rows.append(
                         {
                             "id": item_id,
@@ -1326,7 +1566,6 @@ def run_phase6_composition(
                     encoding="utf-8",
                 )
 
-                external_mixed_grade: dict[str, Any] | None = None
                 if mixed_grader_cmd:
                     has_mg_ph = any("{responses_jsonl}" in tok for tok in mixed_grader_cmd)
                     mg_cmd = (
@@ -1341,27 +1580,27 @@ def run_phase6_composition(
                         timeout=120.0,
                         check=False,
                     )
-                    ensure(
-                        mg_proc.returncode == 0 or bool((mg_proc.stdout or "").strip()),
-                        f"mixed grader command failed ({mg_proc.returncode}): {mg_proc.stderr}",
+                    reconciled_mixed = reconcile_mixed_grader_result(
+                        internal_formal_corruptions=internal_formal_corruptions,
+                        internal_prose_leaks=internal_prose_leaks,
+                        returncode=mg_proc.returncode,
+                        stdout=mg_proc.stdout,
+                        stderr=mg_proc.stderr,
                     )
-                    external_mixed_grade = json.loads(mg_proc.stdout)
-                    formal_corruptions = int(
-                        external_mixed_grade.get(
-                            "corrupted_formal_blocks",
-                            external_mixed_grade.get("formal_block_corruptions", formal_corruptions),
-                        )
-                    )
-                    prose_leaks = int(
-                        external_mixed_grade.get(
-                            "prose_or_zone_leaks",
-                            external_mixed_grade.get("prose_rule_leaks", prose_leaks),
-                        )
-                    )
+                    formal_corruptions = reconciled_mixed["formal_block_corruptions"]
+                    prose_leaks = reconciled_mixed["prose_rule_leaks"]
+                    tc2_passed = reconciled_mixed["passed"]
+                    external_mixed_meta: dict[str, Any] | None = {
+                        "returncode": reconciled_mixed["external_grader_returncode"],
+                        "external_formal_block_corruptions": reconciled_mixed["external_formal_block_corruptions"],
+                        "external_prose_rule_leaks": reconciled_mixed["external_prose_rule_leaks"],
+                    }
+                else:
+                    formal_corruptions = internal_formal_corruptions
+                    prose_leaks = internal_prose_leaks
+                    tc2_passed = formal_corruptions == 0 and prose_leaks == 0
+                    external_mixed_meta = None
 
-                tc2_passed = formal_corruptions == 0 and prose_leaks == 0
-                if external_mixed_grade is not None and "passed" in external_mixed_grade:
-                    tc2_passed = tc2_passed and bool(external_mixed_grade["passed"])
                 tc2_report = {
                     "passed": tc2_passed,
                     "prompt_source": mixed_source,
@@ -1369,7 +1608,10 @@ def run_phase6_composition(
                     "contested_hard_veto2_escalations": contested_escalations,
                     "formal_block_corruptions": formal_corruptions,
                     "prose_rule_leaks": prose_leaks,
+                    "internal_formal_block_corruptions": internal_formal_corruptions,
+                    "internal_prose_rule_leaks": internal_prose_leaks,
                     "external_grader_used": bool(mixed_grader_cmd),
+                    "external_grader_details": external_mixed_meta,
                     "failing_items": [d for d in mixed_details if d["formal_issues"] or d["prose_issues"]],
                 }
 
@@ -1393,8 +1635,6 @@ def run_phase6_composition(
                 routed_passed = 0
                 naive_passed = 0
 
-                # Evaluate W0, Zone-Routed Triple Stack (code zone -> [0.4, 0.0, 0.5] or prose -> [1.0, 0.0, 0.0]),
-                # and Naive Unprojected Sum (llama_adapter_id=3 at scale 1.0 + all 3 at 1.0 without gating)
                 routed_lora_scales = [
                     {"id": 0, "scale": 0.4},
                     {"id": 1, "scale": 0.0},
@@ -1468,29 +1708,33 @@ def run_phase6_composition(
                     )
 
                 n_ret = max(len(ret_prompts), 1)
+                ret_grader_gate_ok = True
                 if retention_grader_cmd:
                     has_single_ph = any("{responses_jsonl}" in tok for tok in retention_grader_cmd)
                     has_paired_ph = any(
                         "{baseline_jsonl}" in tok or "{candidate_jsonl}" in tok for tok in retention_grader_cmd
                     )
                     if has_single_ph:
-                        def _score_ret_single(resp_file: Path) -> tuple[int, float]:
+                        def _score_ret_single(resp_file: Path) -> tuple[bool, int, float]:
                             rcmd = [tok.replace("{responses_jsonl}", str(resp_file)) for tok in retention_grader_cmd]
                             rproc = subprocess.run(rcmd, capture_output=True, text=True, timeout=120.0, check=False)
-                            ensure(
-                                rproc.returncode == 0 or bool((rproc.stdout or "").strip()),
-                                f"retention grader failed ({rproc.returncode}): {rproc.stderr}",
+                            r_ok, rj = parse_and_validate_grader_process(
+                                rproc.returncode,
+                                rproc.stdout,
+                                rproc.stderr,
+                                grader_name="retention_grader",
+                                required_int_keys=("total_count",),
+                                any_of_int_keys=(("total_passed", "passed_count", "correct"),),
                             )
-                            rj = json.loads(rproc.stdout)
                             p_cnt = int(rj.get("total_passed", rj.get("passed_count", rj.get("correct", 0))))
                             acc_v = float(rj.get("accuracy_pct", (p_cnt / n_ret) * 100.0))
-                            return p_cnt, acc_v
+                            return r_ok, p_cnt, acc_v
 
-                        w0_passed, w0_acc = _score_ret_single(ret_w0_file)
-                        routed_passed, routed_acc = _score_ret_single(ret_rt_file)
-                        naive_passed, naive_acc = _score_ret_single(ret_nv_file)
+                        _, w0_passed, w0_acc = _score_ret_single(ret_w0_file)
+                        _, routed_passed, routed_acc = _score_ret_single(ret_rt_file)
+                        _, naive_passed, naive_acc = _score_ret_single(ret_nv_file)
                     else:
-                        def _score_ret_paired(base_file: Path, cand_file: Path) -> dict[str, Any]:
+                        def _score_ret_paired(base_file: Path, cand_file: Path) -> tuple[bool, dict[str, Any]]:
                             if has_paired_ph:
                                 rcmd = [
                                     tok.replace("{baseline_jsonl}", str(base_file)).replace("{candidate_jsonl}", str(cand_file))
@@ -1507,57 +1751,30 @@ def run_phase6_composition(
                                     "1.5",
                                 ]
                             rproc = subprocess.run(rcmd, capture_output=True, text=True, timeout=120.0, check=False)
-                            ensure(
-                                bool((rproc.stdout or "").strip()),
-                                f"retention paired grader failed ({rproc.returncode}): {rproc.stderr}",
+                            return parse_and_validate_grader_process(
+                                rproc.returncode,
+                                rproc.stdout,
+                                rproc.stderr,
+                                grader_name="retention_paired_grader",
+                                required_int_keys=("baseline_passed", "candidate_passed", "total_count"),
                             )
-                            return json.loads(rproc.stdout)
 
-                        rj_rt = _score_ret_paired(ret_w0_file, ret_rt_file)
-                        rj_nv = _score_ret_paired(ret_w0_file, ret_nv_file)
-                        base_sub = rj_rt.get("baseline") if isinstance(rj_rt.get("baseline"), Mapping) else rj_rt
-                        rt_sub = rj_rt.get("candidate") if isinstance(rj_rt.get("candidate"), Mapping) else rj_rt
-                        nv_sub = rj_nv.get("candidate") if isinstance(rj_nv.get("candidate"), Mapping) else rj_nv
-                        w0_passed = int(
-                            rj_rt.get(
-                                "baseline_passed",
-                                base_sub.get("total_passed", base_sub.get("passed_count", 0)),
-                            )
-                        )
-                        w0_acc = float(
-                            rj_rt.get("baseline_accuracy_pct", base_sub.get("accuracy_pct", (w0_passed / n_ret) * 100.0))
-                        )
-                        routed_passed = int(
-                            rj_rt.get(
-                                "candidate_passed",
-                                rt_sub.get("total_passed", rt_sub.get("passed_count", 0)),
-                            )
-                        )
-                        routed_acc = float(
-                            rj_rt.get(
-                                "candidate_accuracy_pct",
-                                rt_sub.get("accuracy_pct", (routed_passed / n_ret) * 100.0),
-                            )
-                        )
-                        naive_passed = int(
-                            rj_nv.get(
-                                "candidate_passed",
-                                nv_sub.get("total_passed", nv_sub.get("passed_count", 0)),
-                            )
-                        )
-                        naive_acc = float(
-                            rj_nv.get(
-                                "candidate_accuracy_pct",
-                                nv_sub.get("accuracy_pct", (naive_passed / n_ret) * 100.0),
-                            )
-                        )
+                        rt_exit_ok, rj_rt = _score_ret_paired(ret_w0_file, ret_rt_file)
+                        _, rj_nv = _score_ret_paired(ret_w0_file, ret_nv_file)
+                        ret_grader_gate_ok = bool(rt_exit_ok and rj_rt.get("gate_passed", True))
+                        w0_passed = int(rj_rt["baseline_passed"])
+                        w0_acc = float(rj_rt.get("baseline_accuracy_pct", (w0_passed / n_ret) * 100.0))
+                        routed_passed = int(rj_rt["candidate_passed"])
+                        routed_acc = float(rj_rt.get("candidate_accuracy_pct", (routed_passed / n_ret) * 100.0))
+                        naive_passed = int(rj_nv["candidate_passed"])
+                        naive_acc = float(rj_nv.get("candidate_accuracy_pct", (naive_passed / n_ret) * 100.0))
                 else:
                     w0_acc = (w0_passed / n_ret) * 100.0
                     routed_acc = (routed_passed / n_ret) * 100.0
                     naive_acc = (naive_passed / n_ret) * 100.0
 
-                drop_pp = max(0.0, w0_acc - routed_acc)
-                tc3_passed = (drop_pp <= 1.5) and (routed_acc > naive_acc)
+                signed_drop_pp = w0_acc - routed_acc
+                tc3_passed = bool(ret_grader_gate_ok and (signed_drop_pp <= 1.5) and (routed_acc > naive_acc))
                 tc3_report = {
                     "passed": tc3_passed,
                     "prompt_source": ret_source,
@@ -1567,7 +1784,7 @@ def run_phase6_composition(
                     "w0_accuracy_pct": round(w0_acc, 2),
                     "routed_triple_passed": routed_passed,
                     "routed_triple_accuracy_pct": round(routed_acc, 2),
-                    "drop_pp_vs_w0": round(drop_pp, 2),
+                    "drop_pp_vs_w0": round(signed_drop_pp, 2),
                     "max_allowed_drop_pp": 1.5,
                     "naive_unweighted_sum_passed": naive_passed,
                     "naive_unweighted_sum_accuracy_pct": round(naive_acc, 2),
@@ -1575,19 +1792,14 @@ def run_phase6_composition(
                 }
 
                 # ----------------------------------------------------------
-                # 5. T-C1: Solo Gain Preservation (>= 90% in paired and triple stacks)
+                # 5. T-C1: Solo Gain Preservation (strictly gated on live step0 retention >= 90%)
                 # ----------------------------------------------------------
-                # Evaluate both:
-                # (a) Zone-routed behavioral & logprob shift retention across solo vs paired vs triple stacks:
-                #     Because ZoneRouter routes `prose -> [1,0,0]`, `formal_proof -> [0,0,1]`, `ui_module -> [0.2,1,0]`,
-                #     and `research_page -> [0,1,1]`, we measure BOTH exact target-direction projection retention
-                #     AND live llama-server domain pass / logprob target-shift retention!
                 tc1_domain_probes = {
                     "corpus": "Write one short plain sentence explaining what git bisect finds. No em dashes.",
                     "weft-eido": "Write a JS function `export const clamp01 = x => Math.max(0, Math.min(1, x));`.",
                     "formal-verification": "Write Lean 4 `theorem add_z (n : Nat) : n + 0 = n := Nat.add_zero n`.",
                 }
-                tc1_Retention_by_domain: dict[str, dict[str, Any]] = {}
+                tc1_retention_by_domain: dict[str, dict[str, Any]] = {}
                 pol_map = {
                     "corpus": corpus_pol,
                     "weft-eido": weft_eido_repo_policy("Moissanite-Labs/weft-eido"),
@@ -1643,20 +1855,38 @@ def run_phase6_composition(
                         p_txt, lora=trip_lora, temperature=0.0, top_p=1.0, seed=42, n_predict=16, n_probs=20, cache_prompt=False, id_slot=0
                     )
 
-                    solo_step0 = step0_logprob_shift(
-                        r_solo_d["completion_probabilities"], r_base_d["completion_probabilities"]
+                    probs_base_d = r_base_d["completion_probabilities"]
+                    probs_solo_d = r_solo_d["completion_probabilities"]
+                    probs_pair_d = r_pair_d["completion_probabilities"]
+                    probs_trip_d = r_trip_d["completion_probabilities"]
+                    assert_nonempty_completion_probs(probs_base_d, label=f"tc1_base[{dom}]")
+                    assert_nonempty_completion_probs(probs_solo_d, label=f"tc1_solo[{dom}]")
+                    assert_nonempty_completion_probs(probs_pair_d, label=f"tc1_pair[{dom}]")
+                    assert_nonempty_completion_probs(probs_trip_d, label=f"tc1_trip[{dom}]")
+
+                    solo_step0 = step0_logprob_shift(probs_solo_d, probs_base_d)
+                    pair_step0_drift = step0_logprob_shift(probs_pair_d, probs_solo_d)
+                    trip_step0_drift = step0_logprob_shift(probs_trip_d, probs_solo_d)
+
+                    # Live behavioral step-0 retention ONLY (never masked by CPU subspace alignment!)
+                    paired_live_ret = compute_live_step0_retention_pct(
+                        solo_shift=solo_step0,
+                        drift_from_solo=pair_step0_drift,
                     )
-                    pair_step0_drift = step0_logprob_shift(
-                        r_pair_d["completion_probabilities"], r_solo_d["completion_probabilities"]
-                    )
-                    trip_step0_drift = step0_logprob_shift(
-                        r_trip_d["completion_probabilities"], r_solo_d["completion_probabilities"]
+                    triple_live_ret = compute_live_step0_retention_pct(
+                        solo_shift=solo_step0,
+                        drift_from_solo=trip_step0_drift,
                     )
 
-                    # Compute subspace projection retention of `dom` under `dec_pair` & `dec_trip` scales,
-                    # combined with exact live step-0 agreement when active scales match solo!
-                    def _subspace_ret_for_scales(scales: Mapping[str, float]) -> float:
+                    def _cpu_subspace_alignment_for_scales(scales: Mapping[str, float]) -> float | None:
                         t_dom = artifacts[dom].target_tensor
+                        other_touching = [
+                            k_dom
+                            for k_dom, sc in scales.items()
+                            if k_dom != dom and sc > 0.0 and t_dom in artifacts[k_dom].layer_factors
+                        ]
+                        if not other_touching:
+                            return None
                         b_d, a_d = artifacts[dom].layer_factors[t_dom]
                         d_solo = b_d @ a_d
                         _, _, vh_d = np.linalg.svd(a_d, full_matrices=False)
@@ -1669,65 +1899,50 @@ def run_phase6_composition(
                                 d_comb = d_comb + float(sc) * (bk @ ak)
                         comb_out = d_comb @ k_d
                         denom = max(float(np.sum(solo_out * solo_out)), 1e-12)
-                        return min(100.0, max(0.0, float(np.sum(comb_out * solo_out) / denom) * 100.0))
+                        return round(float(np.sum(comb_out * solo_out) / denom) * 100.0, 2)
 
-                    if pair_lora == [{"id": lid, "scale": 1.0}] and pair_step0_drift == 0.0:
-                        pair_ret = 100.0
-                    else:
-                        step0_ret_p = max(0.0, 1.0 - (pair_step0_drift / max(solo_step0, 1e-6))) * 100.0
-                        pair_ret = max(step0_ret_p, _subspace_ret_for_scales(dec_pair.scale_map()))
+                    pair_cpu_align = _cpu_subspace_alignment_for_scales(dec_pair.scale_map())
+                    trip_cpu_align = _cpu_subspace_alignment_for_scales(dec_trip.scale_map())
 
-                    if trip_lora == [{"id": lid, "scale": 1.0}] and trip_step0_drift == 0.0:
-                        trip_ret = 100.0
-                    else:
-                        step0_ret_t = max(0.0, 1.0 - (trip_step0_drift / max(solo_step0, 1e-6))) * 100.0
-                        trip_ret = max(step0_ret_t, _subspace_ret_for_scales(dec_trip.scale_map()))
-
-                    tc1_Retention_by_domain[dom] = {
+                    tc1_retention_by_domain[dom] = {
                         "zone": zone_for_dom[dom],
                         "solo_logprob_shift": round(float(solo_step0), 8),
                         "paired_step0_drift_from_solo": round(float(pair_step0_drift), 8),
                         "triple_step0_drift_from_solo": round(float(trip_step0_drift), 8),
+                        "paired_drift_to_solo_shift_ratio": (
+                            round(float(pair_step0_drift / solo_step0), 6) if solo_step0 > 0.0 else None
+                        ),
+                        "triple_drift_to_solo_shift_ratio": (
+                            round(float(trip_step0_drift / solo_step0), 6) if solo_step0 > 0.0 else None
+                        ),
                         "paired_routed_scales": dec_pair.scale_map(),
                         "triple_routed_scales": dec_trip.scale_map(),
-                        "paired_retention_pct": round(float(pair_ret), 2),
-                        "triple_retention_pct": round(float(trip_ret), 2),
+                        "paired_live_step0_retention_pct": round(float(paired_live_ret), 2),
+                        "triple_live_step0_retention_pct": round(float(triple_live_ret), 2),
+                        "live_step0_retention_pct": round(float(min(paired_live_ret, triple_live_ret)), 2),
+                        "cpu_linear_subspace_alignment_pct": {
+                            "diagnostic_only": True,
+                            "paired_pct": pair_cpu_align,
+                            "paired_status": (
+                                "shared_tensors_evaluated"
+                                if pair_cpu_align is not None
+                                else "not_applicable_disjoint_tensors"
+                            ),
+                            "triple_pct": trip_cpu_align,
+                            "triple_status": (
+                                "shared_tensors_evaluated"
+                                if trip_cpu_align is not None
+                                else "not_applicable_disjoint_tensors"
+                            ),
+                        },
                     }
 
-                # Check simultaneous additive `research_page` [0.0, 1.0, 1.0] subspace cosine retention in float64
-                shared_ef_tensors = sorted(
-                    set(artifacts["weft-eido"].layer_factors) & set(artifacts["formal-verification"].layer_factors)
+                sim_subspace_diagnostic = compute_shared_subspace_diagnostic(
+                    artifacts["weft-eido"].layer_factors,
+                    artifacts["formal-verification"].layer_factors,
                 )
-                if shared_ef_tensors:
-                    eido_rets: list[float] = []
-                    fv_rets: list[float] = []
-                    for t_sh in shared_ef_tensors:
-                        b_e, a_e = artifacts["weft-eido"].layer_factors[t_sh]
-                        b_f, a_f = artifacts["formal-verification"].layer_factors[t_sh]
-                        d_e = b_e @ a_e
-                        d_f = b_f @ a_f
-                        d_ef = d_e + d_f
-                        _, _, vh_e = np.linalg.svd(a_e, full_matrices=False)
-                        _, _, vh_f = np.linalg.svd(a_f, full_matrices=False)
-                        k_e = vh_e.T
-                        k_f = vh_f.T
-                        e_solo_out = d_e @ k_e
-                        f_solo_out = d_f @ k_f
-                        e_sim_out = d_ef @ k_e
-                        f_sim_out = d_ef @ k_f
-                        eido_rets.append(
-                            float(np.sum(e_sim_out * e_solo_out) / max(float(np.sum(e_solo_out * e_solo_out)), 1e-12)) * 100.0
-                        )
-                        fv_rets.append(
-                            float(np.sum(f_sim_out * f_solo_out) / max(float(np.sum(f_solo_out * f_solo_out)), 1e-12)) * 100.0
-                        )
-                    sim_eido_retention_pct = min(eido_rets)
-                    sim_formal_retention_pct = min(fv_rets)
-                else:
-                    sim_eido_retention_pct = 100.0
-                    sim_formal_retention_pct = 100.0
 
-                # Optional dataset-level evaluation when `formal_eval_jsonl_path` is provided (validation.jsonl or private_holdout.jsonl)
+                # Optional dataset-level evaluation when `formal_eval_jsonl_path` is provided
                 formal_dataset_eval: dict[str, Any] | None = None
                 fe_rows_w0: list[dict[str, Any]] = []
                 fe_rows_solo: list[dict[str, Any]] = []
@@ -1917,11 +2132,14 @@ def run_phase6_composition(
                                 else [*holdout_grader_cmd, "--responses", str(arm_file)]
                             )
                             hproc = subprocess.run(hcmd, capture_output=True, text=True, timeout=300.0, check=False)
-                            ensure(
-                                bool((hproc.stdout or "").strip()),
-                                f"holdout grader failed ({hproc.returncode}): {hproc.stderr}",
+                            _, hj = parse_and_validate_grader_process(
+                                hproc.returncode,
+                                hproc.stdout,
+                                hproc.stderr,
+                                grader_name="holdout_grader",
+                                required_int_keys=("total_count",),
+                                any_of_int_keys=(("total_passed", "passed_count", "overall_passed"),),
                             )
-                            hj = json.loads(hproc.stdout)
                             return int(
                                 hj.get(
                                     "total_passed",
@@ -1939,11 +2157,15 @@ def run_phase6_composition(
                         )
 
                     solo_gain = solo_oracle_cnt - w0_oracle_cnt
-                    paired_gain_ret = (
-                        ((paired_oracle_cnt - w0_oracle_cnt) / float(solo_gain)) * 100.0 if solo_gain > 0 else 100.0
+                    paired_gain_ret: float | None = (
+                        round(((paired_oracle_cnt - w0_oracle_cnt) / float(solo_gain)) * 100.0, 2)
+                        if solo_gain > 0
+                        else None
                     )
-                    triple_gain_ret = (
-                        ((triple_oracle_cnt - w0_oracle_cnt) / float(solo_gain)) * 100.0 if solo_gain > 0 else 100.0
+                    triple_gain_ret: float | None = (
+                        round(((triple_oracle_cnt - w0_oracle_cnt) / float(solo_gain)) * 100.0, 2)
+                        if solo_gain > 0
+                        else None
                     )
                     formal_dataset_eval = {
                         "dataset": fe_path.name,
@@ -1954,43 +2176,65 @@ def run_phase6_composition(
                         "solo_fv_oracle_passed": solo_oracle_cnt,
                         "paired_routed_oracle_passed": paired_oracle_cnt,
                         "triple_routed_oracle_passed": triple_oracle_cnt,
-                        "paired_oracle_gain_retention_pct": round(paired_gain_ret, 2),
-                        "triple_oracle_gain_retention_pct": round(triple_gain_ret, 2),
+                        "paired_oracle_gain_retention_pct": paired_gain_ret,
+                        "triple_oracle_gain_retention_pct": triple_gain_ret,
+                        "gain_retention_status": (
+                            "positive_solo_gain_evaluated"
+                            if solo_gain > 0
+                            else "not_applicable_non_positive_solo_gain"
+                        ),
                         "w0_surface_clean": w0_ok_cnt,
                         "solo_fv_surface_clean": solo_fv_cnt,
                         "paired_routed_surface_clean": paired_fv_cnt,
                         "triple_routed_surface_clean": triple_fv_cnt,
                     }
 
-                min_retention = min(
-                    min(v["paired_retention_pct"] for v in tc1_Retention_by_domain.values()),
-                    min(v["triple_retention_pct"] for v in tc1_Retention_by_domain.values()),
-                    sim_eido_retention_pct,
-                    sim_formal_retention_pct,
+                min_live_step0_retention_pct = min(
+                    min(v["paired_live_step0_retention_pct"] for v in tc1_retention_by_domain.values()),
+                    min(v["triple_live_step0_retention_pct"] for v in tc1_retention_by_domain.values()),
                 )
-                tc1_passed = min_retention >= 90.0
+                tc1_passed = bool(min_live_step0_retention_pct >= 90.0)
                 tc1_report = {
                     "passed": tc1_passed,
-                    "min_retention_pct": round(min_retention, 2),
+                    "live_step0_retention_pct": round(min_live_step0_retention_pct, 2),
+                    "min_retention_pct": round(min_live_step0_retention_pct, 2),
                     "required_min_retention_pct": 90.0,
-                    "routed_domain_retention": tc1_Retention_by_domain,
-                    "simultaneous_research_page_subspace_retention": {
-                        "weft_eido_pct": round(sim_eido_retention_pct, 2),
-                        "formal_verification_pct": round(sim_formal_retention_pct, 2),
+                    "max_allowed_drift_fraction_of_solo_shift": 0.10,
+                    "routed_domain_retention": tc1_retention_by_domain,
+                    "cpu_linear_subspace_alignment_pct": {
+                        "diagnostic_only": True,
+                        "by_domain": {
+                            dom: tc1_retention_by_domain[dom]["cpu_linear_subspace_alignment_pct"]
+                            for dom in ("corpus", "weft-eido", "formal-verification")
+                        },
+                        "simultaneous_research_page": sim_subspace_diagnostic,
                     },
                     "formal_dataset_eval": formal_dataset_eval,
                     "adapter_sources": {d: artifacts[d].source_kind for d in ("corpus", "weft-eido", "formal-verification")},
                 }
 
                 # ----------------------------------------------------------
-                # 6. T-C5: Serving Budget (<= 15% tok/s overhead, >= 8k KV headroom, <= 7.2 GiB VRAM)
+                # 6. T-C5: Serving Budget (same-instance interleaved W0 vs triple_lora, /slots n_ctx, analytical VRAM)
                 # ----------------------------------------------------------
-                # Benchmark simultaneous 3-LoRA active forward pass [1.0, 1.0, 1.0] at ctx_size = 8192!
+                bridge.unmount(reason="tc5_same_instance_interleaved_benchmark")
                 three_active = [
                     {"id": 0, "scale": 1.0},
                     {"id": 1, "scale": 1.0},
                     {"id": 2, "scale": 1.0},
                 ]
+
+                # Interleaved warmup on the EXACT SAME live_llama instance (`parallel_slots`, `ctx_size`)
+                llama_client.erase_slot(0)
+                _ = llama_client.completion(
+                    bench_prompt,
+                    lora=[],
+                    temperature=0.0,
+                    top_p=1.0,
+                    seed=42,
+                    n_predict=64,
+                    cache_prompt=False,
+                    id_slot=0,
+                )
                 llama_client.erase_slot(0)
                 _ = llama_client.completion(
                     bench_prompt,
@@ -2002,13 +2246,13 @@ def run_phase6_composition(
                     cache_prompt=False,
                     id_slot=0,
                 )
-                stack_tok_s_samples: list[float] = []
-                for _ in range(3):
+
+                def _measure_single_bench_trial(lora_arg: list[dict[str, Any]]) -> float:
                     llama_client.erase_slot(0)
-                    t0 = time.perf_counter()
-                    r_s = llama_client.completion(
+                    t0_b = time.perf_counter()
+                    r_b = llama_client.completion(
                         bench_prompt,
-                        lora=three_active,
+                        lora=lora_arg,
                         temperature=0.0,
                         top_p=1.0,
                         seed=42,
@@ -2016,71 +2260,80 @@ def run_phase6_composition(
                         cache_prompt=False,
                         id_slot=0,
                     )
-                    wall_s = time.perf_counter() - t0
-                    timings = r_s.get("timings") or {}
-                    pred_per_s = float(timings.get("predicted_per_second") or (96.0 / max(wall_s, 1e-6)))
-                    stack_tok_s_samples.append(pred_per_s)
+                    wall_s = time.perf_counter() - t0_b
+                    timings = r_b.get("timings") or {}
+                    return float(timings.get("predicted_per_second") or (96.0 / max(wall_s, 1e-6)))
 
-                stack_median_tok_s = float(statistics.median(stack_tok_s_samples))
-                overhead_pct = max(0.0, ((w0_median_tok_s - stack_median_tok_s) / max(w0_median_tok_s, 1e-6)) * 100.0)
+                w0_tok_s_samples: list[float] = []
+                stack_tok_s_samples: list[float] = []
+                for trial_idx in range(5):
+                    if trial_idx % 2 == 0:
+                        w0_tok_s_samples.append(_measure_single_bench_trial([]))
+                        stack_tok_s_samples.append(_measure_single_bench_trial(three_active))
+                    else:
+                        stack_tok_s_samples.append(_measure_single_bench_trial(three_active))
+                        w0_tok_s_samples.append(_measure_single_bench_trial([]))
+                llama_client.erase_slot(0)
 
-                raw_slots = json.loads(
-                    subprocess.run(
-                        ["curl", "-s", f"{live_llama.base_url}/slots"],
-                        capture_output=True,
-                        text=True,
-                        timeout=5.0,
-                        check=True,
-                    ).stdout
+                overhead_metrics = compute_latency_overhead_metrics(
+                    w0_tok_s_samples,
+                    stack_tok_s_samples,
+                    max_allowed_overhead_pct=15.0,
+                    anomaly_floor_pct=-5.0,
                 )
-                slot_n_ctx = int(raw_slots[0].get("n_ctx", ctx_size)) if raw_slots else int(ctx_size)
 
-                # Exact byte-level 8 GiB RTX 3080 VRAM footprint accounting for Qwen3.5-4B + 8k KV + 3x F16 LoRAs:
-                base_gib = base_gguf.stat().st_size / (1024.0**3)
+                # Query `/slots` via fail-closed HTTP client and require explicit `"n_ctx"` on `raw_slots[0]`
+                raw_slots = llama_client._request("GET", "/slots")
+                slot_n_ctx = extract_verified_slot_n_ctx(raw_slots)
+                kv_ctx_gate_passed = bool(slot_n_ctx is not None and slot_n_ctx >= 8192)
+
                 lora_total_bytes = sum(
                     artifacts[d].gguf_bytes for d in ("corpus", "weft-eido", "formal-verification")
                 )
-                lora_mib = lora_total_bytes / (1024.0**2)
-                # Qwen3.5-4B has ONLY 8 full_attention layers (n_kv_heads=4, head_dim=256 -> 1024 dims K + 1024 dims V)
-                # plus 24 Gated DeltaNet recurrent layers (constant O(1) state ~48 MiB) + ~450 MiB CUDA compute buffer:
-                bytes_per_kv_elem = 2.0 if warp_flags.kv_cache_type.lower() == "f16" else 1.0625
-                kv_8k_gib = (8 * 2 * 1024 * slot_n_ctx * bytes_per_kv_elem) / (1024.0**3)
-                deltanet_and_cuda_scratch_gib = 0.52
-                projected_rtx3080_vram_gib = base_gib + kv_8k_gib + (lora_total_bytes / (1024.0**3)) + deltanet_and_cuda_scratch_gib
+                cfg_json_path = (
+                    (paths.default_safetensors_dir / "config.json")
+                    if paths.default_safetensors_dir is not None and (paths.default_safetensors_dir / "config.json").is_file()
+                    else None
+                )
+                companion_q4_cand = base_gguf.parent / "Qwen3.5-4B-Q4_K_M.gguf"
+                vram_proj = compute_analytical_vram_projection_gib(
+                    base_gguf_bytes=base_gguf.stat().st_size,
+                    lora_total_bytes=lora_total_bytes,
+                    kv_ctx_tokens=slot_n_ctx if slot_n_ctx is not None else int(ctx_size),
+                    kv_cache_type=warp_flags.kv_cache_type,
+                    geometry=geom,
+                    config_json_path=cfg_json_path,
+                    companion_q4_gguf_path=companion_q4_cand if companion_q4_cand.is_file() else None,
+                )
+                projected_vram_gib = float(vram_proj["analytical_vram_projection_gib"])
                 m1_max_live_rss_mib = live_llama.rss_mib
 
-                tc5_passed = (
-                    overhead_pct <= 15.0
-                    and slot_n_ctx >= 8192
-                    and projected_rtx3080_vram_gib <= 7.2
+                tc5_passed = bool(
+                    overhead_metrics["overhead_gate_passed"]
+                    and kv_ctx_gate_passed
+                    and projected_vram_gib <= 7.2
                 )
                 tc5_report = {
                     "passed": tc5_passed,
-                    "w0_median_tok_per_s": round(w0_median_tok_s, 2),
-                    "triple_lora_median_tok_per_s": round(stack_median_tok_s, 2),
-                    "latency_overhead_pct": round(overhead_pct, 2),
-                    "max_allowed_overhead_pct": 15.0,
+                    "benchmark_protocol": (
+                        f"same_llama_server_instance_interleaved_5trials_np{parallel_slots}_ctx{ctx_size}"
+                    ),
+                    "w0_median_tok_per_s": overhead_metrics["w0_median_tok_per_s"],
+                    "triple_lora_median_tok_per_s": overhead_metrics["triple_lora_median_tok_per_s"],
+                    "w0_samples_tok_per_s": overhead_metrics["w0_samples_tok_per_s"],
+                    "triple_lora_samples_tok_per_s": overhead_metrics["triple_lora_samples_tok_per_s"],
+                    "latency_overhead_pct": overhead_metrics["latency_overhead_pct"],
+                    "max_allowed_overhead_pct": overhead_metrics["max_allowed_overhead_pct"],
+                    "anomaly_floor_pct": overhead_metrics["anomaly_floor_pct"],
+                    "benchmark_anomaly": overhead_metrics["benchmark_anomaly"],
                     "live_slot_kv_ctx_tokens": slot_n_ctx,
+                    "kv_ctx_gate_passed": kv_ctx_gate_passed,
                     "min_required_kv_ctx_tokens": 8192,
-                    "m1_max_measured_w0_rss_mib": w0_rss_mib,
+                    "m1_max_measured_pure_w0_rss_mib": w0_rss_mib,
                     "m1_max_measured_stack_rss_mib": m1_max_live_rss_mib,
-                    "rtx_3080_8gib_vram_accounting_gib": {
-                        "base_gguf_gib": round(base_gib, 4),
-                        "kv_cache_dtype": warp_flags.kv_cache_type,
-                        "kv_cache_8k_gib": round(kv_8k_gib, 4),
-                        "three_f16_loras_mib": round(lora_mib, 3),
-                        "deltanet_state_and_compute_scratch_gib": deltanet_and_cuda_scratch_gib,
-                        "total_estimated_vram_gib": round(projected_rtx3080_vram_gib, 4),
-                        "windows_wddm_desktop_estimated_vram_gib": round(projected_rtx3080_vram_gib + 1.2, 4),
-                        "companion_q4_k_m_headless_vram_gib": 3.4034,
-                        "companion_q4_k_m_windows_wddm_vram_gib": 4.6034,
-                        "hard_vram_ceiling_gib": 7.2,
-                        "rtx_3080_host_note": (
-                            "geminus (<tailscale-host>, Windows UX582HS 8 GiB RTX 3080) online on Tailscale with "
-                            "sshHostKeys=false and SSH/RPC ports closed (only SMB 445 open); charminar (<tailscale-host>) "
-                            "is AMD Radeon Vega Mobile iGPU; both Q8_0 and Q4_K_M clear <=7.2 GiB"
-                        ),
-                    },
+                    "vram_measurement_kind": "analytical_projection_not_nvml",
+                    "analytical_vram_projection_gib": projected_vram_gib,
+                    "analytical_vram_breakdown_gib": vram_proj,
                 }
 
                 verified_warp_receipts = LedgerVerifier.verify_file(warp_ledger_path, signer)
@@ -2098,7 +2351,7 @@ def run_phase6_composition(
             and tc5_report["passed"]
         )
 
-        report = {
+        raw_report = {
             "phase": "Phase 6: Multi-MDE Composition (T-C1 to T-C5) and Seven Hazards",
             "passed": overall_passed,
             "elapsed_total_s": round(time.perf_counter() - t_start, 3),
@@ -2106,6 +2359,14 @@ def run_phase6_composition(
             "lineage_pinned": lineage.to_dict(),
             "precedence_contract": "Tier 1 Human Authority > Tier 2 RepoPolicy > Specialist Pack in its L5 syntax zone > Base Prose Pack",
             "weft_eido_pr25_unit_tests_passed": eido_tests_passed,
+            "checkpoint": {
+                "model_id": ckpt.model_id,
+                "base_gguf_name": base_gguf.name,
+                "served_gguf_sha256": suite_env["served_gguf_sha256"],
+                "base_weights_sha256": ckpt.weights_sha256,
+                "gguf_quantization": suite_env["gguf_quantization"],
+                "has_ssm_recurrent": ckpt.has_ssm_recurrent,
+            },
             "adapters": {
                 dom: {
                     "adapter_id": artifacts[dom].adapter_id,
@@ -2114,6 +2375,7 @@ def run_phase6_composition(
                     "gguf_sha256": artifacts[dom].gguf_sha256,
                     "gguf_bytes": artifacts[dom].gguf_bytes,
                     "certificate_sha256": artifacts[dom].weft_certificate_sha256,
+                    "rederived_zero_byte_ok": artifacts[dom].rederived_zero_byte_ok,
                 }
                 for dom in ("corpus", "weft-eido", "formal-verification")
             },
@@ -2128,6 +2390,7 @@ def run_phase6_composition(
             "signed_warp_ledger_receipts_verified": len(verified_warp_receipts),
             "exo_ledger_entries_verified": len(exo_ledger.entries()),
         }
+        report = sanitize_receipt_paths(raw_report)
 
         if output_dir is not None:
             out = Path(output_dir)

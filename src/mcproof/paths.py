@@ -49,11 +49,15 @@ def elan_bin_dir() -> Path:
 
 
 def find_lean_tool(name: str) -> str:
-    """Resolve `lean`, `lake`, or `leanchecker` binary path."""
+    """Resolve `lean`, `lake`, or `leanchecker` binary path across POSIX and Windows."""
     try:
-        cand = elan_bin_dir() / name
-        if cand.is_file():
-            return str(cand)
+        bdir = elan_bin_dir()
+        found_in_elan = shutil.which(name, path=str(bdir))
+        if found_in_elan:
+            return str(Path(found_in_elan).resolve())
+        for cand in (bdir / name, bdir / f"{name}.exe"):
+            if cand.is_file():
+                return str(cand)
     except FileNotFoundError:
         found = shutil.which(name)
         if found:
@@ -75,19 +79,28 @@ def siliconcordat_mde_root() -> Path:
     candidates = [
         r_root.parent.parent / "siliconcordat" / "mde",
         r_root.parent / "mde",
+        deps_dir() / "mde",
     ]
     for cand in candidates:
         if (cand / "Cargo.toml").is_file():
             return cand.resolve()
-    raise FileNotFoundError("siliconcordat/mde checkout not found; set MCPROOF_MDE_ROOT")
+    raise FileNotFoundError("siliconcordat/mde checkout not found; set MCPROOF_MDE_ROOT or run ./bin/bootstrap-deps --with-siliconcordat")
 
 
-def check_prose_script() -> Path:
-    """Locate the canonical check-prose.py script (~/.hermes/team-skills/scripts/check-prose.py)."""
-    override = os.environ.get("MCPROOF_CHECK_PROSE")
-    if override:
-        return Path(override).resolve()
-    cand = Path.home() / ".hermes" / "team-skills" / "scripts" / "check-prose.py"
-    if cand.is_file():
-        return cand.resolve()
-    raise FileNotFoundError("check-prose.py not found under ~/.hermes/team-skills/scripts/")
+def check_prose_script(override: str | Path | None = None) -> Path:
+    """Locate the vendored `mcproof.prose_gate` script or an explicit override (`--prose-script` / `MCPROOF_CHECK_PROSE`)."""
+    if override is not None:
+        cand = Path(override).expanduser().resolve()
+        if not cand.is_file():
+            raise FileNotFoundError(f"prose gate override script not found: {cand}")
+        return cand
+    env_override = os.environ.get("MCPROOF_CHECK_PROSE")
+    if env_override:
+        cand = Path(env_override).expanduser().resolve()
+        if not cand.is_file():
+            raise FileNotFoundError(f"MCPROOF_CHECK_PROSE script not found: {cand}")
+        return cand
+    vendored = (Path(__file__).resolve().parent / "prose_gate.py").resolve()
+    if vendored.is_file():
+        return vendored
+    raise FileNotFoundError("vendored prose_gate.py not found in src/mcproof/")

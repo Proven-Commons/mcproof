@@ -58,6 +58,19 @@ BAR_FORBIDDEN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
             r"|simproc|dsimproc|simproc_decl|dsimproc_decl|binder_predicate)\b"
         ),
     ),
+    (
+        "FORBIDDEN_EVAL_COMMAND",
+        re.compile(r"(?m)^[ \t]*#(?:eval|reduce|check|print|synth)\b"),
+    ),
+)
+
+COMPARATOR_ORDERED_KERNELS: tuple[tuple[str, str, str], ...] = (
+    ("lean-paranoid", "Running Lean paranoid kernel on solution", "Lean paranoid kernel accepts the solution"),
+    ("lean4lean", "Running lean4lean kernel on solution", "lean4lean kernel accepts the solution"),
+    ("nanoda", "Running nanoda kernel on solution", "nanoda kernel accepts the solution"),
+    ("con-leche", "Running con-leche kernel on solution", "con-leche kernel accepts the solution"),
+    ("con-ron", "Running con-ron kernel on solution", "con-ron kernel accepts the solution"),
+    ("lean-default", "Running Lean default kernel on solution", "Lean default kernel accepts the solution"),
 )
 
 THEOREM_DECL_RE = re.compile(
@@ -78,6 +91,32 @@ def targetRoot : Name := Name.mkSimple {root_json}
     let some idx := env.getModuleIdxFor? name | continue
     let mod := env.header.moduleNames[idx.toNat]!
     unless mod.getRoot == targetRoot do continue
+    let kind := match info with
+      | .thmInfo _ => "theorem"
+      | .axiomInfo _ => "axiom"
+      | .defnInfo _ => "def"
+      | .opaqueInfo _ => "opaque"
+      | _ => ""
+    if kind.isEmpty then continue
+    let isSrc := if (<- findDeclarationRanges? name).isSome then "src" else "gen"
+    let axs <- collectAxioms name
+    let axStr := ",".intercalate (axs.toList.map toString)
+    IO.println s!"MCPROOF_AUDIT\\t{{kind}}\\t{{isSrc}}\\t{{name}}\\t{{axStr}}"
+"""
+
+MODULE_AXIOM_AUDIT_TEMPLATE = """import Lean
+import {module_name}
+
+open Lean
+
+def targetMod : Name := `{module_name}
+
+#eval show CoreM Unit from do
+  let env <- getEnv
+  for (name, info) in env.constants.map₁.toList do
+    let some idx := env.getModuleIdxFor? name | continue
+    let mod := env.header.moduleNames[idx.toNat]!
+    unless mod == targetMod do continue
     let kind := match info with
       | .thmInfo _ => "theorem"
       | .axiomInfo _ => "axiom"
@@ -191,6 +230,19 @@ def audit_weak_statements(source: str) -> list[dict[str, Any]]:
                 })
 
         for self_lt in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_']*)\s*(?:<|≠|!=)\s*\1\b", compact):
+            prefix = compact[: self_lt.start()].rstrip()
+            suffix = compact[self_lt.end() :].lstrip()
+            # Strip enclosing open parentheses on prefix to detect `¬(a ≠ a)` or `Not (a ≠ a)`
+            unwrapped_prefix = prefix.rstrip("(").rstrip()
+            negated_by_op = unwrapped_prefix.endswith("¬") or bool(re.search(r"\bNot$", unwrapped_prefix))
+            # Also permit explicit irreflexive implication conclusion `: (a < a) -> False`
+            unwrapped_suffix = suffix.lstrip(")").lstrip()
+            negated_by_false_arrow = bool(
+                re.match(r"^(?:->|→)\s*False\s*$", unwrapped_suffix)
+                and unwrapped_prefix.endswith(":")
+            )
+            if negated_by_op or negated_by_false_arrow:
+                continue
             findings.append({
                 "line": line_no,
                 "rule": "VACUOUS_SELF_CONTRADICTION",
@@ -281,8 +333,63 @@ def _lean_env() -> dict[str, str]:
     env = dict(os.environ)
     bin_dir = str(elan_bin_dir())
     cur_path = env.get("PATH", "")
-    env["PATH"] = f"{bin_dir}:{cur_path}" if cur_path else bin_dir
+    env["PATH"] = f"{bin_dir}{os.pathsep}{cur_path}" if cur_path else bin_dir
     return env
+
+
+def parse_comparator_stdout(
+    stdout_text: str,
+    solution_module: str,
+) -> tuple[list[str], bool, list[dict[str, Any]]]:
+    """Parse `lake comparator --paranoid` stdout strictly after the post-build export boundary.
+
+    Prevents candidate `#eval IO.println` spoofing during elaboration from inflating `kernels_accepted`:
+    1. Any kernel-acceptance line before `Exporting #[...] from <solution_module>` triggers
+       `COMPARATOR_STDOUT_SPOOF_ATTEMPT`.
+    2. Only exact full-line `Running ...` followed by exact full-line `... accepts the solution`
+       strictly after the export boundary are counted (deduplicated, in order).
+    3. Final non-empty stdout line must equal `Your solution is okay!`.
+    """
+    raw_lines = [ln.strip() for ln in (stdout_text or "").splitlines()]
+    export_pat = re.compile(rf"^Exporting #\[.*\] from {re.escape(solution_module)}$")
+    accept_set = {acc for _, _, acc in COMPARATOR_ORDERED_KERNELS}
+
+    export_idx = -1
+    for idx, ln in enumerate(raw_lines):
+        if export_pat.match(ln):
+            export_idx = idx
+
+    spoof_findings: list[dict[str, Any]] = []
+    pre_export = raw_lines if export_idx < 0 else raw_lines[:export_idx]
+    for ln in pre_export:
+        if ln in accept_set or ln == "Your solution is okay!":
+            spoof_findings.append({
+                "line": 1,
+                "rule": "COMPARATOR_STDOUT_SPOOF_ATTEMPT",
+                "message": f"comparator output marker {ln!r} appeared prior to solution export boundary",
+            })
+            break
+
+    if export_idx < 0:
+        return [], False, spoof_findings
+
+    post_lines = [ln for ln in raw_lines[export_idx + 1 :] if ln]
+    kernels_accepted: list[str] = []
+    cursor = 0
+    for k_label, run_marker, accept_marker in COMPARATOR_ORDERED_KERNELS:
+        saw_run = False
+        while cursor < len(post_lines):
+            cur = post_lines[cursor]
+            cursor += 1
+            if not saw_run and cur == run_marker:
+                saw_run = True
+            elif saw_run and cur == accept_marker:
+                if k_label not in kernels_accepted:
+                    kernels_accepted.append(k_label)
+                break
+
+    solution_ok = bool(post_lines) and post_lines[-1] == "Your solution is okay!" and not spoof_findings
+    return kernels_accepted, solution_ok, spoof_findings
 
 
 @dataclass(frozen=True)
@@ -296,6 +403,8 @@ class LeanVerificationResult:
     paranoid_kernels_run: tuple[str, ...]
     sandboxed: bool
     findings: tuple[dict[str, Any], ...]
+    caveats: tuple[str, ...] = ()
+    challenge_sorry_whitelisted_module: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -307,6 +416,8 @@ class LeanVerificationResult:
             "sorry_declarations": list(self.sorry_declarations),
             "paranoid_kernels_run": list(self.paranoid_kernels_run),
             "sandboxed": self.sandboxed,
+            "caveats": list(self.caveats),
+            "challenge_sorry_whitelisted_module": self.challenge_sorry_whitelisted_module,
             "findings": list(self.findings),
         }
 
@@ -520,11 +631,13 @@ def verify_lean4_project_comparator(
     project_dir: Path | None = None,
     *,
     strict_init_only: bool = True,
+    allow_unsandboxed: bool = False,
     timeout_sec: int = 300,
 ) -> LeanVerificationResult:
-    """Run full 6-kernel `lake comparator --paranoid` + source escape-hatch checks on a Lake project."""
+    """Run full 6-kernel `lake comparator --paranoid` + `collectAxioms` + source escape-hatch checks on a Lake project."""
     proj = (project_dir or (repo_root() / "lean")).resolve()
     toolchain = _read_toolchain(proj)
+    lean_bin = find_lean_tool("lean")
     lake_bin = find_lean_tool("lake")
     env = _lean_env()
     findings: list[dict[str, Any]] = []
@@ -545,6 +658,19 @@ def verify_lean4_project_comparator(
 
     cmp_cfg = json.loads(cmp_path.read_text(encoding="utf-8"))
     challenge_mod = str(cmp_cfg.get("challenge_module", ""))
+    solution_mod = str(cmp_cfg.get("solution_module", "Mcproof.Proofs"))
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*", solution_mod):
+        return LeanVerificationResult(
+            passed=False,
+            toolchain=toolchain,
+            theorems_checked=(),
+            axioms_used=(),
+            nonstandard_axioms=(),
+            sorry_declarations=(),
+            paranoid_kernels_run=(),
+            sandboxed=False,
+            findings=({"line": 1, "rule": "INVALID_SOLUTION_MODULE", "message": f"invalid solution_module {solution_mod!r}"},),
+        )
     challenge_rel = Path(*challenge_mod.split(".")).with_suffix(".lean") if challenge_mod else None
     theorem_names = tuple(str(t) for t in cmp_cfg.get("theorem_names", []))
     permitted = set(cmp_cfg.get("permitted_axioms", []))
@@ -555,6 +681,34 @@ def verify_lean4_project_comparator(
             "rule": "NONSTANDARD_PERMITTED_AXIOMS",
             "message": f"comparator.json permits non-standard axioms: {sorted(extra_permitted)}",
         })
+
+    # Fail closed before compiling untrusted Lean code when Linux bubblewrap is unavailable unless explicitly opted in
+    bwrap_available = shutil.which("bwrap") is not None and sys.platform.startswith("linux")
+    caveats: list[str] = []
+    if not bwrap_available:
+        if not allow_unsandboxed:
+            findings.append({
+                "line": 1,
+                "rule": "SANDBOX_UNAVAILABLE",
+                "message": (
+                    "Linux bubblewrap (`bwrap`) is unavailable on this host; "
+                    "pass allow_unsandboxed=True or `--allow-unsandboxed` to explicitly authorize unsandboxed execution"
+                ),
+            })
+            return LeanVerificationResult(
+                passed=False,
+                toolchain=toolchain,
+                theorems_checked=theorem_names,
+                axioms_used=(),
+                nonstandard_axioms=(),
+                sorry_declarations=(),
+                paranoid_kernels_run=(),
+                sandboxed=False,
+                findings=tuple(findings),
+                caveats=(),
+                challenge_sorry_whitelisted_module=challenge_mod or None,
+            )
+        caveats.append("UNSANDBOXED_EXECUTION")
 
     # Static source lint on every `.lean` file in the project outside `.lake` and `.git`
     for lean_file in sorted(proj.rglob("*.lean")):
@@ -597,11 +751,77 @@ def verify_lean4_project_comparator(
             nonstandard_axioms=(),
             sorry_declarations=(),
             paranoid_kernels_run=(),
-            sandboxed=False,
+            sandboxed=bwrap_available,
             findings=tuple(findings),
+            caveats=tuple(caveats),
+            challenge_sorry_whitelisted_module=challenge_mod or None,
         )
 
-    bwrap_available = shutil.which("bwrap") is not None and sys.platform.startswith("linux")
+    # Measure actual transitive kernel axioms and sorry dependencies on solution_module via `collectAxioms`
+    measured_axioms: set[str] = set()
+    sorry_decls: list[str] = []
+    nonstd: list[str] = []
+    lib_olean_dir = proj / ".lake" / "build" / "lib" / "lean"
+    with tempfile.TemporaryDirectory(prefix="mcproof_proj_ax_") as ax_tmp_str:
+        ax_tmp = Path(ax_tmp_str)
+        audit_driver = ax_tmp / "McproofProjectAxiomDriver.lean"
+        audit_driver.write_text(
+            MODULE_AXIOM_AUDIT_TEMPLATE.format(module_name=solution_mod),
+            encoding="utf-8",
+        )
+        ax_env = dict(env)
+        lean_path_parts = [str(ax_tmp)]
+        if lib_olean_dir.is_dir():
+            lean_path_parts.append(str(lib_olean_dir))
+        ax_env["LEAN_PATH"] = os.pathsep.join(lean_path_parts)
+        ax_run = subprocess.run(
+            [lean_bin, str(audit_driver)],
+            cwd=ax_tmp,
+            env=ax_env,
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+        if ax_run.returncode != 0:
+            tail = " | ".join(line.strip() for line in ((ax_run.stdout or "") + "\n" + (ax_run.stderr or "")).splitlines()[-4:] if line.strip())
+            findings.append({
+                "line": 1,
+                "rule": "AXIOM_WALK_FAILED",
+                "message": f"trusted collectAxioms driver failed on {solution_mod}: {tail}",
+            })
+        else:
+            for line in (ax_run.stdout or "").splitlines():
+                if not line.startswith("MCPROOF_AUDIT\t"):
+                    continue
+                parts = line.split("\t")
+                if len(parts) != 5:
+                    continue
+                _, kind, _, decl_name, ax_csv = parts
+                axs = {a for a in ax_csv.split(",") if a}
+                measured_axioms.update(axs)
+                if kind in ("axiom", "opaque"):
+                    findings.append({
+                        "line": 1,
+                        "rule": "KERNEL_EXTRA_AXIOM_OR_OPAQUE",
+                        "message": f"solution module {solution_mod} contains {kind} declaration '{decl_name}'",
+                    })
+                if "sorryAx" in axs:
+                    sorry_decls.append(decl_name)
+                    findings.append({
+                        "line": 1,
+                        "rule": "KERNEL_SORRY_AXIOM",
+                        "message": f"solution declaration '{decl_name}' depends on 'sorryAx'",
+                    })
+                extra_axs = axs - (permitted & STANDARD_AXIOMS) - {"sorryAx"}
+                if extra_axs:
+                    nonstd.extend(sorted(extra_axs))
+                    findings.append({
+                        "line": 1,
+                        "rule": "KERNEL_NONSTANDARD_AXIOM",
+                        "message": f"solution declaration '{decl_name}' uses unpermitted axioms: {sorted(extra_axs)}",
+                    })
+
     cmp_cmd = [lake_bin, "comparator", "--paranoid"]
     if not bwrap_available:
         cmp_cmd.append("--inadvisably-no-sandbox")
@@ -615,23 +835,12 @@ def verify_lean4_project_comparator(
         timeout=timeout_sec,
         check=False,
     )
-    cmp_out = (cmp_res.stdout or "") + "\n" + (cmp_res.stderr or "")
-    kernels_accepted: list[str] = []
-    for k_label, pat in (
-        ("lean-paranoid", "Lean paranoid kernel accepts the solution"),
-        ("lean4lean", "lean4lean kernel accepts the solution"),
-        ("nanoda", "nanoda kernel accepts the solution"),
-        ("con-leche", "con-leche kernel accepts the solution"),
-        ("con-ron", "con-ron kernel accepts the solution"),
-        ("lean-default", "Lean default kernel accepts the solution"),
-    ):
-        if pat in cmp_out:
-            kernels_accepted.append(k_label)
+    kernels_accepted, solution_ok, spoof_findings = parse_comparator_stdout(cmp_res.stdout or "", solution_mod)
+    findings.extend(spoof_findings)
 
-    sorry_decls: list[str] = []
-    nonstd: list[str] = []
-    if cmp_res.returncode != 0 or "Your solution is okay!" not in cmp_out:
-        if "sorryAx" in cmp_out:
+    cmp_out = (cmp_res.stdout or "") + "\n" + (cmp_res.stderr or "")
+    if cmp_res.returncode != 0 or not solution_ok:
+        if "sorryAx" in cmp_out and "sorryAx" not in sorry_decls:
             sorry_decls.append("sorryAx")
         for ax_m in re.finditer(r"Illegal axiom detected:\s*'([^']+)'", cmp_out):
             ax_name = ax_m.group(1)
@@ -650,16 +859,19 @@ def verify_lean4_project_comparator(
     passed = (
         len(findings) == 0
         and cmp_res.returncode == 0
+        and solution_ok
         and len(kernels_accepted) == 6
     )
     return LeanVerificationResult(
         passed=passed,
         toolchain=toolchain,
         theorems_checked=theorem_names,
-        axioms_used=tuple(sorted(permitted & STANDARD_AXIOMS)),
+        axioms_used=tuple(sorted(measured_axioms - {"sorryAx"})),
         nonstandard_axioms=tuple(sorted(set(nonstd))),
-        sorry_declarations=tuple(sorry_decls),
+        sorry_declarations=tuple(sorted(set(sorry_decls))),
         paranoid_kernels_run=tuple(kernels_accepted),
         sandboxed=bwrap_available,
         findings=tuple(findings),
+        caveats=tuple(caveats),
+        challenge_sorry_whitelisted_module=challenge_mod or None,
     )

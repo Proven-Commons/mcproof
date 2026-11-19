@@ -53,6 +53,10 @@
         ]
       }
     },
+    "checker_matrix_summary": {
+      "matched": 5,
+      "total": 5
+    },
     "deps_shas": {
       "Foundation-0/.github": {
         "actual": "81f83c38918382b4ca142b81debd3cc5ccf61d3a",
@@ -115,6 +119,7 @@
       "mutations_killed": 4,
       "mutations_total": 4,
       "passed": true,
+      "python_sandboxed": false,
       "survived_mutations": []
     },
     "lean_adversarial_cheats": {
@@ -140,6 +145,14 @@
           "KERNEL_NONSTANDARD_AXIOM",
           "KERNEL_EXTRA_AXIOM_OR_OPAQUE",
           "KERNEL_NONSTANDARD_AXIOM"
+        ],
+        "sorry_declarations": []
+      },
+      "eval_spoof_cheat": {
+        "caught": true,
+        "nonstandard_axioms": [],
+        "rules": [
+          "FORBIDDEN_EVAL_COMMAND"
         ],
         "sorry_declarations": []
       },
@@ -237,12 +250,20 @@
         "sorry_declarations": []
       }
     },
+    "lean_cheats_summary": {
+      "caught": 15,
+      "total": 15
+    },
     "lean_clean_project": {
       "axioms_used": [
         "Classical.choice",
         "Quot.sound",
         "propext"
       ],
+      "caveats": [
+        "UNSANDBOXED_EXECUTION"
+      ],
+      "challenge_sorry_whitelisted_module": "Mcproof.Spec",
       "findings": [],
       "nonstandard_axioms": [],
       "paranoid_kernels_run": [
@@ -271,6 +292,7 @@
     "lean_project_cheats": {
       "project_custom_axiom": {
         "caught": true,
+        "nonstandard_axioms": [],
         "rules": [
           "EXTRA_AXIOM_DECL",
           "LAKE_BUILD_FAILED"
@@ -280,16 +302,24 @@
         "caught": true,
         "rules": [
           "UNPROVED_SORRY",
+          "KERNEL_SORRY_AXIOM",
           "COMPARATOR_PARANOID_REJECT"
+        ],
+        "sorry_declarations": [
+          "Mcproof.Spec.bezoutCheck_sound",
+          "sorryAx"
         ]
       }
     },
+    "lean_unsandboxed_fails_closed_by_default": true,
     "lineage_1byte_tamper_rejected": true,
     "plane1_spec": {
       "bytes": 106763,
       "control_bytes": [],
       "lineage_details": {
         "corpus_tree_sha256": "5bdb7f30363b956e82947f668f98c48f99876e87fb5ed4f785b873e4f4f98305",
+        "deps_checkouts_verified": true,
+        "deps_manifest_verified": true,
         "findings": [],
         "passed": true,
         "plane1_spec_sha256": "49beff2a0185cfa4032170b614a543c0d67541494e858803d21cfb837111b230",
@@ -303,37 +333,47 @@
       "sha256": "49beff2a0185cfa4032170b614a543c0d67541494e858803d21cfb837111b230"
     },
     "prose_gate": {
-      "check_dupes_out": "check-prose --dupes: clean (5 file(s))",
+      "check_dupes_out": "check-prose --dupes: clean (11 file(s))",
       "check_dupes_rc": 0,
-      "check_prose_out": "check-prose: clean (5 file(s), 1983 lines)",
+      "check_prose_out": "check-prose: clean (11 file(s), 2422 lines)",
       "check_prose_rc": 0,
       "files": [
         "README.md",
+        "compile/README.md",
+        "datasets/README.md",
+        "docs/CONTINUITY.md",
         "lean/README.md",
         "lean/SPEC.md",
         "lean/tests/TEST-RESULTS.md",
-        "spec/plane1_formal_spec.md"
+        "spec/plane1_formal_spec.md",
+        "stack/README.md",
+        "stack/STACK_REPORT.md",
+        "verification/VERIFICATION_REPORT.md"
       ]
     },
     "pytest_strict": {
+      "counts": {
+        "executed_total": 34,
+        "failed": 0,
+        "passed": 34,
+        "skipped": 0
+      },
       "returncode": 0,
       "summary_tail": [
-        "  ",
-        "    self._warn_about_missing_assertion(mode)",
+        "../../../Work/mcproof-lab/repo/tests/test_lean_harness.py ...........    [ 73%]",
+        "../../../Work/mcproof-lab/repo/tests/test_lineage_prose_and_cli.py ..... [ 88%]",
+        "....                                                                     [100%]",
         "",
-        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
-        "================== 20 passed, 1 warning in 104.72s (0:01:44) ==================="
+        "======================== 34 passed in 137.54s (0:02:17) ========================"
       ]
     },
     "readme_top_lines": [
       "# mcproof",
-      "`mcproof` is the verification harness and Plane 1 rulebook for the Siliconcordat Formal Verification MDE. It checks Lean 4.35.0 proofs across six kernels, tests Python exact-math checkers against planted bugs, and verifies honest claim labels. Proof authors, automated verifiers, and local open-weight compilers use it to catch vacuous theorems, float drift, and overstated claims.",
-      "Blueprint and acceptance gates live in [siliconcordat/mde issue 4](https://github.com/siliconcordat/mde/issues/4) under the [Siliconcordat Master Plan](https://github.com/siliconcordat/.github/blob/main/MASTER-PLAN.md)."
+      "`mcproof` is the verification harness, Plane 1 rulebook, dataset suite, weight compiler, and serving benchmark for the Siliconcordat Formal Verification MDE. It checks Lean 4.35.0 proofs across six kernels, grades exact-math checkers against planted bugs, compiles `weft` adapters, and audits live `warp-modeld` mounts. Proof authors, verifiers, and researchers use it to test formal reasoning without weakening deterministic gates.",
+      "Blueprint and gates live in [siliconcordat/mde issue 4](https://github.com/siliconcordat/mde/issues/4) under the [Master Plan](https://github.com/siliconcordat/.github/blob/main/MASTER-PLAN.md). Companion serving changes live in [siliconcordat/exo](https://github.com/siliconcordat/exo/tree/feat/mde4-phase4-phase6-stack) and [siliconcordat/warp PR 5](https://github.com/siliconcordat/warp/pull/5)."
     ],
     "siliconcordat_clean": {
-      ".github": "",
       "exo": "",
-      "loom": "",
       "mde": "",
       "warp": "",
       "weft": ""

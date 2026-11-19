@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import subprocess
 import sys
 from typing import Any, Sequence
 
@@ -58,6 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
     s_lean.add_argument("--project", action="store_true", help="Run full 6-kernel `lake comparator --paranoid` on project dir")
     s_lean.add_argument("--allow-mathlib", action="store_true", help="Disable strict_init_only lint")
     s_lean.add_argument("--no-vacuous-check", action="store_true", help="Skip WeakStatement vacuous-hypothesis lint")
+    s_lean.add_argument("--allow-unsandboxed", action="store_true", help="Explicitly permit comparator `--inadvisably-no-sandbox` when Linux bwrap is unavailable")
 
     # checker
     s_chk = sub.add_parser("checker", help="Audit an exact-math Python checker (AST + mde guard + python3 -O -B -W error + >=80%% mutation kill)")
@@ -92,9 +94,10 @@ def build_parser() -> argparse.ArgumentParser:
     s_mde.add_argument("--cargo-run", action="store_true", help="Force `cargo run --manifest-path` invocation")
 
     # prose
-    s_prs = sub.add_parser("prose", help="Run `check-prose.py`, `--dupes`, and mixed-register zone checks")
+    s_prs = sub.add_parser("prose", help="Run vendored `prose_gate.py` (or `--prose-script`), `--dupes`, and mixed-register zone checks")
     s_prs.add_argument("markdown_file", help="Path to markdown document or '-' for stdin")
     s_prs.add_argument("--mixed-formal", action="store_true", help="Require formal sections, `data-eido-skip`, and 40-char verdict SHAs")
+    s_prs.add_argument("--prose-script", default=None, help="Optional override path to check-prose.py script")
 
     # integrity
     s_int = sub.add_parser("integrity", help="Write or verify `SHA256SUMS` via `siliconcordat/mde integrity`")
@@ -107,6 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
     s_lin = sub.add_parser("lineage", help="Write or verify `spec/lineage.json` Plane 1 SHA-256 lineage binding")
     s_lin.add_argument("--write", action="store_true", help="Recompute and write spec/lineage.json")
     s_lin.add_argument("--verify", action="store_true", help="Verify spec/lineage.json against live Plane 1 files (default)")
+    s_lin.add_argument("--require-deps", action="store_true", help="Fail closed if `deps/DEPS_MANIFEST.json` or `deps/` git checkouts are absent")
 
     # grade
     s_grd = sub.add_parser("grade", help="Grade a Family A, B, C, or D completion file or stdin")
@@ -116,19 +120,23 @@ def build_parser() -> argparse.ArgumentParser:
     s_grd.add_argument("--fixture-json", default=None, help="Optional JSON fixture with generator_source / valid_cases / planted_mutations")
 
     # selftest
-    sub.add_parser("selftest", help="Run full Tier 2 oracle and Plane 1 lineage self-test suite")
+    s_self = sub.add_parser("selftest", help="Run full Tier 2 oracle and Plane 1 lineage self-test suite")
+    s_self.add_argument("--allow-unsandboxed", action="store_true", help="Explicitly permit comparator `--inadvisably-no-sandbox` when Linux bwrap is unavailable")
 
     return p
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
+def _dispatch(args: argparse.Namespace) -> int:
     cmd = args.subcommand
 
     if cmd == "lean":
         if args.target is None:
-            rec = run_lean4_oracle(repo_root() / "lean", is_project_dir=True, strict_init_only=not args.allow_mathlib)
+            rec = run_lean4_oracle(
+                repo_root() / "lean",
+                is_project_dir=True,
+                strict_init_only=not args.allow_mathlib,
+                allow_unsandboxed=args.allow_unsandboxed,
+            )
         elif args.target == "-":
             src = sys.stdin.read()
             rec = run_lean4_oracle(
@@ -136,6 +144,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 is_project_dir=False,
                 strict_init_only=not args.allow_mathlib,
                 check_vacuous=not args.no_vacuous_check,
+                allow_unsandboxed=args.allow_unsandboxed,
             )
         else:
             t_path = Path(args.target)
@@ -144,6 +153,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 is_project_dir=args.project or t_path.is_dir(),
                 strict_init_only=not args.allow_mathlib,
                 check_vacuous=not args.no_vacuous_check,
+                allow_unsandboxed=args.allow_unsandboxed,
             )
         return _emit(rec, args.json)
 
@@ -205,6 +215,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             require_data_eido_skip=args.mixed_formal,
             verify_embedded_lean=True,
             verify_verdict_shas=args.mixed_formal,
+            prose_script_override=args.prose_script,
         )
         return _emit(rec, args.json)
 
@@ -224,7 +235,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             out_path = r_root / "spec" / "lineage.json"
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        rep = verify_lineage_manifest(r_root)
+        rep = verify_lineage_manifest(r_root, require_deps=args.require_deps)
         rec = OracleReceipt.create(
             oracle="lineage",
             passed=rep.passed,
@@ -256,10 +267,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _emit(rec, args.json)
 
     if cmd == "selftest":
-        rec = run_all_reference_selftests()
+        rec = run_all_reference_selftests(allow_unsandboxed=args.allow_unsandboxed)
         return _emit(rec, args.json)
 
     return 2
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    cmd = str(args.subcommand or "mcproof")
+    try:
+        return _dispatch(args)
+    except (FileNotFoundError, subprocess.TimeoutExpired, RuntimeError, OSError, ValueError, KeyError) as exc:
+        rec = OracleReceipt.create(
+            oracle=cmd,
+            passed=False,
+            epistemic_status="REJECTED",
+            checks={"error": type(exc).__name__},
+            findings=[{"rule": "ORACLE_EXEC_ERROR", "message": str(exc)[:240]}],
+        )
+        return _emit(rec, bool(args.json))
 
 
 if __name__ == "__main__":

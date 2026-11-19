@@ -23,7 +23,6 @@ compile/artifacts/*.npz
 stack/worktrees/
 stack/results/smoke/
 stack/results/final/*.jsonl
-verification/vault_arm*.json
 verification/rederived_p2b/
 verification/stack_sealed_receipts/
 

@@ -1,4 +1,7 @@
 {
+  "phase": "Phase 4: Live End-to-End 4-Layer Mount",
+  "passed": true,
+  "elapsed_total_s": 31.677,
   "_meta": {
     "gg.siliconcordat/mde": {
       "adapter_class": "class1_rederivable",
@@ -14,61 +17,42 @@
       "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
     }
   },
-  "checkpoint": {
-    "base_gguf_bytes": 4482403488,
-    "base_gguf_name": "Qwen3.5-4B-Q8_0.gguf",
-    "base_weights_sha256": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
-    "geometry": {
-      "architecture": "qwen35",
-      "block_count": 32,
-      "embedding_length": 2560,
-      "feed_forward_length": 9216,
-      "model_name": "Qwen3.5-4B",
-      "target_shape": [
-        9216,
-        2560
-      ],
-      "target_tensor": "blk.31.ffn_up.weight"
-    },
-    "model_id": "Qwen/Qwen3.5-4B"
-  },
-  "elapsed_total_s": 25.394,
-  "formal_adapter": {
-    "adapter_id": "mde:formal-verification",
-    "certificate_sha256": "56820652f47de5866a57fd39bbb092ea2c14c658f2671dbcbcafcc2fa5180b76",
-    "gguf_bytes": 189408,
-    "gguf_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
-    "rederived_zero_byte_ok": true,
-    "slab_int4_f16_bytes": 78803,
-    "slab_int4_int8_bytes": 58357,
-    "source_kind": "compiler_handoff"
-  },
-  "hardware_boundary": {
-    "charminar_linux_probe": "online on Tailscale SSH (<tailscale-host>), AMD Radeon Vega Mobile iGPU (not NVIDIA RTX 3080)",
-    "geminus_windows_rtx3080_probe": "online on Tailscale (<tailscale-host> / <lan-host>), sshHostKeys=false, SSH/RPC ports closed (only SMB 445 open); analytical <=7.2 GiB VRAM verified on Q8_0 (5.03 GiB headless / 6.23 GiB WDDM) & Q4_K_M (3.40 GiB / 4.60 GiB)",
-    "host": "Apple M1 Max (64 GiB unified memory, macOS arm64, Metal -ngl 99)",
-    "live_multi_lora_rss_mib": 6960.16,
-    "pure_base_rss_mib": 4755.0
-  },
   "lineage_pinned": {
-    "contested_heads": [],
     "corpus_tree_sha256": "5bdb7f30363b956e82947f668f98c48f99876e87fb5ed4f785b873e4f4f98305",
     "domain_commits": {
       "corpus": "7b22e542f0db0f3013ab1439cf5d1947676a5083",
       "formal-verification": "49beff2a0185cfa4032170b614a543c0d6754149",
       "weft-eido": "be27665255d9aa2553060d275f7d1b1b3306c703"
-    }
+    },
+    "contested_heads": []
+  },
+  "hardware_boundary": {
+    "measured_host": "Apple M1 Max (64 GiB unified memory, macOS arm64, Metal -ngl 99)",
+    "pure_base_rss_mib": 6913.31,
+    "live_multi_lora_rss_mib": 6975.27,
+    "linux_rtx3080_note": "Tailscale peer geminus (Windows UX582HS 8 GiB RTX 3080) had SSH/RPC ports closed; charminar is AMD Radeon Vega Mobile iGPU; RTX 3080 VRAM figures in Phase 6 are analytical projections, not NVML measurements."
   },
   "llama_server": {
     "binary": "/opt/homebrew/Cellar/llama.cpp/0.5.0/bin/llama-server",
+    "version": "version: 0.5.0 (build 11146, commit 7fe450e19)",
     "commit": "7fe450e19",
+    "verified_required_flags": [
+      "--lora",
+      "--lora-scaled",
+      "--lora-init-without-apply",
+      "--slots",
+      "--slot-save-path",
+      "--no-cache-idle-slots",
+      "--slot-prompt-similarity",
+      "--ctx-checkpoints"
+    ],
     "exact_launch_flags": [
       "-m",
       "<workspace>/mcproof-lab/compile/checkpoints/Qwen3.5-4B-GGUF/Qwen3.5-4B-Q8_0.gguf",
       "--host",
       "127.0.0.1",
       "--port",
-      "54283",
+      "59874",
       "-c",
       "65536",
       "-ngl",
@@ -81,7 +65,7 @@
       "f16",
       "--slots",
       "--slot-save-path",
-      "<tmpdir>/mcproof_phase4_4cqo6zzu/slots_live",
+      "<tmpdir>/slots_live",
       "--no-cache-idle-slots",
       "--slot-prompt-similarity",
       "0.0",
@@ -90,34 +74,52 @@
       "--chat-template-kwargs",
       "{\"enable_thinking\":false}",
       "--lora-scaled",
-      "compile/artifacts/composition/formal-verification.f16.gguf:0.0,<tmpdir>/mcproof_phase4_4cqo6zzu/compiled_adapters/behavioral_corruptor.f16.gguf:0.0,compile/artifacts/controls/formal-verification.goodhart.f16.gguf:0.0",
+      "compile/artifacts/composition/formal-verification.f16.gguf:0.0,<tmpdir>/compiled_adapters/behavioral_corruptor.f16.gguf:0.0,compile/artifacts/controls/formal-verification.goodhart.f16.gguf:0.0",
       "--lora-init-without-apply"
     ],
-    "multi_lora_boot_ms": 1575.31,
-    "pure_base_boot_ms": 1252.98,
-    "verified_required_flags": [
-      "--lora",
-      "--lora-scaled",
-      "--lora-init-without-apply",
-      "--slots",
-      "--slot-save-path",
-      "--no-cache-idle-slots",
-      "--slot-prompt-similarity",
-      "--ctx-checkpoints"
-    ],
-    "version": "version: 0.5.0 (build 11146, commit 7fe450e19)"
+    "pure_base_boot_ms": 1708.87,
+    "multi_lora_boot_ms": 1693.95
   },
-  "passed": true,
-  "phase": "Phase 4: Live End-to-End 4-Layer Mount",
+  "checkpoint": {
+    "model_id": "Qwen/Qwen3.5-4B",
+    "base_gguf_name": "Qwen3.5-4B-Q8_0.gguf",
+    "base_gguf_bytes": 4482403488,
+    "served_gguf_sha256": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1",
+    "base_weights_sha256": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
+    "gguf_quantization": "Q8_0",
+    "has_ssm_recurrent": true,
+    "geometry": {
+      "architecture": "qwen35",
+      "model_name": "Qwen3.5-4B",
+      "block_count": 32,
+      "embedding_length": 2560,
+      "feed_forward_length": 9216,
+      "target_tensor": "blk.31.ffn_up.weight",
+      "target_shape": [
+        9216,
+        2560
+      ]
+    }
+  },
+  "formal_adapter": {
+    "adapter_id": "mde:formal-verification",
+    "source_kind": "compiler_handoff",
+    "gguf_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+    "gguf_bytes": 189408,
+    "certificate_sha256": "56820652f47de5866a57fd39bbb092ea2c14c658f2671dbcbcafcc2fa5180b76",
+    "rederived_zero_byte_ok": true,
+    "slab_int4_int8_bytes": 58357,
+    "slab_int4_f16_bytes": 78803
+  },
   "step_4_1_mde": {
+    "passed": true,
+    "manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca",
     "classified_zones": {
-      "condensed_json": "condensed_json",
       "lean_file": "formal_proof",
-      "mixed_markdown": "formal_proof",
       "python_symbols": {
         "check_cramer_2x2": "formal_proof",
-        "normalize_count": "code",
-        "render_status_chip": "ui_module"
+        "render_status_chip": "ui_module",
+        "normalize_count": "code"
       },
       "python_zone_bytes": {
         "code": 52,
@@ -126,83 +128,124 @@
         "prose": 41,
         "ui_module": 155
       },
+      "mixed_markdown": "formal_proof",
+      "condensed_json": "condensed_json",
       "tsx_widget": "ui_module"
     },
+    "trace_symbol": "check_cramer_2x2",
+    "vendor_meta_key_verified": true,
     "code_audit_clean_passed": true,
     "code_audit_negative_caught_rules": [
       "bare_assert",
       "bare_except",
       "duplicate_json_key",
       "silent_except_swallow"
-    ],
-    "manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca",
-    "passed": true,
-    "trace_symbol": "check_cramer_2x2",
-    "vendor_meta_key_verified": true
+    ]
   },
   "step_4_2_exo": {
-    "constraints": {
-      "allow_exact_formal_notation": true,
-      "allow_negative_disclaimers": true,
-      "claim_vocabulary": "foundation0",
-      "enforce_data_eido_skip": true,
-      "forbid_float_in_exact_math": true
-    },
+    "passed": true,
+    "router_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca",
     "formal_proof_scales": {
       "corpus": 0.0,
-      "formal-verification": 1.0,
-      "weft-eido": 0.0
+      "weft-eido": 0.0,
+      "formal-verification": 1.0
     },
-    "forwarded_bundle_zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca",
     "l1_bank_tag": 3,
-    "passed": true,
-    "router_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
+    "constraints": {
+      "claim_vocabulary": "foundation0",
+      "allow_negative_disclaimers": true,
+      "allow_exact_formal_notation": true,
+      "forbid_float_in_exact_math": true,
+      "enforce_data_eido_skip": true
+    },
+    "forwarded_bundle_zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
   },
   "step_4_3_warp_stages": {
-    "active_lora_logprob_shift": 0.91785812,
-    "active_lora_step0_logprob_shift": 0.01105264,
-    "active_lora_trajectory_changed": false,
-    "canary_mode": "synthetic_host_16",
-    "goodhart_control": {
-      "disjoint_holdout_frobenius": 0.00092744,
-      "rejected_by_private_holdout": true,
-      "visible_canary_cosine": 1.0
-    },
     "passed": true,
+    "canary_mode": "synthetic_host_16",
+    "zero_init_vs_pure_base_max_logprob_diff": 0.0,
     "stage1_five_layer_and_zone_verified": true,
+    "stage2_elapsed_ms": 0.0138,
     "stage2_budget_ms": 1.0,
-    "stage2_elapsed_ms": 0.0245,
+    "stage3_elapsed_ms": 2828.95,
     "stage3_budget_ms": 3000.0,
     "stage3_canaries_passed": 12,
-    "stage3_elapsed_ms": 2666.03,
+    "stage4_kill_switch_elapsed_ms": 5.528,
     "stage4_budget_ms": 10.0,
-    "stage4_kill_switch_elapsed_ms": 5.204,
-    "tamper_and_sabotage_rejections": {
-      "behavioral_corruptor_stage3": "ERR_CANARY_FAILED",
-      "compiler_goodhart_patch": "ERR_CANARY_FAILED",
-      "forged_cert_digest": "ERR_CERT_INVALID",
-      "forged_inline_canary": "ERR_FORGED_CANARY_REJECTED",
-      "goodhart_in_nullspace_overfit": "REJECTED_BY_DISJOINT_HOLDOUT",
-      "raw_lora_override": "ERR_UNVERIFIED_LORA_OVERRIDE",
-      "sabotage_low_norm_high_leakage": "ERR_CERT_INVALID",
-      "stale_lineage_remount": "ERR_STALE_LINEAGE",
-      "zone_manifest_drift": "ERR_ZONE_MANIFEST_DRIFT"
+    "active_lora_logprob_shift": 0.01105264,
+    "active_lora_step0_logprob_shift": 0.01105264,
+    "active_lora_trajectory_changed": true,
+    "tamper_rejected_count": 9,
+    "tamper_total_count": 9,
+    "live_mount_rejections": {
+      "forged_cert_digest": {
+        "code": "ERR_CERT_INVALID",
+        "rejected": true,
+        "passed": true
+      },
+      "forged_inline_canary": {
+        "code": "ERR_FORGED_CANARY_REJECTED",
+        "rejected": true,
+        "passed": true
+      },
+      "sabotage_low_norm_high_leakage": {
+        "code": "ERR_CERT_INVALID",
+        "rejected": true,
+        "passed": true
+      },
+      "behavioral_corruptor_stage3": {
+        "code": "ERR_CANARY_FAILED",
+        "rejected": true,
+        "passed": true
+      },
+      "compiler_goodhart_patch": {
+        "code": "ERR_CANARY_FAILED",
+        "rejected": true,
+        "passed": true
+      },
+      "raw_lora_override": {
+        "code": "ERR_UNVERIFIED_LORA_OVERRIDE",
+        "rejected": true,
+        "passed": true
+      },
+      "stale_lineage_remount": {
+        "code": "ERR_STALE_LINEAGE",
+        "rejected": true,
+        "passed": true
+      },
+      "zone_manifest_drift_infer": {
+        "code": "ERR_ZONE_MANIFEST_DRIFT",
+        "rejected": true,
+        "passed": true
+      },
+      "zone_manifest_drift_mount": {
+        "code": "ERR_ZONE_MANIFEST_DRIFT",
+        "rejected": true,
+        "passed": true
+      }
     },
-    "zero_init_vs_pure_base_max_logprob_diff": 0.0
+    "cpu_property_checks": {
+      "goodhart_in_nullspace_subspace_orthogonality": {
+        "check_kind": "cpu_float64_algebraic_property_not_live_mount",
+        "visible_canary_cosine": 1.0,
+        "orthogonal_subspace_frobenius": 0.00092744,
+        "property_verified": true
+      }
+    }
   },
   "step_4_4_drift_and_rollback": {
-    "exo_ledger_entries_verified": 9,
     "passed": true,
     "plane1_1byte_mutation_auto_unload_reason": "stale_lineage_auto_unload",
-    "plane1_auto_unload_max_logprob_diff": 0.0,
     "plane1_stale_remount_error_code": "ERR_STALE_LINEAGE",
-    "post_kill_switch_content_matches_pure_base": true,
-    "post_kill_switch_max_logprob_diff": 0.0,
-    "signed_warp_ledger_receipts_verified": 13,
+    "plane1_auto_unload_max_logprob_diff": 0.0,
+    "zone_manifest_rotation_old_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca",
+    "zone_manifest_rotation_new_id": "sha256:e7727f134ddf579db64632d01203c1fc7e260c55e066395541ed15ceae2828b0",
     "zone_manifest_auto_unload_reason": "zone_manifest_drift_auto_unload",
     "zone_manifest_drift_infer_code": "ERR_ZONE_MANIFEST_DRIFT",
     "zone_manifest_drift_mount_code": "ERR_ZONE_MANIFEST_DRIFT",
-    "zone_manifest_rotation_new_id": "sha256:e7727f134ddf579db64632d01203c1fc7e260c55e066395541ed15ceae2828b0",
-    "zone_manifest_rotation_old_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
+    "post_kill_switch_content_matches_pure_base": true,
+    "post_kill_switch_max_logprob_diff": 0.0,
+    "signed_warp_ledger_receipts_verified": 13,
+    "exo_ledger_entries_verified": 9
   }
 }

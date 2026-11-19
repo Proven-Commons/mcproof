@@ -15,20 +15,28 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 import json
+import os
 import shlex
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.request
 from pathlib import Path
-from typing import Any
-
-from transformers import AutoTokenizer
-
-from weft.gguf_lora import build_llama_server_lora_flags
+from typing import Any, Sequence
 
 from .activation_harvester import format_chat_prompt, load_jsonl
+
+ALLOWED_ORACLE_EXECUTABLES: frozenset[str] = frozenset(
+    {
+        "mcproof",
+        "./bin/mcproof",
+        "bin/mcproof",
+        "python",
+        "python3",
+    }
+)
 
 
 def _pick_free_port() -> int:
@@ -90,6 +98,132 @@ def _stop_server(proc: subprocess.Popen[str]) -> None:
         proc.wait(timeout=5)
 
 
+def resolve_datasets_root(repo_root: Path, datasets_dir: Path | None = None) -> Path:
+    """Resolve `(repo_root / 'datasets')` before sibling `(repo_root.parent / 'datasets')`."""
+    if datasets_dir is not None:
+        return Path(datasets_dir)
+    in_repo = Path(repo_root) / "datasets"
+    if in_repo.is_dir():
+        return in_repo
+    sibling = Path(repo_root).parent / "datasets"
+    if sibling.is_dir():
+        return sibling
+    return in_repo
+
+
+def _subprocess_env_with_repo_src(repo_root: Path) -> dict[str, str]:
+    env = dict(os.environ)
+    env["PYTHONHASHSEED"] = "0"
+    src_dir = str((Path(repo_root) / "src").resolve())
+    cur_pp = env.get("PYTHONPATH", "")
+    parts = [p for p in cur_pp.split(os.pathsep) if p]
+    if src_dir not in parts:
+        env["PYTHONPATH"] = os.pathsep.join([src_dir, *parts]) if parts else src_dir
+    mcproof_bin = Path(repo_root) / "bin" / "mcproof"
+    if mcproof_bin.is_file():
+        env.setdefault("MCPROOF_BIN", str(mcproof_bin.resolve()))
+    return env
+
+
+def validate_and_resolve_oracle_cmd(
+    oracle_cmd: str,
+    *,
+    repo_root: Path,
+    ds_root: Path,
+) -> tuple[list[str] | None, str | None]:
+    """Validate `oracle_cmd` against strict executable allowlist and rewrite to `sys.executable`."""
+    try:
+        tokens = shlex.split(oracle_cmd)
+    except ValueError as exc:
+        return None, f"malformed oracle_cmd shell tokens: {exc}"
+    if not tokens:
+        return None, "empty oracle_cmd"
+
+    exe = tokens[0]
+    if exe not in ALLOWED_ORACLE_EXECUTABLES:
+        return None, f"disallowed oracle_cmd executable {exe!r}"
+
+    repo_resolved = Path(repo_root).resolve()
+    ds_resolved = Path(ds_root).resolve()
+
+    if exe in ("mcproof", "./bin/mcproof", "bin/mcproof"):
+        rest = list(tokens[1:])
+        if "--json" not in rest:
+            rest.insert(0, "--json")
+        return [sys.executable, "-m", "mcproof.cli", *rest], None
+
+    # exe is "python" or "python3"
+    if len(tokens) < 2:
+        return None, "python oracle_cmd missing target module or script"
+    if tokens[1] == "-m":
+        if len(tokens) < 3 or tokens[2] not in ("mcproof", "mcproof.cli"):
+            return None, f"disallowed python -m target in oracle_cmd: {tokens[2:3]!r}"
+        rest = list(tokens[3:])
+        if "--json" not in rest:
+            rest.insert(0, "--json")
+        return [sys.executable, "-m", "mcproof.cli", *rest], None
+
+    if tokens[1].startswith("-"):
+        return None, f"disallowed python flag in oracle_cmd: {tokens[1]!r}"
+
+    cand_script = (repo_resolved / tokens[1]).resolve()
+    if not (cand_script.is_relative_to(repo_resolved) or cand_script.is_relative_to(ds_resolved)):
+        return None, f"oracle_cmd script escapes repo_root/datasets: {tokens[1]!r}"
+    if not cand_script.is_file():
+        return None, f"oracle_cmd script not found: {tokens[1]!r}"
+    return [sys.executable, str(cand_script), *tokens[2:]], None
+
+
+def _parse_fail_closed_oracle_stdout(
+    proc: subprocess.CompletedProcess[str],
+    *,
+    default_oracle: str,
+    grading_path: str,
+) -> dict[str, Any]:
+    """Parse subprocess oracle JSON strictly fail-closed (`ORACLE_OUTPUT_UNPARSEABLE` on missing `passed`)."""
+    parsed: Any = None
+    try:
+        parsed = json.loads(proc.stdout or "")
+    except ValueError:
+        parsed = None
+
+    if not isinstance(parsed, dict) or "passed" not in parsed or type(parsed["passed"]) is not bool:
+        return {
+            "passed": False,
+            "oracle": default_oracle,
+            "epistemic_status": "REJECTED",
+            "grading_path": grading_path,
+            "findings": [
+                {
+                    "rule": "ORACLE_OUTPUT_UNPARSEABLE",
+                    "message": ((proc.stderr or "") + "\n" + (proc.stdout or "")).strip()[-240:]
+                    or f"exit={proc.returncode} without valid boolean 'passed' JSON",
+                }
+            ],
+        }
+
+    raw_findings = parsed.get("findings")
+    findings = list(raw_findings) if isinstance(raw_findings, list) else []
+    passed = bool(parsed["passed"]) and proc.returncode == 0
+    if proc.returncode != 0 and not findings:
+        findings.append(
+            {
+                "rule": "ORACLE_NONZERO_EXIT",
+                "message": f"oracle exited with code {proc.returncode}",
+            }
+        )
+    epistemic = str(parsed.get("epistemic_status") or ("VERIFIED" if passed else "REJECTED"))
+    if not passed and epistemic == "VERIFIED":
+        epistemic = "REJECTED"
+    return {
+        "passed": passed,
+        "oracle": str(parsed.get("oracle") or default_oracle),
+        "epistemic_status": epistemic,
+        "grading_path": grading_path,
+        "findings": findings,
+    }
+
+
 def grade_validation_record(
     rec: dict[str, Any],
     completion_text: str,
@@ -97,53 +231,70 @@ def grade_validation_record(
     repo_root: Path,
     datasets_dir: Path | None = None,
 ) -> dict[str, Any]:
-    """Grade one model completion deterministically via `datasets/scripts/grade_item.py` or `mcproof.oracles`."""
-    from mcproof.oracles import grade_family_completion
-
+    """Grade one model completion fail-closed via `datasets/scripts/grade_item.py` or `mcproof.oracles`."""
     rec_id = str(rec.get("id") or "")
-    ds_root = datasets_dir or (repo_root.parent / "datasets")
+    ds_root = resolve_datasets_root(repo_root, datasets_dir)
     grade_item_script = ds_root / "scripts" / "grade_item.py"
-    mcproof_venv_py = repo_root / ".venv" / "bin" / "python"
+    sub_env = _subprocess_env_with_repo_src(repo_root)
 
     if rec_id.startswith("PUB-") and grade_item_script.is_file():
-        py_bin = str(mcproof_venv_py) if mcproof_venv_py.is_file() else "python3"
         proc = subprocess.run(
-            [py_bin, str(grade_item_script), "--id", rec_id, "--input", "-"],
+            [sys.executable, str(grade_item_script), "--id", rec_id, "--input", "-"],
             input=completion_text,
             capture_output=True,
             text=True,
             cwd=str(ds_root),
+            env=sub_env,
             timeout=180,
             check=False,
         )
-        parsed_item: Any = None
-        try:
-            parsed_item = json.loads(proc.stdout)
-        except ValueError as exc:
-            parsed_item = {"_parse_error": str(exc)}
-        if isinstance(parsed_item, dict) and "passed" in parsed_item:
+        return _parse_fail_closed_oracle_stdout(
+            proc,
+            default_oracle="grade_item",
+            grading_path="datasets_grade_item_script",
+        )
+
+    oracle_cmd = str(rec.get("oracle_cmd") or "").strip()
+    if oracle_cmd and ("--fixture-json" in oracle_cmd or "--generator-file" in oracle_cmd):
+        resolved_cmd, err_reason = validate_and_resolve_oracle_cmd(
+            oracle_cmd, repo_root=repo_root, ds_root=ds_root
+        )
+        if resolved_cmd is None:
             return {
-                "passed": bool(parsed_item["passed"]) and proc.returncode == 0,
-                "oracle": str(parsed_item.get("oracle", "grade_item")),
-                "epistemic_status": str(parsed_item.get("epistemic_status", "REJECTED")),
-                "findings": list(parsed_item.get("findings", [])),
+                "passed": False,
+                "oracle": "oracle_cmd",
+                "epistemic_status": "REJECTED",
+                "grading_path": "oracle_cmd_rejected_allowlist",
+                "findings": [
+                    {
+                        "rule": "UNSAFE_ORACLE_CMD",
+                        "message": str(err_reason or "disallowed oracle_cmd"),
+                    }
+                ],
             }
-        return {
-            "passed": False,
-            "oracle": "grade_item",
-            "epistemic_status": "REJECTED",
-            "findings": [
-                {
-                    "rule": "GRADE_ITEM_EXEC_FAIL",
-                    "message": (proc.stderr or proc.stdout).strip()[-240:],
-                }
-            ],
-        }
+        proc = subprocess.run(
+            resolved_cmd,
+            input=completion_text,
+            capture_output=True,
+            text=True,
+            cwd=str(repo_root),
+            env=sub_env,
+            timeout=180,
+            check=False,
+        )
+        return _parse_fail_closed_oracle_stdout(
+            proc,
+            default_oracle="oracle_cmd",
+            grading_path="oracle_cmd_subprocess",
+        )
+
+    repo_src = str((Path(repo_root) / "src").resolve())
+    if repo_src not in sys.path and (Path(repo_root) / "src").is_dir():
+        sys.path.insert(0, repo_src)
+    from mcproof.oracles import grade_family_completion
 
     family = str(rec["family"]).strip().upper()
     expected_tier = str(rec.get("expected_tier") or "") or None
-
-    # Check if record provides explicit oracle_cmd expecting stdin or file, OR fixture fields
     gen_src = rec.get("generator_source")
     valid_cases = rec.get("valid_cases") or ()
     planted_mutations = rec.get("planted_mutations")
@@ -153,50 +304,6 @@ def grade_validation_record(
         valid_cases = valid_cases or fx.get("valid_cases") or ()
         if planted_mutations is None:
             planted_mutations = fx.get("planted_mutations")
-
-    oracle_cmd = str(rec.get("oracle_cmd") or "").strip()
-    # If oracle_cmd invokes `mcproof` CLI with explicit fixture flags, execute it directly in repo/.venv
-    mcproof_venv_py = repo_root / ".venv" / "bin" / "python"
-    mcproof_bin = repo_root / ".venv" / "bin" / "mcproof"
-    if oracle_cmd and ("--fixture-json" in oracle_cmd or "--generator-file" in oracle_cmd):
-        cmd_tokens = shlex.split(oracle_cmd)
-        if cmd_tokens and cmd_tokens[0] == "mcproof" and mcproof_bin.is_file():
-            cmd_tokens[0] = str(mcproof_bin)
-        elif cmd_tokens and cmd_tokens[0] in ("python", "python3") and mcproof_venv_py.is_file():
-            cmd_tokens[0] = str(mcproof_venv_py)
-        if "--json" not in cmd_tokens and len(cmd_tokens) >= 2 and "mcproof" in cmd_tokens[0]:
-            cmd_tokens.insert(1, "--json")
-        proc = subprocess.run(
-            cmd_tokens,
-            input=completion_text,
-            capture_output=True,
-            text=True,
-            cwd=str(repo_root),
-            timeout=180,
-            check=False,
-        )
-        parsed: Any = None
-        try:
-            parsed = json.loads(proc.stdout)
-        except ValueError as exc:
-            parsed = {"_parse_error": str(exc)}
-        if isinstance(parsed, dict) and "passed" in parsed:
-            return {
-                "passed": bool(parsed["passed"]),
-                "oracle": str(parsed.get("oracle", "oracle_cmd")),
-                "epistemic_status": str(parsed.get("epistemic_status", "")),
-                "findings": list(parsed.get("findings", [])),
-            }
-        return {
-            "passed": proc.returncode == 0,
-            "oracle": "oracle_cmd",
-            "epistemic_status": "VERIFIED" if proc.returncode == 0 else "REJECTED",
-            "findings": (
-                []
-                if proc.returncode == 0
-                else [{"rule": "ORACLE_CMD_FAIL", "message": (proc.stderr or proc.stdout).strip()[:240]}]
-            ),
-        }
 
     receipt = grade_family_completion(
         family,
@@ -210,8 +317,28 @@ def grade_validation_record(
         "passed": bool(receipt.passed),
         "oracle": receipt.oracle,
         "epistemic_status": receipt.epistemic_status,
+        "grading_path": "mcproof_oracles_inprocess",
         "findings": list(receipt.findings),
     }
+
+
+def verify_b1_repeat_parity(
+    primary_completions: Sequence[str],
+    repeat_completions: Sequence[str],
+) -> tuple[bool, int]:
+    """Verify exact full-string equality across all tested B1 slot-restore repeat items."""
+    b1_prefix_cache_exact = False
+    b1_prefix_cache_tested_items = 0
+    if len(primary_completions) != len(repeat_completions) or len(primary_completions) == 0:
+        return b1_prefix_cache_exact, b1_prefix_cache_tested_items
+
+    all_exact = True
+    for comp_b1, comp_repeat in zip(primary_completions, repeat_completions):
+        b1_prefix_cache_tested_items += 1
+        if comp_b1 != comp_repeat:
+            all_exact = False
+    b1_prefix_cache_exact = (b1_prefix_cache_tested_items > 0) and all_exact
+    return b1_prefix_cache_exact, b1_prefix_cache_tested_items
 
 
 def _surface_hygiene_signals(text: str) -> dict[str, bool]:
@@ -229,6 +356,218 @@ def _surface_hygiene_signals(text: str) -> dict[str, bool]:
     }
 
 
+def build_validation_scorecard_summary(
+    *,
+    arm_summaries: dict[str, Any],
+    n_prompts: int,
+    max_tokens: int,
+    spec_token_count: int,
+    b1_prefix_cache_exact: bool,
+    b1_prefix_cache_tested_items: int,
+    p2b_scale: float,
+    safety_probe_results: dict[str, Any],
+    grading_paths_used: dict[str, int],
+) -> dict[str, Any]:
+    """Build honest validation scorecard surfacing negative efficacy and control ordering."""
+    b0_tot = int(arm_summaries["B0"]["total"])
+    b0_passed = int(arm_summaries["B0"]["passed"])
+    b0_failed = b0_tot - b0_passed
+
+    p2b_tot = int(arm_summaries["P2-B"]["total"])
+    p2b_passed = int(arm_summaries["P2-B"]["passed"])
+    p2b_failed = p2b_tot - p2b_passed
+
+    b1_tot = int(arm_summaries["B1"]["total"])
+    b1_passed = int(arm_summaries["B1"]["passed"])
+
+    gh_passed = int(arm_summaries["goodhart"]["passed"])
+    gh_tot = int(arm_summaries["goodhart"]["total"])
+    lb_passed = int(arm_summaries["logit_bias"]["passed"])
+    lb_tot = int(arm_summaries["logit_bias"]["total"])
+    p2a_passed = int(arm_summaries["P2-A"]["passed"])
+    p2a_tot = int(arm_summaries["P2-A"]["total"])
+
+    rel_fail_drop = (b0_failed - p2b_failed) / float(b0_failed) if b0_failed > 0 else 0.0
+    b1_rate = b1_passed / float(max(1, b1_tot))
+    p2b_rate = p2b_passed / float(max(1, p2b_tot))
+    ceiling_ratio = p2b_rate / b1_rate if b1_rate > 0 else (1.0 if p2b_rate > 0 else 0.0)
+
+    if p2b_passed < b0_passed:
+        efficacy_verdict = "REJECTED_NEGATIVE_EFFICACY"
+    elif p2b_passed == b0_passed:
+        efficacy_verdict = "REJECTED_ZERO_GAIN_OVER_BASE"
+    elif rel_fail_drop < 0.25 or ceiling_ratio < 0.50:
+        efficacy_verdict = "REJECTED_BELOW_PROMOTION_FLOOR"
+    else:
+        efficacy_verdict = "CANDIDATE_ABOVE_VALIDATION_FLOOR"
+
+    def _fmt(p: int, t: int) -> str:
+        pct = float(100) * p / float(max(1, t))
+        return f"{p}/{t} [{pct:.2f}%]"
+
+    display_arms = [
+        ("P2-A", p2a_passed, p2a_tot, 0),
+        ("P2-B", p2b_passed, p2b_tot, 1),
+        ("B0", b0_passed, b0_tot, 2),
+        ("goodhart", gh_passed, gh_tot, 3),
+        ("constant logit_bias", lb_passed, lb_tot, 4),
+        ("B1", b1_passed, b1_tot, 5),
+    ]
+    display_arms.sort(key=lambda item: (item[1] / float(max(1, item[2])), item[3]))
+    parts: list[str] = []
+    for idx_a, (label_a, p_a, t_a, _) in enumerate(display_arms):
+        token = f"{label_a} {_fmt(p_a, t_a)}"
+        if idx_a == 0:
+            parts.append(token)
+        else:
+            prev_label, prev_p, prev_t, _ = display_arms[idx_a - 1]
+            _ = prev_label
+            rel_op = "=" if (p_a * max(1, prev_t) == prev_p * max(1, t_a)) else "<"
+            parts.append(f"{rel_op} {token}")
+    control_ordering_summary = " ".join(parts)
+
+    p2b_sop_injected = int(arm_summaries["P2-B"]["sop_injected_tokens_per_prompt"])
+    b1_sop_injected = int(spec_token_count)
+
+    return {
+        "schema": "mcproof-validation-evaluation/v0.2",
+        "split": "validation",
+        "n_prompts": int(n_prompts),
+        "efficacy_verdict": efficacy_verdict,
+        "control_ordering_summary": control_ordering_summary,
+        "decoding": {"temperature": 0.0, "top_p": 1.0, "seed": 42, "max_tokens": int(max_tokens)},
+        "plane1_spec_tokens_qwen35": int(spec_token_count),
+        "p2b_sop_tokens_injected": p2b_sop_injected,
+        "b1_sop_tokens_injected": b1_sop_injected,
+        "b1_prefix_cache_parity_verified": bool(b1_prefix_cache_exact),
+        "b1_prefix_cache_tested_items": int(b1_prefix_cache_tested_items),
+        "grading_paths_used": dict(sorted(grading_paths_used.items())),
+        "p2b_lora_scale": float(p2b_scale),
+        "safety_preservation_smoke": safety_probe_results,
+        "arms": arm_summaries,
+        "phase5_preview_on_public_validation": {
+            "efficacy_verdict": efficacy_verdict,
+            "control_ordering_summary": control_ordering_summary,
+            "p2b_relative_failure_reduction_vs_b0": round(rel_fail_drop, 6),
+            "p2b_ceiling_ratio_vs_b1": round(ceiling_ratio, 4),
+            "p2b_sop_tokens_injected": p2b_sop_injected,
+            "b1_sop_tokens_injected": b1_sop_injected,
+        },
+    }
+
+
+def measure_live_b1_prefix_cache_parity(
+    *,
+    gguf_path: Path,
+    safetensors_dir: Path,
+    validation_jsonl: Path,
+    plane1_spec_path: Path,
+    llama_bin: str = "/opt/homebrew/bin/llama-server",
+    max_tokens: int = 1024,
+    n_test_items: int = 3,
+) -> tuple[bool, int]:
+    """Run live `llama-server` B1 slot-restore exact full-string equality check across `n_test_items`."""
+    from transformers import AutoTokenizer
+
+    b1_prefix_cache_exact = False
+    b1_prefix_cache_tested_items = 0
+    tokenizer = AutoTokenizer.from_pretrained(str(safetensors_dir))
+    val_rows = load_jsonl(validation_jsonl)[: max(1, int(n_test_items))]
+    spec_text = plane1_spec_path.read_text(encoding="utf-8")
+    spec_token_count = len(tokenizer.encode(spec_text, add_special_tokens=False))
+    stop_tokens = ["<|im_end|>", "<|endoftext|>"]
+
+    port_b1 = _pick_free_port()
+    ctx_b1 = max(40960, spec_token_count + 4096)
+    primary_list: list[str] = []
+    repeat_list: list[str] = []
+
+    with tempfile.TemporaryDirectory(prefix="mcproof_b1_parity_") as tmp_b1:
+        b1_slot_dir = Path(tmp_b1) / "slots"
+        b1_slot_dir.mkdir()
+        cmd_b1 = [
+            llama_bin,
+            "-m",
+            str(gguf_path),
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port_b1),
+            "-c",
+            str(ctx_b1),
+            "-ngl",
+            "99",
+            "--parallel",
+            "1",
+            "--slot-save-path",
+            str(b1_slot_dir),
+            "--chat-template-kwargs",
+            '{"enable_thinking":false}',
+        ]
+        proc_b1 = _start_server(cmd_b1, port_b1, Path(tmp_b1) / "llama_b1_parity.log", timeout_s=120.0)
+        url_b1 = f"http://127.0.0.1:{port_b1}"
+        try:
+            sample_b1 = format_chat_prompt(tokenizer, "PROBE", system_prompt=spec_text)
+            user_marker = "<|im_start|>user\n"
+            b1_common_prefix = sample_b1[: sample_b1.index(user_marker) + len(user_marker)]
+            _http_post(
+                f"{url_b1}/completion",
+                {
+                    "prompt": b1_common_prefix,
+                    "n_predict": 0,
+                    "temperature": 0.0,
+                    "cache_prompt": True,
+                    "id_slot": 0,
+                },
+                timeout=300.0,
+            )
+            _http_post(
+                f"{url_b1}/slots/0?action=save",
+                {"filename": "b1_sys_prefix.bin"},
+                timeout=120.0,
+            )
+
+            for rec in val_rows:
+                rendered_b1 = format_chat_prompt(
+                    tokenizer, str(rec["prompt"]), system_prompt=spec_text
+                )
+                req_payload = {
+                    "prompt": rendered_b1,
+                    "n_predict": max_tokens,
+                    "temperature": 0.0,
+                    "top_p": 1.0,
+                    "seed": 42,
+                    "cache_prompt": True,
+                    "stop": stop_tokens,
+                    "id_slot": 0,
+                }
+                _http_post(
+                    f"{url_b1}/slots/0?action=restore",
+                    {"filename": "b1_sys_prefix.bin"},
+                    timeout=120.0,
+                )
+                resp_b1 = _http_post(f"{url_b1}/completion", req_payload, timeout=300.0)
+                comp_b1 = str(resp_b1.get("content", ""))
+
+                _http_post(
+                    f"{url_b1}/slots/0?action=restore",
+                    {"filename": "b1_sys_prefix.bin"},
+                    timeout=120.0,
+                )
+                resp_b1_repeat = _http_post(f"{url_b1}/completion", req_payload, timeout=300.0)
+                comp_repeat = str(resp_b1_repeat.get("content", ""))
+
+                primary_list.append(comp_b1)
+                repeat_list.append(comp_repeat)
+        finally:
+            _stop_server(proc_b1)
+
+    b1_prefix_cache_exact, b1_prefix_cache_tested_items = verify_b1_repeat_parity(
+        primary_list, repeat_list
+    )
+    return b1_prefix_cache_exact, b1_prefix_cache_tested_items
+
+
 def evaluate_all_arms_on_validation(
     *,
     gguf_path: Path,
@@ -242,11 +581,16 @@ def evaluate_all_arms_on_validation(
     goodhart_gguf: Path,
     logit_bias_json: Path,
     output_dir: Path,
+    datasets_dir: Path | None = None,
     llama_bin: str = "/opt/homebrew/bin/llama-server",
     max_tokens: int = 1024,
     p2b_scale: float = 1.0,
+    b1_parity_test_items: int = 3,
 ) -> dict[str, Any]:
     """Run deterministic evaluation (`temperature = 0`, `top_p = 1.0`) across all arms."""
+    from transformers import AutoTokenizer
+    from weft.gguf_lora import build_llama_server_lora_flags
+
     output_dir.mkdir(parents=True, exist_ok=True)
     tokenizer = AutoTokenizer.from_pretrained(str(safetensors_dir))
     val_rows = load_jsonl(validation_jsonl)
@@ -256,7 +600,6 @@ def evaluate_all_arms_on_validation(
 
     stop_tokens = ["<|im_end|>", "<|endoftext|>"]
 
-    # 1. Evaluate B0, P2-A, P2-B, Constant Logit-Bias, Sabotage, and Goodhart on multi-LoRA server
     arm_outputs: dict[str, list[dict[str, Any]]] = {
         "B0": [],
         "B1": [],
@@ -298,7 +641,6 @@ def evaluate_all_arms_on_validation(
         proc = _start_server(cmd, port, Path(tmp) / "llama_multilora.log")
         base_url = f"http://127.0.0.1:{port}"
         try:
-            # Verify Sabotage vs P2-B vs B0 on basic arithmetic/safety preservation probes
             safety_prompts = [
                 ("pres_mul", "Compute 17 * 23 and reply with only the exact integer.", "391"),
                 ("pres_add", "Compute 125 + 375 and reply with only the exact integer.", "500"),
@@ -340,8 +682,6 @@ def evaluate_all_arms_on_validation(
                     "details": details,
                 }
 
-            # Score validation.jsonl (48 prompts) across B0, P2-A, P2-B, logit_bias, and goodhart
-            # using 8 isolated parallel slots (erased before every prompt) + concurrent Tier 2 grading.
             rendered_prompts = [format_chat_prompt(tokenizer, str(rec["prompt"])) for rec in val_rows]
             arm_configs: list[tuple[str, list[dict[str, Any]], list[Any] | None]] = [
                 ("B0", [], None),
@@ -389,7 +729,9 @@ def evaluate_all_arms_on_validation(
                 def _grade_idx(item_idx: int) -> dict[str, Any]:
                     rec = val_rows[item_idx]
                     comp_text, elapsed_ms = raw_generations[item_idx]
-                    grade = grade_validation_record(rec, comp_text, repo_root=repo_root)
+                    grade = grade_validation_record(
+                        rec, comp_text, repo_root=repo_root, datasets_dir=datasets_dir
+                    )
                     return {
                         "id": rec["id"],
                         "family": rec["family"],
@@ -400,6 +742,7 @@ def evaluate_all_arms_on_validation(
                         "passed": grade["passed"],
                         "oracle": grade["oracle"],
                         "epistemic_status": grade["epistemic_status"],
+                        "grading_path": grade["grading_path"],
                         "findings": grade["findings"],
                         "surface_hygiene": _surface_hygiene_signals(comp_text),
                         "completion": comp_text,
@@ -410,10 +753,12 @@ def evaluate_all_arms_on_validation(
         finally:
             _stop_server(proc)
 
-    # 2. Dedicated B1 server pass (Base W0 + full ~32.7k-token Plane 1 spec in context)
-    # Uses exact slot save/restore of the shared `<|im_start|>system\n<spec><|im_end|>\n<|im_start|>user\n`
-    # prefix so every prompt starts from the identical KV + DeltaNet recurrent snapshot with zero
-    # cross-prompt state bleed and deterministic repeatability.
+    # 2. Dedicated B1 server pass (Base W0 + full Plane 1 spec in context)
+    b1_prefix_cache_exact = False
+    b1_prefix_cache_tested_items = 0
+    b1_primary_checked: list[str] = []
+    b1_repeat_checked: list[str] = []
+
     port_b1 = _pick_free_port()
     ctx_b1 = max(40960, spec_token_count + 4096)
     with tempfile.TemporaryDirectory(prefix="mcproof_eval_b1_") as tmp_b1:
@@ -462,61 +807,53 @@ def evaluate_all_arms_on_validation(
             )
 
             b1_raw_gens: list[tuple[str, float]] = []
+            parity_limit = max(1, int(b1_parity_test_items))
             for idx, rec in enumerate(val_rows):
                 rendered_b1 = format_chat_prompt(
                     tokenizer, str(rec["prompt"]), system_prompt=spec_text
                 )
+                req_b1 = {
+                    "prompt": rendered_b1,
+                    "n_predict": max_tokens,
+                    "temperature": 0.0,
+                    "top_p": 1.0,
+                    "seed": 42,
+                    "cache_prompt": True,
+                    "stop": stop_tokens,
+                    "id_slot": 0,
+                }
                 _http_post(
                     f"{url_b1}/slots/0?action=restore",
                     {"filename": "b1_sys_prefix.bin"},
                     timeout=120.0,
                 )
                 t0 = time.perf_counter()
-                resp_b1 = _http_post(
-                    f"{url_b1}/completion",
-                    {
-                        "prompt": rendered_b1,
-                        "n_predict": max_tokens,
-                        "temperature": 0.0,
-                        "top_p": 1.0,
-                        "seed": 42,
-                        "cache_prompt": True,
-                        "stop": stop_tokens,
-                        "id_slot": 0,
-                    },
-                    timeout=300.0,
-                )
+                resp_b1 = _http_post(f"{url_b1}/completion", req_b1, timeout=300.0)
                 elapsed_ms = (time.perf_counter() - t0) * 1000.0
                 comp_b1 = str(resp_b1.get("content", ""))
 
-                # Verify on prompt 0 that restore + cache_prompt=True is 100% repeatable
-                if idx == 0:
+                # Verify exact full-string equality across all tested repeat items (never startswith!)
+                if idx < parity_limit:
                     _http_post(
                         f"{url_b1}/slots/0?action=restore",
                         {"filename": "b1_sys_prefix.bin"},
                         timeout=120.0,
                     )
-                    resp_b1_repeat = _http_post(
-                        f"{url_b1}/completion",
-                        {
-                            "prompt": rendered_b1,
-                            "n_predict": 64,
-                            "temperature": 0.0,
-                            "top_p": 1.0,
-                            "seed": 42,
-                            "cache_prompt": True,
-                            "stop": stop_tokens,
-                            "id_slot": 0,
-                        },
-                        timeout=300.0,
-                    )
-                    b1_prefix_cache_exact = comp_b1.startswith(str(resp_b1_repeat.get("content", "")))
+                    resp_b1_repeat = _http_post(f"{url_b1}/completion", req_b1, timeout=300.0)
+                    b1_primary_checked.append(comp_b1)
+                    b1_repeat_checked.append(str(resp_b1_repeat.get("content", "")))
                 b1_raw_gens.append((comp_b1, elapsed_ms))
+
+            b1_prefix_cache_exact, b1_prefix_cache_tested_items = verify_b1_repeat_parity(
+                b1_primary_checked, b1_repeat_checked
+            )
 
             def _grade_b1_idx(item_idx: int) -> dict[str, Any]:
                 rec = val_rows[item_idx]
                 comp_b1, elapsed_ms = b1_raw_gens[item_idx]
-                grade_b1 = grade_validation_record(rec, comp_b1, repo_root=repo_root)
+                grade_b1 = grade_validation_record(
+                    rec, comp_b1, repo_root=repo_root, datasets_dir=datasets_dir
+                )
                 return {
                     "id": rec["id"],
                     "family": rec["family"],
@@ -527,6 +864,7 @@ def evaluate_all_arms_on_validation(
                     "passed": grade_b1["passed"],
                     "oracle": grade_b1["oracle"],
                     "epistemic_status": grade_b1["epistemic_status"],
+                    "grading_path": grade_b1["grading_path"],
                     "findings": grade_b1["findings"],
                     "surface_hygiene": _surface_hygiene_signals(comp_b1),
                     "completion": comp_b1,
@@ -537,8 +875,9 @@ def evaluate_all_arms_on_validation(
         finally:
             _stop_server(proc_b1)
 
-    # Aggregate per-arm and per-family scorecards
     arm_summaries: dict[str, Any] = {}
+    overall_grading_paths: dict[str, int] = {}
+
     for arm_name, rows in arm_outputs.items():
         if not rows:
             continue
@@ -554,7 +893,11 @@ def evaluate_all_arms_on_validation(
                 "pass_rate": round(f_pass / max(1, len(f_rows)), 4),
             }
         rule_counts: dict[str, int] = {}
+        arm_grading_paths: dict[str, int] = {}
         for r in rows:
+            gp_label = str(r.get("grading_path") or "unknown")
+            arm_grading_paths[gp_label] = arm_grading_paths.get(gp_label, 0) + 1
+            overall_grading_paths[gp_label] = overall_grading_paths.get(gp_label, 0) + 1
             for f in r["findings"]:
                 rk = str(f.get("rule", "OTHER"))
                 rule_counts[rk] = rule_counts.get(rk, 0) + 1
@@ -580,42 +923,28 @@ def evaluate_all_arms_on_validation(
             "failure_rate": round((tot - passed) / tot, 4),
             "sop_injected_tokens_per_prompt": rows[0]["sop_injected_tokens"],
             "mean_elapsed_ms": round(sum(r["elapsed_ms"] for r in rows) / tot, 1),
+            "grading_paths_used": dict(sorted(arm_grading_paths.items())),
             "by_family": by_fam,
             "surface_hygiene_rates": hygiene_rates,
             "top_failure_rules": dict(sorted(rule_counts.items(), key=lambda kv: -kv[1])[:12]),
         }
 
-        # Write full raw completions JSONL per arm for independent verifier audit
         out_jsonl = output_dir / f"validation_{arm_name.lower().replace('-', '_')}.jsonl"
         with out_jsonl.open("w", encoding="utf-8") as fh:
             for r in rows:
                 fh.write(json.dumps(r, sort_keys=True) + "\n")
 
-    b0_fail = arm_summaries["B0"]["failure_rate"]
-    p2b_fail = arm_summaries["P2-B"]["failure_rate"]
-    b1_pass = arm_summaries["B1"]["pass_rate"]
-    p2b_pass = arm_summaries["P2-B"]["pass_rate"]
-
-    rel_fail_drop = (b0_fail - p2b_fail) / b0_fail if b0_fail > 0 else 0.0
-    ceiling_ratio = p2b_pass / b1_pass if b1_pass > 0 else (1.0 if p2b_pass > 0 else 0.0)
-    token_savings = 1.0 - (0.0 / max(1, spec_token_count))
-
-    summary_report = {
-        "schema": "mcproof-validation-evaluation/v0.1",
-        "split": "validation",
-        "n_prompts": len(val_rows),
-        "decoding": {"temperature": 0.0, "top_p": 1.0, "seed": 42, "max_tokens": max_tokens},
-        "plane1_spec_tokens_qwen35": spec_token_count,
-        "b1_prefix_cache_parity_verified": bool(locals().get("b1_prefix_cache_exact", True)),
-        "p2b_lora_scale": p2b_scale,
-        "safety_preservation_smoke": safety_probe_results,
-        "arms": arm_summaries,
-        "phase5_preview_on_public_validation": {
-            "p2b_relative_failure_reduction_vs_b0": round(rel_fail_drop, 4),
-            "p2b_ceiling_ratio_vs_b1": round(ceiling_ratio, 4),
-            "p2b_sop_token_savings_ratio": round(token_savings, 6),
-        },
-    }
+    summary_report = build_validation_scorecard_summary(
+        arm_summaries=arm_summaries,
+        n_prompts=len(val_rows),
+        max_tokens=max_tokens,
+        spec_token_count=spec_token_count,
+        b1_prefix_cache_exact=b1_prefix_cache_exact,
+        b1_prefix_cache_tested_items=b1_prefix_cache_tested_items,
+        p2b_scale=p2b_scale,
+        safety_probe_results=safety_probe_results,
+        grading_paths_used=overall_grading_paths,
+    )
     report_path = output_dir / "validation_scorecard.json"
     report_path.write_text(json.dumps(summary_report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return summary_report

@@ -15,18 +15,18 @@
     ]
   },
   "loud_column_headline": {
-    "base_ffn_down_int4_top10_kept_drift_reduction_pct": -0.01,
-    "ffn_down_int4_int8_vs_int4_int4_leakage_reduction_x": 20.766,
-    "ffn_down_top10_protected_vs_unprotected_int4_int8_ratio": 0.8797,
-    "p2b_ffn_up_int4_int8_vs_int4_int4_leakage_reduction_x": 2.295,
-    "p2b_ffn_up_top10_protected_vs_unprotected_int4_int8_ratio": 0.9998
+    "base_weight_loud_col_drift_delta_pct": -0.01,
+    "compiled_p2b_ffn_up_leakage_ratio": 2.295,
+    "random_nullspace_probe_ffn_down_leakage_ratio": 20.766,
+    "random_nullspace_probe_ffn_down_top10_imatrix_protection_ratio": 0.8797,
+    "top10_loud_col_protection_ratio": 0.9998
   },
-  "manifest_sha256": "57dd0c0fea77ef8a537e478d3e810bfb0943987a91372a8693f55ead6780c689",
+  "manifest_sha256": "feb435b67d3f065539cef8a5c02ab9f189a20314ca1388b845f268538f89935b",
   "mde_guard_exit_code": 0,
   "overall_passed": true,
   "pytest_exit_code": 0,
   "readme_prose_clean": true,
-  "schema": "verifier-compiler-verification-receipt/v0.1",
+  "schema": "verifier-compiler-verification-receipt/v0.2",
   "slab_wire_checks": {
     "f16": true,
     "int4_f16": true,
@@ -58,6 +58,9 @@
           }
         },
         "failure_rate": 0.9167,
+        "grading_paths_used": {
+          "datasets_grade_item_script": 48
+        },
         "mean_elapsed_ms": 64538.8,
         "pass_rate": 0.0833,
         "passed": 4,
@@ -111,6 +114,9 @@
           }
         },
         "failure_rate": 0.8333,
+        "grading_paths_used": {
+          "datasets_grade_item_script": 48
+        },
         "mean_elapsed_ms": 18758.7,
         "pass_rate": 0.1667,
         "passed": 8,
@@ -164,6 +170,9 @@
           }
         },
         "failure_rate": 1.0,
+        "grading_paths_used": {
+          "datasets_grade_item_script": 48
+        },
         "mean_elapsed_ms": 104773.1,
         "pass_rate": 0.0,
         "passed": 0,
@@ -214,6 +223,9 @@
           }
         },
         "failure_rate": 0.9583,
+        "grading_paths_used": {
+          "datasets_grade_item_script": 48
+        },
         "mean_elapsed_ms": 52834.8,
         "pass_rate": 0.0417,
         "passed": 2,
@@ -267,6 +279,9 @@
           }
         },
         "failure_rate": 0.9167,
+        "grading_paths_used": {
+          "datasets_grade_item_script": 48
+        },
         "mean_elapsed_ms": 41027.8,
         "pass_rate": 0.0833,
         "passed": 4,
@@ -320,6 +335,9 @@
           }
         },
         "failure_rate": 0.875,
+        "grading_paths_used": {
+          "datasets_grade_item_script": 48
+        },
         "mean_elapsed_ms": 35650.3,
         "pass_rate": 0.125,
         "passed": 6,
@@ -351,18 +369,29 @@
       }
     },
     "b1_prefix_cache_parity_verified": true,
+    "b1_prefix_cache_tested_items": 3,
+    "b1_sop_tokens_injected": 32216,
+    "control_ordering_summary": "P2-A 0/48 [0.00%] < P2-B 2/48 [4.17%] < B0 4/48 [8.33%] = goodhart 4/48 [8.33%] < constant logit_bias 6/48 [12.50%] < B1 8/48 [16.67%]",
     "decoding": {
       "max_tokens": 1024,
       "seed": 42,
       "temperature": 0.0,
       "top_p": 1.0
     },
+    "efficacy_verdict": "REJECTED_NEGATIVE_EFFICACY",
+    "grading_paths_used": {
+      "datasets_grade_item_script": 288
+    },
     "n_prompts": 48,
     "p2b_lora_scale": 1.0,
+    "p2b_sop_tokens_injected": 0,
     "phase5_preview_on_public_validation": {
-      "p2b_ceiling_ratio_vs_b1": 0.2501,
-      "p2b_relative_failure_reduction_vs_b0": -0.0454,
-      "p2b_sop_token_savings_ratio": 1.0
+      "b1_sop_tokens_injected": 32216,
+      "control_ordering_summary": "P2-A 0/48 [0.00%] < P2-B 2/48 [4.17%] < B0 4/48 [8.33%] = goodhart 4/48 [8.33%] < constant logit_bias 6/48 [12.50%] < B1 8/48 [16.67%]",
+      "efficacy_verdict": "REJECTED_NEGATIVE_EFFICACY",
+      "p2b_ceiling_ratio_vs_b1": 0.25,
+      "p2b_relative_failure_reduction_vs_b0": -0.045455,
+      "p2b_sop_tokens_injected": 0
     },
     "plane1_spec_tokens_qwen35": 32216,
     "safety_preservation_smoke": {
@@ -451,7 +480,7 @@
         "total": 3
       }
     },
-    "schema": "mcproof-validation-evaluation/v0.1",
+    "schema": "mcproof-validation-evaluation/v0.2",
     "split": "validation"
   },
   "verified_hashes": {
@@ -470,7 +499,7 @@
     "p2b.slab_int4_int8": "a1b8566c5a4ef4337c55e56673fe9fe6d6bcc6fb90288c9d6ad650787f343d16",
     "phase6.corpus.gguf": "d81bab6b8c5555674dbbe29e38566435fedc1828d652fbfbf12f35f9562ea640",
     "phase6.formal-verification.gguf": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
-    "phase6.weft-eido.gguf": "29f1b18c7061edcafe74d85271eb3738029258f1a29b9353087629693400b4bb",
+    "phase6.weft-eido.gguf": "71bedfeee40d0b11a559f73d1c720822a1281452859f43a250bf86bc2755bb86",
     "sabotage_gguf": "c78da8945546ec394300b08fb60d6f9588190cca1c1ebbb3fbd9a9318181aca4"
   }
 }

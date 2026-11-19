@@ -1,5 +1,5 @@
 {
-  "activations_npz_sha256": "413a112304d3f80c27e76d16558900f82c16692151275ac488206d202aea72be",
+  "checkpoint_fingerprint": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
   "files": {
     "formal-verification.p2b.binding.json": {
       "byte_diff_count": 0,
@@ -29,6 +29,13 @@
       "rederived_sha256": "7f68b13bac77427e1734d32bf6e5593d61975313abfd62fe1041f878f7b15164",
       "zero_byte_diff": true
     },
+    "formal-verification.p2b.gate_policy.json": {
+      "byte_diff_count": 0,
+      "bytes": 236,
+      "expected_sha256": "a6445d66592528c2e68020c9b9df8d89573e5fe319cefaca17d816872ff6dc97",
+      "rederived_sha256": "a6445d66592528c2e68020c9b9df8d89573e5fe319cefaca17d816872ff6dc97",
+      "zero_byte_diff": true
+    },
     "formal-verification.p2b.int4_f16.wfsl": {
       "byte_diff_count": 0,
       "bytes": 78803,
@@ -42,11 +49,27 @@
       "expected_sha256": "a1b8566c5a4ef4337c55e56673fe9fe6d6bcc6fb90288c9d6ad650787f343d16",
       "rederived_sha256": "a1b8566c5a4ef4337c55e56673fe9fe6d6bcc6fb90288c9d6ad650787f343d16",
       "zero_byte_diff": true
+    },
+    "formal-verification.p2b.warp_bundle.json": {
+      "byte_diff_count": 0,
+      "bytes": 2104,
+      "expected_sha256": "c8995729247d9d81690f75dc224127d2bd77a2237e7e7e056fb78e9ad25e70f2",
+      "rederived_sha256": "c8995729247d9d81690f75dc224127d2bd77a2237e7e7e056fb78e9ad25e70f2",
+      "zero_byte_diff": true
+    },
+    "formal-verification.p2b.wmcp_meta.json": {
+      "byte_diff_count": 0,
+      "bytes": 1583,
+      "expected_sha256": "6b31545190f4631fd982c4a7443e173ac11a84980efe13d89e7a6162fba826d4",
+      "rederived_sha256": "6b31545190f4631fd982c4a7443e173ac11a84980efe13d89e7a6162fba826d4",
+      "zero_byte_diff": true
     }
   },
-  "method": "pure_weft_cpu_float64_no_mcproof_compile_imports",
-  "schema": "verifier-independent-p2b-rederivation/v0.1",
-  "target_tensor_gguf": "blk.31.ffn_up.weight",
-  "target_tensor_safetensors": "model.language_model.layers.31.mlp.up_proj.weight",
+  "files_checked_count": 9,
+  "harvested_activations_meta_sha256": "36df5b5734b1c0b2f538f2393bf9a02f2823634f8d776d6d62c1d312a1602933",
+  "harvested_activations_npz_sha256": "413a112304d3f80c27e76d16558900f82c16692151275ac488206d202aea72be",
+  "hyperparameter_source": "pinned_constants_and_spec_lineage_json__never_read_from_expected_artifact",
+  "implementation": "pure_numpy_and_python_stdlib__zero_weft_or_mcproof_compile_imports",
+  "schema": "verifier-independent-p2b-rederivation/v0.2",
   "zero_byte_diff_all": true
 }

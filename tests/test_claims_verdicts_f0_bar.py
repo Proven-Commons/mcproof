@@ -1,22 +1,29 @@
-"""Tests for mission bar, f0 gate, formal-claims-audit verdicts, soko integrity, and claim hygiene."""
+"""Tests for mission bar, f0 gate, formal-claims-audit verdicts, soko integrity, claim hygiene, and Family C security."""
 
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 from mcproof.oracles import (
+    grade_family_completion,
     run_claim_hygiene_oracle,
     run_f0_gate_oracle,
     run_mission_bar_oracle,
+    run_prose_and_mixed_zone_oracle,
     run_soko_integrity_and_evidence_oracle,
     run_verdicts_oracle,
+    sanitize_verdict_id,
 )
 from mcproof.paths import repo_root
 
-from helpers import expect_eq, expect_false, expect_in, expect_true
+from helpers import expect_eq, expect_false, expect_in, expect_true, requires_dep
 
 
+@requires_dep("soko", "mission", "f0", "formal-claims-audit")
 def test_pinned_soko_mission_f0_and_verdicts_oracles_pass() -> None:
     soko_rec = run_soko_integrity_and_evidence_oracle()
     expect_true(soko_rec.passed, f"soko integrity failed: {soko_rec.findings}")
@@ -33,6 +40,7 @@ def test_pinned_soko_mission_f0_and_verdicts_oracles_pass() -> None:
     expect_true(verdict_rec.passed, f"empty main verdicts dir should pass structurally: {verdict_rec.findings}")
 
 
+@requires_dep("formal-claims-audit")
 def test_verdicts_oracle_validates_40char_sha_and_unique_keys(tmp_path: Path) -> None:
     good_verdict = {
         "id": "sample-verdict-01",
@@ -55,11 +63,108 @@ def test_verdicts_oracle_validates_40char_sha_and_unique_keys(tmp_path: Path) ->
     expect_true(rec_ok.passed, f"valid verdict rejected: {rec_ok.findings}")
 
     bad_verdict = dict(good_verdict)
-    bad_verdict["source_commit"] = "7517a86"  # 7-char truncated SHA must fail!
+    bad_verdict["source_commit"] = "7517a86"
     bad_file = tmp_path / "sample-verdict-01.json"
     bad_file.write_text(json.dumps(bad_verdict, indent=2), encoding="utf-8")
     rec_bad = run_verdicts_oracle(bad_file)
     expect_false(rec_bad.passed, "7-char source_commit must fail check_verdicts.py")
+
+
+def test_family_c_verdict_id_blocks_path_traversal_and_writes_zero_files(tmp_path: Path) -> None:
+    canary_target = tmp_path / "escaped.json"
+    bad_ids = [
+        "../escaped",
+        "../../escaped",
+        "/etc/passwd",
+        "C:/foo",
+        "C:\\foo",
+        str(canary_target),
+        "foo..bar",
+        ".hidden",
+        "",
+    ]
+    for bad_id in bad_ids:
+        expect_eq(sanitize_verdict_id(bad_id), None, f"expected {bad_id!r} to be rejected")
+        doc = f"""# Verdict Review
+
+Claim tier: `VERIFIED`
+
+```json
+{json.dumps({"id": bad_id, "verdict": "weaker", "source_commit": "7517a86223e6741b0a6b5c0b3b0fabcf68347bee"})}
+```
+
+## What is not proved
+
+- Performance sits outside the scope of this check.
+
+## What you must trust
+
+- Lean kernel, compiler, runtime, and hardware.
+"""
+        old_tmp = os.environ.get("TMPDIR")
+        os.environ["TMPDIR"] = str(tmp_path)
+        try:
+            rec = grade_family_completion("C", doc, expected_tier="VERIFIED")
+        finally:
+            if old_tmp is None:
+                os.environ.pop("TMPDIR", None)
+            else:
+                os.environ["TMPDIR"] = old_tmp
+        expect_false(rec.passed, f"malicious verdict id {bad_id!r} must fail closed")
+        expect_in("INVALID_VERDICT_ID", {f["rule"] for f in rec.findings})
+        expect_eq(list(tmp_path.iterdir()), [], f"zero files may be left in {tmp_path} for {bad_id!r}")
+
+
+def test_claim_tier_precedence_is_deterministic_across_python_hash_seeds() -> None:
+    ambiguous_doc = """# Multi-Tier Discussion
+
+This note compares CONJECTURE, KNOWN, VERIFIED, and PROVEN claims without an explicit header.
+
+## What is not proved
+
+- Unbounded inputs sit outside finite checks.
+
+## What you must trust
+
+- Python runtime and host hardware.
+"""
+    code = (
+        "import json, sys; "
+        f"sys.path.insert(0, {str(repo_root() / 'src')!r}); "
+        "from mcproof.oracles import run_claim_hygiene_oracle; "
+        f"r = run_claim_hygiene_oracle({ambiguous_doc!r}); "
+        "print(json.dumps({'tier': r.checks['declared_tier'], 'sha': r.receipt_sha256}))"
+    )
+    seen_tiers: set[str] = set()
+    seen_shas: set[str] = set()
+    for seed in ("0", "1", "2", "42", "99999"):
+        env = dict(os.environ)
+        env["PYTHONHASHSEED"] = seed
+        proc = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True)
+        out = json.loads(proc.stdout.strip())
+        seen_tiers.add(out["tier"])
+        seen_shas.add(out["sha"])
+    expect_eq(seen_tiers, {"CONJECTURE"}, "least-inflationary tier present must win deterministically")
+    expect_eq(len(seen_shas), 1, f"receipt_sha256 drifted across PYTHONHASHSEED: {seen_shas}")
+
+
+def test_dupes_fallback_records_finding_on_unparseable_stderr_failure(tmp_path: Path) -> None:
+    fake_prose = tmp_path / "fake_prose_gate.py"
+    fake_prose.write_text(
+        "import sys\n"
+        "if '--dupes' in sys.argv:\n"
+        "    sys.stderr.write('UNFORMATTED DUPES ERROR ON STDERR\\n')\n"
+        "    sys.exit(1)\n"
+        "sys.exit(0)\n",
+        encoding="utf-8",
+    )
+    rec = run_prose_and_mixed_zone_oracle(
+        "# Clean Heading\n\nPlain prose paragraph.\n",
+        verify_embedded_lean=False,
+        prose_script_override=fake_prose,
+    )
+    expect_false(rec.passed, "non-zero --dupes exit with unindented stderr must fail closed")
+    expect_in("PROSE_DUPES_VIOLATION", {f["rule"] for f in rec.findings})
 
 
 def test_claim_hygiene_enforces_disclaimers_and_blocks_tier_inflation() -> None:

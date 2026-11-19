@@ -17,6 +17,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import socket
 import subprocess
 import sys
@@ -33,18 +34,27 @@ VAULT_ROOT = Path(os.environ.get("MCPROOF_VAULT_DIR") or (REPO_ROOT.parents[1] /
 COMPILE_DIR = Path(os.environ.get("MCPROOF_COMPILE_DIR") or (REPO_ROOT / "compile"))
 WEFT_SRC = Path(os.environ.get("WEFT_SRC") or (_SC_ROOT / "weft" / "src"))
 EXO_SRC = Path(os.environ.get("EXO_SRC") or (_SC_ROOT / "exo" / "src"))
-BASE_GGUF = COMPILE_DIR / "checkpoints" / "Qwen3.5-4B-GGUF" / "Qwen3.5-4B-Q8_0.gguf"
-SAFETENSORS_DIR = COMPILE_DIR / "checkpoints" / "Qwen3.5-4B"
-LLAMA_BIN = Path(os.environ.get("LLAMA_SERVER_BIN") or "/opt/homebrew/bin/llama-server")
+BASE_GGUF = (
+    (COMPILE_DIR / "checkpoints" / "Qwen3.5-4B-GGUF" / "Qwen3.5-4B-Q8_0.gguf")
+    if (COMPILE_DIR / "checkpoints" / "Qwen3.5-4B-GGUF" / "Qwen3.5-4B-Q8_0.gguf").is_file()
+    else (REPO_ROOT.parent / "compile" / "checkpoints" / "Qwen3.5-4B-GGUF" / "Qwen3.5-4B-Q8_0.gguf")
+)
+SAFETENSORS_DIR = (
+    (COMPILE_DIR / "checkpoints" / "Qwen3.5-4B")
+    if (COMPILE_DIR / "checkpoints" / "Qwen3.5-4B").is_dir()
+    else (REPO_ROOT.parent / "compile" / "checkpoints" / "Qwen3.5-4B")
+)
+LLAMA_BIN = Path(os.environ.get("LLAMA_SERVER_BIN") or shutil.which("llama-server") or "llama-server")
 
-for p in (str(VAULT_ROOT / "harnesses"), str(WEFT_SRC), str(EXO_SRC)):
+for p in (str(VERIF_DIR / "graders"), str(VERIF_DIR), str(WEFT_SRC), str(EXO_SRC)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-import grade_canaries  # type: ignore[import-not-found]  # noqa: E402
-import grade_holdout  # type: ignore[import-not-found]  # noqa: E402
-import grade_mixed  # type: ignore[import-not-found]  # noqa: E402
-import grade_retention  # type: ignore[import-not-found]  # noqa: E402
+import grade_canaries  # noqa: E402
+import grade_holdout  # noqa: E402
+import grade_mixed  # noqa: E402
+import grade_retention  # noqa: E402
+from leak_audit import load_vault_prompts, verify_zero_vault_leak_text  # noqa: E402
 from weft.gguf_lora import build_llama_server_lora_flags  # noqa: E402
 
 STOP_TOKENS = ["<|im_end|>", "<|endoftext|>"]
@@ -673,9 +683,9 @@ def run_compiled_adapters(p2b_scale: float = 1.0) -> dict[str, Any]:
         finally:
             stop_llama_server(proc)
 
-    (VERIF_DIR / "vault_arms_adapters.json").write_text(
-        json.dumps(results, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    serialized_ad = json.dumps(results, indent=2, sort_keys=True) + "\n"
+    verify_zero_vault_leak_text(serialized_ad, load_vault_prompts(VAULT_ROOT), label="vault_arms_adapters.json")
+    (VERIF_DIR / "vault_arms_adapters.json").write_text(serialized_ad, encoding="utf-8")
     return results
 
 

@@ -19,50 +19,62 @@
       "weight_fro_error": 10.169774
     }
   },
-  "ffn_down_nullspace_adapter_ablation": {
+  "compiled_p2b_ffn_up_adapter_ablation": {
     "f16_f16": {
-      "k0_leakage_fro": 0.096229,
+      "cert_frobenius_sq_scaled": 315383710,
+      "cert_leakage_energy_scaled": 582874839,
+      "k0_leakage_fro": 0.372784,
       "payload_bytes": 188416
     },
     "int4_f16": {
-      "k0_leakage_fro": 0.097268,
-      "payload_bytes": 157728
+      "cert_frobenius_sq_scaled": 305702688,
+      "cert_leakage_energy_scaled": 565191032,
+      "k0_leakage_fro": 0.367086,
+      "payload_bytes": 77856
     },
-    "int4_int4_top10_imatrix_cols_protected": {
-      "k0_leakage_fro": 134.584736,
+    "int4_int4_top10_cols_protected": {
+      "cert_frobenius_sq_scaled": 313673078,
+      "cert_leakage_energy_scaled": 2292483469,
+      "k0_leakage_fro": 0.739304,
       "payload_bytes": 47348
     },
     "int4_int4_unprotected": {
-      "k0_leakage_fro": 159.391531,
+      "cert_frobenius_sq_scaled": 313880344,
+      "cert_leakage_energy_scaled": 3004219337,
+      "k0_leakage_fro": 0.846322,
       "payload_bytes": 47168
     },
-    "int4_int8_top10_imatrix_cols_protected": {
-      "k0_leakage_fro": 6.752324,
-      "payload_bytes": 84212
-    },
-    "int4_int8_top10_weight_cols_protected": {
-      "k0_leakage_fro": 7.865954,
-      "payload_bytes": 84212
+    "int4_int8_top10_cols_protected": {
+      "cert_frobenius_sq_scaled": 305721613,
+      "cert_leakage_energy_scaled": 570064064,
+      "k0_leakage_fro": 0.368665,
+      "payload_bytes": 57588
     },
     "int4_int8_unprotected": {
-      "k0_leakage_fro": 7.675565,
-      "payload_bytes": 84032
-    },
-    "int8_int4_reversed_control": {
-      "k0_leakage_fro": 157.448119,
+      "cert_frobenius_sq_scaled": 305723235,
+      "cert_leakage_energy_scaled": 570237026,
+      "k0_leakage_fro": 0.368721,
       "payload_bytes": 57408
     },
+    "int8_int4_reversed_control": {
+      "cert_frobenius_sq_scaled": 324970348,
+      "cert_leakage_energy_scaled": 3151485258,
+      "k0_leakage_fro": 0.866818,
+      "payload_bytes": 84032
+    },
     "int8_int8": {
-      "k0_leakage_fro": 7.588111,
+      "cert_frobenius_sq_scaled": 316482638,
+      "cert_leakage_energy_scaled": 590102128,
+      "k0_leakage_fro": 0.375088,
       "payload_bytes": 94272
     }
   },
   "headline_ratios": {
-    "base_ffn_down_int4_top10_kept_drift_reduction_pct": -0.01,
-    "ffn_down_int4_int8_vs_int4_int4_leakage_reduction_x": 20.766,
-    "ffn_down_top10_protected_vs_unprotected_int4_int8_ratio": 0.8797,
-    "p2b_ffn_up_int4_int8_vs_int4_int4_leakage_reduction_x": 2.295,
-    "p2b_ffn_up_top10_protected_vs_unprotected_int4_int8_ratio": 0.9998
+    "base_weight_loud_col_drift_delta_pct": -0.01,
+    "compiled_p2b_ffn_up_leakage_ratio": 2.295,
+    "random_nullspace_probe_ffn_down_leakage_ratio": 20.766,
+    "random_nullspace_probe_ffn_down_top10_imatrix_protection_ratio": 0.8797,
+    "top10_loud_col_protection_ratio": 0.9998
   },
   "per_layer_ffn_down_outlier_profile": [
     {
@@ -418,10 +430,52 @@
       ]
     }
   ],
+  "provenance_separation": {
+    "compiled_p2b_ffn_up": "Measured directly on compiled Arm P2-B factors (blk.31.ffn_up.weight, 9216 x 2560) over Hybrid K0.",
+    "random_nullspace_probe_ffn_down": "Synthetic seeded Gaussian probe (seed 20261119) projected into Null(ffn_down_k0) on blk.31.ffn_down.weight (2560 x 9216); NOT the compiled P2-B adapter."
+  },
   "qwen3_5_4b_max_to_mean_col_norm_peak": 1.7832,
   "qwen3_5_4b_peak_ffn_down_layer": 30,
+  "random_nullspace_probe_ffn_down_ablation": {
+    "f16_f16": {
+      "k0_leakage_fro": 0.096229,
+      "payload_bytes": 188416
+    },
+    "int4_f16": {
+      "k0_leakage_fro": 0.097268,
+      "payload_bytes": 157728
+    },
+    "int4_int4_top10_imatrix_cols_protected": {
+      "k0_leakage_fro": 134.584736,
+      "payload_bytes": 47348
+    },
+    "int4_int4_unprotected": {
+      "k0_leakage_fro": 159.391531,
+      "payload_bytes": 47168
+    },
+    "int4_int8_top10_imatrix_cols_protected": {
+      "k0_leakage_fro": 6.752324,
+      "payload_bytes": 84212
+    },
+    "int4_int8_top10_weight_cols_protected": {
+      "k0_leakage_fro": 7.865954,
+      "payload_bytes": 84212
+    },
+    "int4_int8_unprotected": {
+      "k0_leakage_fro": 7.675565,
+      "payload_bytes": 84032
+    },
+    "int8_int4_reversed_control": {
+      "k0_leakage_fro": 157.448119,
+      "payload_bytes": 57408
+    },
+    "int8_int8": {
+      "k0_leakage_fro": 7.588111,
+      "payload_bytes": 94272
+    }
+  },
   "reference_pr": "Moissanite-Labs/siliquant#12",
-  "schema": "mcproof-loud-column-ablation/v0.1",
+  "schema": "mcproof-loud-column-ablation/v0.2",
   "target_layer": 31,
   "target_layer_top10_ffn_down_imatrix_cols": [
     268,
@@ -447,59 +501,5 @@
     8252,
     227
   ],
-  "tinystories_1m_baseline_max_to_mean_range": [
-    1.21,
-    1.41
-  ],
-  "top_k_protected_columns": 10,
-  "weft_p2b_ffn_up_adapter_ablation": {
-    "f16_f16": {
-      "cert_frobenius_sq_scaled": 315383710,
-      "cert_leakage_energy_scaled": 582874839,
-      "k0_leakage_fro": 0.372784,
-      "payload_bytes": 188416
-    },
-    "int4_f16": {
-      "cert_frobenius_sq_scaled": 305702688,
-      "cert_leakage_energy_scaled": 565191032,
-      "k0_leakage_fro": 0.367086,
-      "payload_bytes": 77856
-    },
-    "int4_int4_top10_cols_protected": {
-      "cert_frobenius_sq_scaled": 313673078,
-      "cert_leakage_energy_scaled": 2292483469,
-      "k0_leakage_fro": 0.739304,
-      "payload_bytes": 47348
-    },
-    "int4_int4_unprotected": {
-      "cert_frobenius_sq_scaled": 313880344,
-      "cert_leakage_energy_scaled": 3004219337,
-      "k0_leakage_fro": 0.846322,
-      "payload_bytes": 47168
-    },
-    "int4_int8_top10_cols_protected": {
-      "cert_frobenius_sq_scaled": 305721613,
-      "cert_leakage_energy_scaled": 570064064,
-      "k0_leakage_fro": 0.368665,
-      "payload_bytes": 57588
-    },
-    "int4_int8_unprotected": {
-      "cert_frobenius_sq_scaled": 305723235,
-      "cert_leakage_energy_scaled": 570237026,
-      "k0_leakage_fro": 0.368721,
-      "payload_bytes": 57408
-    },
-    "int8_int4_reversed_control": {
-      "cert_frobenius_sq_scaled": 324970348,
-      "cert_leakage_energy_scaled": 3151485258,
-      "k0_leakage_fro": 0.866818,
-      "payload_bytes": 84032
-    },
-    "int8_int8": {
-      "cert_frobenius_sq_scaled": 316482638,
-      "cert_leakage_energy_scaled": 590102128,
-      "k0_leakage_fro": 0.375088,
-      "payload_bytes": 94272
-    }
-  }
+  "top_k_protected_columns": 10
 }

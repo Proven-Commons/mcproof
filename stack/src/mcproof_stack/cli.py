@@ -11,7 +11,7 @@ from typing import Sequence
 
 from .phase4_mount import run_phase4_live_mount
 from .phase6_composition import run_phase6_composition
-from .runtime import STACK_ROOT, StackPaths
+from .runtime import STACK_ROOT, StackPaths, sanitize_receipt_paths
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -137,11 +137,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         ok = ok and bool(p6["passed"])
 
     if args.subcommand == "all":
-        combined = {
-            "passed": ok,
-            "phase4": summary["phase4"],
-            "phase6": summary["phase6"],
-        }
+        combined = sanitize_receipt_paths(
+            {
+                "passed": ok,
+                "phase4": summary["phase4"],
+                "phase6": summary["phase6"],
+            }
+        )
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "stack_combined_receipt.json").write_text(
             json.dumps(combined, indent=2, sort_keys=False, allow_nan=False) + "\n",

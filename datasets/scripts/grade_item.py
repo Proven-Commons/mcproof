@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Deterministic per-item Tier 2 verifier for `datasets/{compile,validation}.jsonl`.
 
-Delegates primary Family A/B/C/D checks to `../repo/bin/mcproof` and runs deep
-project-level Bar/Verdict/F0 replay for Family C items when `--id` is supplied.
+Delegates primary Family A/B/C/D checks to `bin/mcproof` and runs structural
+claim/metadata replay (`mission/bar/check.py` README/bar.toml consistency,
+verdict JSON field checks, and `f0/scripts/gate.py` feed schema checks) for
+Family C items when `--id` is supplied. Note: Family C audits prose/metadata
+alignment and claim-tier honesty, whereas Lean 4 theorem proving is tested in
+Family A and Family D.
 """
 from __future__ import annotations
 
@@ -10,6 +14,7 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -20,9 +25,31 @@ from typing import Any
 
 
 DATASETS_ROOT = Path(__file__).resolve().parents[1]
-LAB_ROOT = DATASETS_ROOT.parent
-MCPROOF_BIN = LAB_ROOT / "repo" / "bin" / "mcproof"
-DEPS_ROOT = LAB_ROOT / "deps"
+REPO_ROOT = DATASETS_ROOT.parent
+
+
+def _resolve_mcproof_bin() -> Path:
+    env_bin = os.environ.get("MCPROOF_BIN")
+    if env_bin:
+        return Path(env_bin).expanduser().resolve()
+    for cand in (REPO_ROOT / "bin" / "mcproof", REPO_ROOT.parent / "repo" / "bin" / "mcproof"):
+        if cand.is_file():
+            return cand.resolve()
+    return (REPO_ROOT / "bin" / "mcproof").resolve()
+
+
+def _resolve_deps_root() -> Path:
+    env_deps = os.environ.get("MCPROOF_DEPS_DIR")
+    if env_deps:
+        return Path(env_deps).expanduser().resolve()
+    for cand in (REPO_ROOT.parent / "deps", REPO_ROOT / "deps"):
+        if cand.is_dir():
+            return cand.resolve()
+    return (REPO_ROOT.parent / "deps").resolve()
+
+
+MCPROOF_BIN = _resolve_mcproof_bin()
+DEPS_ROOT = _resolve_deps_root()
 
 
 def _load_item(item_id: str) -> dict[str, Any]:
@@ -42,14 +69,15 @@ def _extract_json_block(text: str) -> str | None:
     idx = text.find(marker)
     if idx < 0:
         return None
-    rest = text[idx + len(marker):]
+    rest = text[idx + len(marker) :]
     end = rest.find("```")
     if end < 0:
         return None
     return rest[:end].strip()
 
 
-def _run_family_c_deep_oracle(harness: dict[str, Any], completion_text: str) -> tuple[bool, list[str]]:
+def _run_family_c_structural_replay(harness: dict[str, Any], completion_text: str) -> tuple[bool, list[str]]:
+    """Verify Family C README/JSON claims against pinned metadata (`bar_status` taken strictly from `meta`)."""
     otype = harness.get("oracle_type")
     meta = harness.get("spec_meta", {})
     errs: list[str] = []
@@ -57,14 +85,13 @@ def _run_family_c_deep_oracle(harness: dict[str, Any], completion_text: str) -> 
     if otype == "bar_check":
         bar_tpl = DEPS_ROOT / "mission" / "bar" / "template"
         bar_chk = DEPS_ROOT / "mission" / "bar" / "check.py"
-        pkg = meta["pkg"]
-        thms = meta["theorem_names"]
+        if not bar_tpl.is_dir() or not bar_chk.is_file():
+            return False, [f"missing_mission_dep_under_{DEPS_ROOT.name}__run_bin_bootstrap_deps"]
+        pkg = str(meta["pkg"])
+        thms = list(meta["theorem_names"])
         readme_body = re.sub(r"(?im)^Claim-Tier:[^\n]*\n+", "", completion_text, count=1)
-        says_verified = bool(
-            re.search(r"(?im)^status\s*:\s*verified\b", readme_body)
-            and not re.search(r"(?im)^status\s*:.*not verified", readme_body)
-        )
-        bar_status = "verified" if says_verified else meta["bar_status"]
+        # Take bar_status strictly from harness metadata; candidate prose cannot self-promote status.
+        bar_status = str(meta["bar_status"])
         with tempfile.TemporaryDirectory(prefix="mcproof_ds_bar_") as td:
             root = Path(td)
             shutil.copytree(bar_tpl, root, dirs_exist_ok=True)
@@ -82,7 +109,7 @@ def _run_family_c_deep_oracle(harness: dict[str, Any], completion_text: str) -> 
             proof_lines.append(f"end {pkg}.Spec\n")
             (root / pkg / "Spec.lean").write_text("\n".join(spec_lines), encoding="utf-8")
             (root / pkg / "Proofs.lean").write_text("\n".join(proof_lines), encoding="utf-8")
-            (root / "Main.lean").write_text(f"import {pkg}\ndef main : IO Unit := IO.println s!\"{{{pkg}.op 1}}\"\n", encoding="utf-8")
+            (root / "Main.lean").write_text(f'import {pkg}\ndef main : IO Unit := IO.println s!"{{{pkg}.op 1}}"\n', encoding="utf-8")
             (root / "lakefile.toml").write_text(
                 f'name = "{pkg.lower()}"\nversion = "0.1.0"\ndefaultTargets = ["{pkg}"]\n\n'
                 f'[[lean_lib]]\nname = "{pkg}"\n\n'
@@ -92,12 +119,16 @@ def _run_family_c_deep_oracle(harness: dict[str, Any], completion_text: str) -> 
                 encoding="utf-8",
             )
             (root / "comparator.json").write_text(
-                json.dumps({
-                    "challenge_module": f"{pkg}.Spec",
-                    "solution_module": f"{pkg}.Proofs",
-                    "theorem_names": thms,
-                    "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
-                }, indent=2) + "\n",
+                json.dumps(
+                    {
+                        "challenge_module": f"{pkg}.Spec",
+                        "solution_module": f"{pkg}.Proofs",
+                        "theorem_names": thms,
+                        "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
+                    },
+                    indent=2,
+                )
+                + "\n",
                 encoding="utf-8",
             )
             (root / "bar.toml").write_text(
@@ -123,6 +154,8 @@ def _run_family_c_deep_oracle(harness: dict[str, Any], completion_text: str) -> 
                 for req_i in (2, 4, 5, 6):
                     if by_item.get(req_i) != "PASS":
                         errs.append(f"bar_item_{req_i}_not_PASS:{by_item.get(req_i)}")
+            else:
+                errs.append("bar_check_missing_report_json")
         return len(errs) == 0, errs
 
     if otype == "verdict_audit":
@@ -154,6 +187,8 @@ def _run_family_c_deep_oracle(harness: dict[str, Any], completion_text: str) -> 
         if not isinstance(rec, dict) or bucket not in ("claimed", "verified"):
             return False, ["invalid_f0_wrapper"]
         f0_src = DEPS_ROOT / "f0"
+        if not (f0_src / "scripts" / "gate.py").is_file():
+            return False, [f"missing_f0_dep_under_{DEPS_ROOT.name}__run_bin_bootstrap_deps"]
         with tempfile.TemporaryDirectory(prefix="mcproof_ds_f0_") as td:
             rdir = Path(td)
             (rdir / "data").mkdir()
@@ -241,7 +276,7 @@ def _run_family_c_deep_oracle(harness: dict[str, Any], completion_text: str) -> 
                 errs.append("f0_tier_or_bucket_mismatch")
         return len(errs) == 0, errs
 
-    return True, []
+    return False, [f"unknown_oracle_type:{otype!r}"]
 
 
 def main() -> int:
@@ -250,6 +285,18 @@ def main() -> int:
     ap.add_argument("--input", default=None, help="Candidate completion path or '-' for stdin (defaults to gold target)")
     ap.add_argument("--negative", action="store_true", help="Grade the record's negative_completion instead")
     args = ap.parse_args()
+
+    if not MCPROOF_BIN.is_file():
+        err_receipt = {
+            "schema": "mcproof-receipt/v0.1",
+            "oracle": "grade_item",
+            "passed": False,
+            "epistemic_status": "REJECTED",
+            "checks": {},
+            "findings": [{"rule": "MISSING_MCPROOF_BIN", "message": f"mcproof entrypoint not found at {MCPROOF_BIN.name}"}],
+        }
+        print(json.dumps(err_receipt, indent=2, sort_keys=True))
+        return 1
 
     row = _load_item(args.id)
     if args.negative:
@@ -262,6 +309,7 @@ def main() -> int:
         comp_text = (DATASETS_ROOT / row["target_path"]).read_text(encoding="utf-8")
 
     cmd = [
+        sys.executable,
         str(MCPROOF_BIN),
         "--json",
         "grade",
@@ -276,17 +324,27 @@ def main() -> int:
         cmd.extend(["--fixture-json", str(DATASETS_ROOT / row["harness_path"])])
 
     proc = subprocess.run(cmd, input=comp_text, capture_output=True, text=True, check=False)
-    receipt = json.loads(proc.stdout)
+    try:
+        receipt = json.loads(proc.stdout)
+    except ValueError:
+        receipt = {
+            "schema": "mcproof-receipt/v0.1",
+            "oracle": "grade_item",
+            "passed": False,
+            "epistemic_status": "REJECTED",
+            "checks": {},
+            "findings": [{"rule": "ORACLE_OUTPUT_UNPARSEABLE", "message": ((proc.stdout or "") + (proc.stderr or "")).strip()[:240]}],
+        }
     passed = bool(receipt.get("passed", False)) and proc.returncode == 0
 
     if row["family"] == "C":
         harness = json.loads((DATASETS_ROOT / row["harness_path"]).read_text(encoding="utf-8"))
-        c_ok, c_errs = _run_family_c_deep_oracle(harness, comp_text)
+        c_ok, c_errs = _run_family_c_structural_replay(harness, comp_text)
         if not c_ok:
             passed = False
             findings = list(receipt.get("findings", []))
             for ce in c_errs:
-                findings.append({"rule": "FAMILY_C_DEEP_ORACLE", "message": ce})
+                findings.append({"rule": "FAMILY_C_STRUCTURAL_REPLAY", "message": ce})
             receipt["passed"] = False
             receipt["epistemic_status"] = "REJECTED"
             receipt["findings"] = findings

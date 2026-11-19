@@ -1,6 +1,9 @@
 {
-  "passed": true,
+  "passed": false,
   "phase4": {
+    "phase": "Phase 4: Live End-to-End 4-Layer Mount",
+    "passed": true,
+    "elapsed_total_s": 31.677,
     "_meta": {
       "gg.siliconcordat/mde": {
         "adapter_class": "class1_rederivable",
@@ -16,61 +19,42 @@
         "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
       }
     },
-    "checkpoint": {
-      "base_gguf_bytes": 4482403488,
-      "base_gguf_name": "Qwen3.5-4B-Q8_0.gguf",
-      "base_weights_sha256": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
-      "geometry": {
-        "architecture": "qwen35",
-        "block_count": 32,
-        "embedding_length": 2560,
-        "feed_forward_length": 9216,
-        "model_name": "Qwen3.5-4B",
-        "target_shape": [
-          9216,
-          2560
-        ],
-        "target_tensor": "blk.31.ffn_up.weight"
-      },
-      "model_id": "Qwen/Qwen3.5-4B"
-    },
-    "elapsed_total_s": 25.394,
-    "formal_adapter": {
-      "adapter_id": "mde:formal-verification",
-      "certificate_sha256": "56820652f47de5866a57fd39bbb092ea2c14c658f2671dbcbcafcc2fa5180b76",
-      "gguf_bytes": 189408,
-      "gguf_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
-      "rederived_zero_byte_ok": true,
-      "slab_int4_f16_bytes": 78803,
-      "slab_int4_int8_bytes": 58357,
-      "source_kind": "compiler_handoff"
-    },
-    "hardware_boundary": {
-      "charminar_linux_probe": "online on Tailscale SSH (<tailscale-host>), AMD Radeon Vega Mobile iGPU (not NVIDIA RTX 3080)",
-      "geminus_windows_rtx3080_probe": "online on Tailscale (<tailscale-host> / <lan-host>), sshHostKeys=false, SSH/RPC ports closed (only SMB 445 open); analytical <=7.2 GiB VRAM verified on Q8_0 (5.03 GiB headless / 6.23 GiB WDDM) & Q4_K_M (3.40 GiB / 4.60 GiB)",
-      "host": "Apple M1 Max (64 GiB unified memory, macOS arm64, Metal -ngl 99)",
-      "live_multi_lora_rss_mib": 6960.16,
-      "pure_base_rss_mib": 4755.0
-    },
     "lineage_pinned": {
-      "contested_heads": [],
       "corpus_tree_sha256": "5bdb7f30363b956e82947f668f98c48f99876e87fb5ed4f785b873e4f4f98305",
       "domain_commits": {
         "corpus": "7b22e542f0db0f3013ab1439cf5d1947676a5083",
         "formal-verification": "49beff2a0185cfa4032170b614a543c0d6754149",
         "weft-eido": "be27665255d9aa2553060d275f7d1b1b3306c703"
-      }
+      },
+      "contested_heads": []
+    },
+    "hardware_boundary": {
+      "measured_host": "Apple M1 Max (64 GiB unified memory, macOS arm64, Metal -ngl 99)",
+      "pure_base_rss_mib": 6913.31,
+      "live_multi_lora_rss_mib": 6975.27,
+      "linux_rtx3080_note": "Tailscale peer geminus (Windows UX582HS 8 GiB RTX 3080) had SSH/RPC ports closed; charminar is AMD Radeon Vega Mobile iGPU; RTX 3080 VRAM figures in Phase 6 are analytical projections, not NVML measurements."
     },
     "llama_server": {
       "binary": "/opt/homebrew/Cellar/llama.cpp/0.5.0/bin/llama-server",
+      "version": "version: 0.5.0 (build 11146, commit 7fe450e19)",
       "commit": "7fe450e19",
+      "verified_required_flags": [
+        "--lora",
+        "--lora-scaled",
+        "--lora-init-without-apply",
+        "--slots",
+        "--slot-save-path",
+        "--no-cache-idle-slots",
+        "--slot-prompt-similarity",
+        "--ctx-checkpoints"
+      ],
       "exact_launch_flags": [
         "-m",
         "<workspace>/mcproof-lab/compile/checkpoints/Qwen3.5-4B-GGUF/Qwen3.5-4B-Q8_0.gguf",
         "--host",
         "127.0.0.1",
         "--port",
-        "54283",
+        "59874",
         "-c",
         "65536",
         "-ngl",
@@ -83,7 +67,7 @@
         "f16",
         "--slots",
         "--slot-save-path",
-        "<tmpdir>/mcproof_phase4_4cqo6zzu/slots_live",
+        "<tmpdir>/slots_live",
         "--no-cache-idle-slots",
         "--slot-prompt-similarity",
         "0.0",
@@ -92,34 +76,52 @@
         "--chat-template-kwargs",
         "{\"enable_thinking\":false}",
         "--lora-scaled",
-        "compile/artifacts/composition/formal-verification.f16.gguf:0.0,<tmpdir>/mcproof_phase4_4cqo6zzu/compiled_adapters/behavioral_corruptor.f16.gguf:0.0,compile/artifacts/controls/formal-verification.goodhart.f16.gguf:0.0",
+        "compile/artifacts/composition/formal-verification.f16.gguf:0.0,<tmpdir>/compiled_adapters/behavioral_corruptor.f16.gguf:0.0,compile/artifacts/controls/formal-verification.goodhart.f16.gguf:0.0",
         "--lora-init-without-apply"
       ],
-      "multi_lora_boot_ms": 1575.31,
-      "pure_base_boot_ms": 1252.98,
-      "verified_required_flags": [
-        "--lora",
-        "--lora-scaled",
-        "--lora-init-without-apply",
-        "--slots",
-        "--slot-save-path",
-        "--no-cache-idle-slots",
-        "--slot-prompt-similarity",
-        "--ctx-checkpoints"
-      ],
-      "version": "version: 0.5.0 (build 11146, commit 7fe450e19)"
+      "pure_base_boot_ms": 1708.87,
+      "multi_lora_boot_ms": 1693.95
     },
-    "passed": true,
-    "phase": "Phase 4: Live End-to-End 4-Layer Mount",
+    "checkpoint": {
+      "model_id": "Qwen/Qwen3.5-4B",
+      "base_gguf_name": "Qwen3.5-4B-Q8_0.gguf",
+      "base_gguf_bytes": 4482403488,
+      "served_gguf_sha256": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1",
+      "base_weights_sha256": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
+      "gguf_quantization": "Q8_0",
+      "has_ssm_recurrent": true,
+      "geometry": {
+        "architecture": "qwen35",
+        "model_name": "Qwen3.5-4B",
+        "block_count": 32,
+        "embedding_length": 2560,
+        "feed_forward_length": 9216,
+        "target_tensor": "blk.31.ffn_up.weight",
+        "target_shape": [
+          9216,
+          2560
+        ]
+      }
+    },
+    "formal_adapter": {
+      "adapter_id": "mde:formal-verification",
+      "source_kind": "compiler_handoff",
+      "gguf_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+      "gguf_bytes": 189408,
+      "certificate_sha256": "56820652f47de5866a57fd39bbb092ea2c14c658f2671dbcbcafcc2fa5180b76",
+      "rederived_zero_byte_ok": true,
+      "slab_int4_int8_bytes": 58357,
+      "slab_int4_f16_bytes": 78803
+    },
     "step_4_1_mde": {
+      "passed": true,
+      "manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca",
       "classified_zones": {
-        "condensed_json": "condensed_json",
         "lean_file": "formal_proof",
-        "mixed_markdown": "formal_proof",
         "python_symbols": {
           "check_cramer_2x2": "formal_proof",
-          "normalize_count": "code",
-          "render_status_chip": "ui_module"
+          "render_status_chip": "ui_module",
+          "normalize_count": "code"
         },
         "python_zone_bytes": {
           "code": 52,
@@ -128,87 +130,131 @@
           "prose": 41,
           "ui_module": 155
         },
+        "mixed_markdown": "formal_proof",
+        "condensed_json": "condensed_json",
         "tsx_widget": "ui_module"
       },
+      "trace_symbol": "check_cramer_2x2",
+      "vendor_meta_key_verified": true,
       "code_audit_clean_passed": true,
       "code_audit_negative_caught_rules": [
         "bare_assert",
         "bare_except",
         "duplicate_json_key",
         "silent_except_swallow"
-      ],
-      "manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca",
-      "passed": true,
-      "trace_symbol": "check_cramer_2x2",
-      "vendor_meta_key_verified": true
+      ]
     },
     "step_4_2_exo": {
-      "constraints": {
-        "allow_exact_formal_notation": true,
-        "allow_negative_disclaimers": true,
-        "claim_vocabulary": "foundation0",
-        "enforce_data_eido_skip": true,
-        "forbid_float_in_exact_math": true
-      },
+      "passed": true,
+      "router_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca",
       "formal_proof_scales": {
         "corpus": 0.0,
-        "formal-verification": 1.0,
-        "weft-eido": 0.0
+        "weft-eido": 0.0,
+        "formal-verification": 1.0
       },
-      "forwarded_bundle_zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca",
       "l1_bank_tag": 3,
-      "passed": true,
-      "router_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
+      "constraints": {
+        "claim_vocabulary": "foundation0",
+        "allow_negative_disclaimers": true,
+        "allow_exact_formal_notation": true,
+        "forbid_float_in_exact_math": true,
+        "enforce_data_eido_skip": true
+      },
+      "forwarded_bundle_zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
     },
     "step_4_3_warp_stages": {
-      "active_lora_logprob_shift": 0.91785812,
-      "active_lora_step0_logprob_shift": 0.01105264,
-      "active_lora_trajectory_changed": false,
-      "canary_mode": "synthetic_host_16",
-      "goodhart_control": {
-        "disjoint_holdout_frobenius": 0.00092744,
-        "rejected_by_private_holdout": true,
-        "visible_canary_cosine": 1.0
-      },
       "passed": true,
+      "canary_mode": "synthetic_host_16",
+      "zero_init_vs_pure_base_max_logprob_diff": 0.0,
       "stage1_five_layer_and_zone_verified": true,
+      "stage2_elapsed_ms": 0.0138,
       "stage2_budget_ms": 1.0,
-      "stage2_elapsed_ms": 0.0245,
+      "stage3_elapsed_ms": 2828.95,
       "stage3_budget_ms": 3000.0,
       "stage3_canaries_passed": 12,
-      "stage3_elapsed_ms": 2666.03,
+      "stage4_kill_switch_elapsed_ms": 5.528,
       "stage4_budget_ms": 10.0,
-      "stage4_kill_switch_elapsed_ms": 5.204,
-      "tamper_and_sabotage_rejections": {
-        "behavioral_corruptor_stage3": "ERR_CANARY_FAILED",
-        "compiler_goodhart_patch": "ERR_CANARY_FAILED",
-        "forged_cert_digest": "ERR_CERT_INVALID",
-        "forged_inline_canary": "ERR_FORGED_CANARY_REJECTED",
-        "goodhart_in_nullspace_overfit": "REJECTED_BY_DISJOINT_HOLDOUT",
-        "raw_lora_override": "ERR_UNVERIFIED_LORA_OVERRIDE",
-        "sabotage_low_norm_high_leakage": "ERR_CERT_INVALID",
-        "stale_lineage_remount": "ERR_STALE_LINEAGE",
-        "zone_manifest_drift": "ERR_ZONE_MANIFEST_DRIFT"
+      "active_lora_logprob_shift": 0.01105264,
+      "active_lora_step0_logprob_shift": 0.01105264,
+      "active_lora_trajectory_changed": true,
+      "tamper_rejected_count": 9,
+      "tamper_total_count": 9,
+      "live_mount_rejections": {
+        "forged_cert_digest": {
+          "code": "ERR_CERT_INVALID",
+          "rejected": true,
+          "passed": true
+        },
+        "forged_inline_canary": {
+          "code": "ERR_FORGED_CANARY_REJECTED",
+          "rejected": true,
+          "passed": true
+        },
+        "sabotage_low_norm_high_leakage": {
+          "code": "ERR_CERT_INVALID",
+          "rejected": true,
+          "passed": true
+        },
+        "behavioral_corruptor_stage3": {
+          "code": "ERR_CANARY_FAILED",
+          "rejected": true,
+          "passed": true
+        },
+        "compiler_goodhart_patch": {
+          "code": "ERR_CANARY_FAILED",
+          "rejected": true,
+          "passed": true
+        },
+        "raw_lora_override": {
+          "code": "ERR_UNVERIFIED_LORA_OVERRIDE",
+          "rejected": true,
+          "passed": true
+        },
+        "stale_lineage_remount": {
+          "code": "ERR_STALE_LINEAGE",
+          "rejected": true,
+          "passed": true
+        },
+        "zone_manifest_drift_infer": {
+          "code": "ERR_ZONE_MANIFEST_DRIFT",
+          "rejected": true,
+          "passed": true
+        },
+        "zone_manifest_drift_mount": {
+          "code": "ERR_ZONE_MANIFEST_DRIFT",
+          "rejected": true,
+          "passed": true
+        }
       },
-      "zero_init_vs_pure_base_max_logprob_diff": 0.0
+      "cpu_property_checks": {
+        "goodhart_in_nullspace_subspace_orthogonality": {
+          "check_kind": "cpu_float64_algebraic_property_not_live_mount",
+          "visible_canary_cosine": 1.0,
+          "orthogonal_subspace_frobenius": 0.00092744,
+          "property_verified": true
+        }
+      }
     },
     "step_4_4_drift_and_rollback": {
-      "exo_ledger_entries_verified": 9,
       "passed": true,
       "plane1_1byte_mutation_auto_unload_reason": "stale_lineage_auto_unload",
-      "plane1_auto_unload_max_logprob_diff": 0.0,
       "plane1_stale_remount_error_code": "ERR_STALE_LINEAGE",
-      "post_kill_switch_content_matches_pure_base": true,
-      "post_kill_switch_max_logprob_diff": 0.0,
-      "signed_warp_ledger_receipts_verified": 13,
+      "plane1_auto_unload_max_logprob_diff": 0.0,
+      "zone_manifest_rotation_old_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca",
+      "zone_manifest_rotation_new_id": "sha256:e7727f134ddf579db64632d01203c1fc7e260c55e066395541ed15ceae2828b0",
       "zone_manifest_auto_unload_reason": "zone_manifest_drift_auto_unload",
       "zone_manifest_drift_infer_code": "ERR_ZONE_MANIFEST_DRIFT",
       "zone_manifest_drift_mount_code": "ERR_ZONE_MANIFEST_DRIFT",
-      "zone_manifest_rotation_new_id": "sha256:e7727f134ddf579db64632d01203c1fc7e260c55e066395541ed15ceae2828b0",
-      "zone_manifest_rotation_old_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
+      "post_kill_switch_content_matches_pure_base": true,
+      "post_kill_switch_max_logprob_diff": 0.0,
+      "signed_warp_ledger_receipts_verified": 13,
+      "exo_ledger_entries_verified": 9
     }
   },
   "phase6": {
+    "phase": "Phase 6: Multi-MDE Composition (T-C1 to T-C5) and Seven Hazards",
+    "passed": false,
+    "elapsed_total_s": 239.17,
     "_meta": {
       "gg.siliconcordat/mde": {
         "adapter_class": "class1_rederivable",
@@ -224,205 +270,90 @@
         "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
       }
     },
-    "adapters": {
-      "corpus": {
-        "adapter_id": "mde:corpus",
-        "certificate_sha256": "315a36a3ab1fcd965eb1bcf5ef89c1e77dc3d831703665b8b3d39df5423d974e",
-        "gguf_bytes": 189184,
-        "gguf_sha256": "d81bab6b8c5555674dbbe29e38566435fedc1828d652fbfbf12f35f9562ea640",
-        "llama_adapter_id": 0,
-        "source_kind": "compiler_handoff"
-      },
-      "formal-verification": {
-        "adapter_id": "mde:formal-verification",
-        "certificate_sha256": "56820652f47de5866a57fd39bbb092ea2c14c658f2671dbcbcafcc2fa5180b76",
-        "gguf_bytes": 189408,
-        "gguf_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
-        "llama_adapter_id": 2,
-        "source_kind": "compiler_handoff"
-      },
-      "weft-eido": {
-        "adapter_id": "mde:weft-eido",
-        "certificate_sha256": "2dda92d7903895770f1b952a9a0aba21affe710ab502027d1c01948f6c430e74",
-        "gguf_bytes": 189184,
-        "gguf_sha256": "29f1b18c7061edcafe74d85271eb3738029258f1a29b9353087629693400b4bb",
-        "llama_adapter_id": 1,
-        "source_kind": "compiler_handoff"
-      }
-    },
-    "elapsed_total_s": 195.836,
-    "exo_ledger_entries_verified": 55,
-    "gates": {
-      "T_C1_solo_preservation": {
-        "adapter_sources": {
-          "corpus": "compiler_handoff",
-          "formal-verification": "compiler_handoff",
-          "weft-eido": "compiler_handoff"
-        },
-        "formal_dataset_eval": null,
-        "min_retention_pct": 99.85,
-        "passed": true,
-        "required_min_retention_pct": 90.0,
-        "routed_domain_retention": {
-          "corpus": {
-            "paired_retention_pct": 100.0,
-            "paired_routed_scales": {
-              "corpus": 1.0,
-              "formal-verification": 0.0
-            },
-            "paired_step0_drift_from_solo": 0.0,
-            "solo_logprob_shift": 0.02351606,
-            "triple_retention_pct": 100.0,
-            "triple_routed_scales": {
-              "corpus": 1.0,
-              "formal-verification": 0.0,
-              "weft-eido": 0.0
-            },
-            "triple_step0_drift_from_solo": 0.0,
-            "zone": "prose"
-          },
-          "formal-verification": {
-            "paired_retention_pct": 100.0,
-            "paired_routed_scales": {
-              "formal-verification": 1.0,
-              "weft-eido": 0.0
-            },
-            "paired_step0_drift_from_solo": 0.0,
-            "solo_logprob_shift": 0.1797455,
-            "triple_retention_pct": 100.0,
-            "triple_routed_scales": {
-              "corpus": 0.0,
-              "formal-verification": 1.0,
-              "weft-eido": 0.0
-            },
-            "triple_step0_drift_from_solo": 0.0,
-            "zone": "formal_proof"
-          },
-          "weft-eido": {
-            "paired_retention_pct": 100.0,
-            "paired_routed_scales": {
-              "formal-verification": 0.0,
-              "weft-eido": 1.0
-            },
-            "paired_step0_drift_from_solo": 0.0,
-            "solo_logprob_shift": 0.00192213,
-            "triple_retention_pct": 99.85,
-            "triple_routed_scales": {
-              "corpus": 0.2,
-              "formal-verification": 0.0,
-              "weft-eido": 1.0
-            },
-            "triple_step0_drift_from_solo": 0.06107306,
-            "zone": "ui_module"
-          }
-        },
-        "simultaneous_research_page_subspace_retention": {
-          "formal_verification_pct": 100.0,
-          "weft_eido_pct": 99.85
-        }
-      },
-      "T_C2_mixed_zone_isolation": {
-        "contested_hard_veto2_escalations": 0,
-        "external_grader_used": false,
-        "failing_items": [],
-        "formal_block_corruptions": 0,
-        "passed": true,
-        "prompt_source": "public_non_vault_30",
-        "prompts_evaluated": 30,
-        "prose_rule_leaks": 0
-      },
-      "T_C3_base_capability_retention": {
-        "beats_naive_unweighted_summation": true,
-        "drop_pp_vs_w0": 0.0,
-        "external_grader_used": false,
-        "max_allowed_drop_pp": 1.5,
-        "naive_unweighted_sum_accuracy_pct": 4.0,
-        "naive_unweighted_sum_passed": 1,
-        "passed": true,
-        "prompt_source": "public_non_vault_25",
-        "prompts_evaluated": 25,
-        "routed_triple_accuracy_pct": 92.0,
-        "routed_triple_passed": 23,
-        "w0_accuracy_pct": 92.0,
-        "w0_passed": 23
-      },
-      "T_C4_order_invariance_and_rollback": {
-        "cpu_float64_max_forward_diff": 4.440892098500626e-16,
-        "cpu_float64_max_matrix_diff": 0.0,
-        "full_stack_o1_rollback_ms": 5.067,
-        "full_stack_rollback_max_logprob_diff": 0.0,
-        "live_llama_order_max_logprob_diff": 0.0,
-        "passed": true,
-        "per_slot_selective_rollback_logprob_diff": 0.0,
-        "permutations_tested": 6
-      },
-      "T_C5_serving_budget": {
-        "latency_overhead_pct": 0.0,
-        "live_slot_kv_ctx_tokens": 8192,
-        "m1_max_measured_stack_rss_mib": 7609.88,
-        "m1_max_measured_w0_rss_mib": 4757.67,
-        "max_allowed_overhead_pct": 15.0,
-        "min_required_kv_ctx_tokens": 8192,
-        "passed": true,
-        "rtx_3080_8gib_vram_accounting_gib": {
-          "base_gguf_gib": 4.1746,
-          "companion_q4_k_m_headless_vram_gib": 3.4034,
-          "companion_q4_k_m_windows_wddm_vram_gib": 4.6034,
-          "deltanet_state_and_compute_scratch_gib": 0.52,
-          "hard_vram_ceiling_gib": 7.2,
-          "kv_cache_8k_gib": 0.25,
-          "kv_cache_dtype": "f16",
-          "rtx_3080_host_note": "geminus (<tailscale-host>, Windows UX582HS 8 GiB RTX 3080) online on Tailscale with sshHostKeys=false and SSH/RPC ports closed (only SMB 445 open); charminar (<tailscale-host>) is AMD Radeon Vega Mobile iGPU; both Q8_0 and Q4_K_M clear <=7.2 GiB",
-          "three_f16_loras_mib": 0.541,
-          "total_estimated_vram_gib": 4.9451,
-          "windows_wddm_desktop_estimated_vram_gib": 6.1451
-        },
-        "triple_lora_median_tok_per_s": 35.21,
-        "w0_median_tok_per_s": 27.92
-      }
-    },
     "lineage_pinned": {
-      "contested_heads": [],
       "corpus_tree_sha256": "5bdb7f30363b956e82947f668f98c48f99876e87fb5ed4f785b873e4f4f98305",
       "domain_commits": {
         "corpus": "7b22e542f0db0f3013ab1439cf5d1947676a5083",
         "formal-verification": "49beff2a0185cfa4032170b614a543c0d6754149",
         "weft-eido": "be27665255d9aa2553060d275f7d1b1b3306c703"
+      },
+      "contested_heads": []
+    },
+    "precedence_contract": "Tier 1 Human Authority > Tier 2 RepoPolicy > Specialist Pack in its L5 syntax zone > Base Prose Pack",
+    "weft_eido_pr25_unit_tests_passed": 120,
+    "checkpoint": {
+      "model_id": "Qwen/Qwen3.5-4B",
+      "base_gguf_name": "Qwen3.5-4B-Q8_0.gguf",
+      "served_gguf_sha256": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1",
+      "base_weights_sha256": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
+      "gguf_quantization": "Q8_0",
+      "has_ssm_recurrent": true
+    },
+    "adapters": {
+      "corpus": {
+        "adapter_id": "mde:corpus",
+        "llama_adapter_id": 0,
+        "source_kind": "compiler_handoff",
+        "gguf_sha256": "d81bab6b8c5555674dbbe29e38566435fedc1828d652fbfbf12f35f9562ea640",
+        "gguf_bytes": 189184,
+        "certificate_sha256": "315a36a3ab1fcd965eb1bcf5ef89c1e77dc3d831703665b8b3d39df5423d974e",
+        "rederived_zero_byte_ok": false
+      },
+      "weft-eido": {
+        "adapter_id": "mde:weft-eido",
+        "llama_adapter_id": 1,
+        "source_kind": "compiler_handoff",
+        "gguf_sha256": "71bedfeee40d0b11a559f73d1c720822a1281452859f43a250bf86bc2755bb86",
+        "gguf_bytes": 189184,
+        "certificate_sha256": "3bd61454a59ddc4511c81b19aeee12c8565de08df1e56436d8b29255de91af3d",
+        "rederived_zero_byte_ok": false
+      },
+      "formal-verification": {
+        "adapter_id": "mde:formal-verification",
+        "llama_adapter_id": 2,
+        "source_kind": "compiler_handoff",
+        "gguf_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+        "gguf_bytes": 189408,
+        "certificate_sha256": "56820652f47de5866a57fd39bbb092ea2c14c658f2671dbcbcafcc2fa5180b76",
+        "rederived_zero_byte_ok": true
       }
     },
-    "passed": true,
-    "phase": "Phase 6: Multi-MDE Composition (T-C1 to T-C5) and Seven Hazards",
-    "precedence_contract": "Tier 1 Human Authority > Tier 2 RepoPolicy > Specialist Pack in its L5 syntax zone > Base Prose Pack",
     "seven_hazards": {
       "H1_negative_clause_vs_what_is_not_proved": {
+        "passed": true,
+        "routed_scales": {
+          "corpus": 0.0,
+          "weft-eido": 0.0,
+          "formal-verification": 1.0
+        },
+        "allow_negative_disclaimers": true,
         "active_lora": [
           {
             "id": 2,
             "scale": 1.0
           }
         ],
-        "allow_negative_disclaimers": true,
-        "passed": true,
-        "routed_scales": {
-          "corpus": 0.0,
-          "formal-verification": 1.0,
-          "weft-eido": 0.0
-        },
         "verified_sections_present": [
           "What is not proved",
           "What you must trust"
         ]
       },
       "H2_jargon_7char_sha_vs_lean_axioms_40char_sha": {
-        "allow_exact_formal_notation": true,
         "passed": true,
-        "preserved_40char_sha": "77b9a1c64ed66d17bf75cc29be1b22ef262e5610",
-        "preserved_axiom": "Quot.sound",
         "protect_axioms": true,
-        "protect_sha_digests": true
+        "protect_sha_digests": true,
+        "allow_exact_formal_notation": true,
+        "preserved_axiom": "Quot.sound",
+        "preserved_40char_sha": "77b9a1c64ed66d17bf75cc29be1b22ef262e5610"
       },
       "H3_divergent_claim_tiers_locked_in_repo_policy": {
         "passed": true,
+        "vocabularies_by_repo": {
+          "aska-digital/corpus": "corpus",
+          "Moissanite-Labs/weft-eido": "corpus",
+          "Foundation-0/f0": "foundation0",
+          "Proven-Commons/mcproof": "proven_commons"
+        },
         "tier2_policy_violations_caught": {
           "foundation0_checker_result_mix": [
             "locked_checker_and_result_mixed:checkers=['scripts/gate.py'],results=['results/run1.json']"
@@ -430,52 +361,42 @@
           "weft_eido_missing_dco": [
             "missing_required_trailer:Signed-off-by (DCO)"
           ]
-        },
-        "vocabularies_by_repo": {
-          "Foundation-0/f0": "foundation0",
-          "Moissanite-Labs/weft-eido": "corpus",
-          "Proven-Commons/mcproof": "proven_commons",
-          "aska-digital/corpus": "corpus"
         }
       },
       "H4_prose_grammar_bans_vs_terse_condensed_json": {
-        "allow_telegraphic_condense": true,
         "passed": true,
         "routed_scales": {
           "corpus": 0.0,
-          "formal-verification": 0.0,
-          "weft-eido": 0.0
+          "weft-eido": 0.0,
+          "formal-verification": 0.0
         },
-        "strict_condensed_problems": [],
-        "validated_eido_passages": 41
+        "allow_telegraphic_condense": true,
+        "validated_eido_passages": 41,
+        "strict_condensed_problems": []
       },
       "H5_static_html_vs_dual_theme_oklch_hard_veto_2": {
         "passed": true,
+        "unoverridden_conflict_key": "html_delivery",
+        "warp_contested_lineage_code": "ERR_CONTESTED_LINEAGE",
+        "resolved_precedence_winner": "weft-eido",
+        "resolved_scales": {
+          "corpus": 0.0,
+          "weft-eido": 1.0
+        },
         "pr25_wcag_360hue_audit": {
           "darkFailuresAtDefaultHue": 0,
           "darkHuesBelowBar": 0,
           "darkWeakestMutedOnWash": 4.99,
           "lightFailuresAtDefaultHue": 24,
           "lightWorstAccent2OnWash": 3.4
-        },
-        "resolved_precedence_winner": "weft-eido",
-        "resolved_scales": {
-          "corpus": 0.0,
-          "weft-eido": 1.0
-        },
-        "unoverridden_conflict_key": "html_delivery",
-        "warp_contested_lineage_code": "ERR_CONTESTED_LINEAGE"
+        }
       },
       "H6_float64_canvas_vs_float_free_exact_verification": {
-        "exact_fraction_verifier_clean": true,
-        "forbid_float_in_exact_math": true,
         "passed": true,
-        "require_certificate_binding": true,
-        "require_illustrative_tag": true,
         "routed_scales": {
           "corpus": 0.0,
-          "formal-verification": 1.0,
-          "weft-eido": 1.0
+          "weft-eido": 1.0,
+          "formal-verification": 1.0
         },
         "simultaneous_active_lora": [
           {
@@ -486,22 +407,248 @@
             "id": 2,
             "scale": 1.0
           }
-        ]
+        ],
+        "forbid_float_in_exact_math": true,
+        "require_certificate_binding": true,
+        "require_illustrative_tag": true,
+        "exact_fraction_verifier_clean": true
       },
       "H7_automated_condensing_stripping_formal_hedges": {
+        "passed": true,
+        "unmarked_conflict_key": "condense_formal_claims",
+        "marked_enforce_data_eido_skip": true,
         "eido_dom_passage_extraction": {
+          "unmarkedPassageCount": 2,
           "markedPassageCount": 1,
           "markedTexts": [
             "Overview prose introducing the finite lattice check for readers."
-          ],
-          "unmarkedPassageCount": 2
-        },
-        "marked_enforce_data_eido_skip": true,
-        "passed": true,
-        "unmarked_conflict_key": "condense_formal_claims"
+          ]
+        }
       }
     },
-    "signed_warp_ledger_receipts_verified": 11,
-    "weft_eido_pr25_unit_tests_passed": 120
+    "gates": {
+      "T_C1_solo_preservation": {
+        "passed": false,
+        "live_step0_retention_pct": 0.0,
+        "min_retention_pct": 0.0,
+        "required_min_retention_pct": 90.0,
+        "max_allowed_drift_fraction_of_solo_shift": 0.1,
+        "routed_domain_retention": {
+          "corpus": {
+            "zone": "prose",
+            "solo_logprob_shift": 0.02351606,
+            "paired_step0_drift_from_solo": 0.0,
+            "triple_step0_drift_from_solo": 0.0,
+            "paired_drift_to_solo_shift_ratio": 0.0,
+            "triple_drift_to_solo_shift_ratio": 0.0,
+            "paired_routed_scales": {
+              "corpus": 1.0,
+              "formal-verification": 0.0
+            },
+            "triple_routed_scales": {
+              "corpus": 1.0,
+              "weft-eido": 0.0,
+              "formal-verification": 0.0
+            },
+            "paired_live_step0_retention_pct": 100.0,
+            "triple_live_step0_retention_pct": 100.0,
+            "live_step0_retention_pct": 100.0,
+            "cpu_linear_subspace_alignment_pct": {
+              "diagnostic_only": true,
+              "paired_pct": null,
+              "paired_status": "not_applicable_disjoint_tensors",
+              "triple_pct": null,
+              "triple_status": "not_applicable_disjoint_tensors"
+            }
+          },
+          "weft-eido": {
+            "zone": "ui_module",
+            "solo_logprob_shift": 0.00192213,
+            "paired_step0_drift_from_solo": 0.0,
+            "triple_step0_drift_from_solo": 0.06107306,
+            "paired_drift_to_solo_shift_ratio": 0.0,
+            "triple_drift_to_solo_shift_ratio": 31.773629,
+            "paired_routed_scales": {
+              "weft-eido": 1.0,
+              "formal-verification": 0.0
+            },
+            "triple_routed_scales": {
+              "corpus": 0.2,
+              "weft-eido": 1.0,
+              "formal-verification": 0.0
+            },
+            "paired_live_step0_retention_pct": 100.0,
+            "triple_live_step0_retention_pct": 0.0,
+            "live_step0_retention_pct": 0.0,
+            "cpu_linear_subspace_alignment_pct": {
+              "diagnostic_only": true,
+              "paired_pct": null,
+              "paired_status": "not_applicable_disjoint_tensors",
+              "triple_pct": 99.85,
+              "triple_status": "shared_tensors_evaluated"
+            }
+          },
+          "formal-verification": {
+            "zone": "formal_proof",
+            "solo_logprob_shift": 0.1797455,
+            "paired_step0_drift_from_solo": 0.0,
+            "triple_step0_drift_from_solo": 0.0,
+            "paired_drift_to_solo_shift_ratio": 0.0,
+            "triple_drift_to_solo_shift_ratio": 0.0,
+            "paired_routed_scales": {
+              "weft-eido": 0.0,
+              "formal-verification": 1.0
+            },
+            "triple_routed_scales": {
+              "corpus": 0.0,
+              "weft-eido": 0.0,
+              "formal-verification": 1.0
+            },
+            "paired_live_step0_retention_pct": 100.0,
+            "triple_live_step0_retention_pct": 100.0,
+            "live_step0_retention_pct": 100.0,
+            "cpu_linear_subspace_alignment_pct": {
+              "diagnostic_only": true,
+              "paired_pct": null,
+              "paired_status": "not_applicable_disjoint_tensors",
+              "triple_pct": null,
+              "triple_status": "not_applicable_disjoint_tensors"
+            }
+          }
+        },
+        "cpu_linear_subspace_alignment_pct": {
+          "diagnostic_only": true,
+          "by_domain": {
+            "corpus": {
+              "diagnostic_only": true,
+              "paired_pct": null,
+              "paired_status": "not_applicable_disjoint_tensors",
+              "triple_pct": null,
+              "triple_status": "not_applicable_disjoint_tensors"
+            },
+            "weft-eido": {
+              "diagnostic_only": true,
+              "paired_pct": null,
+              "paired_status": "not_applicable_disjoint_tensors",
+              "triple_pct": 99.85,
+              "triple_status": "shared_tensors_evaluated"
+            },
+            "formal-verification": {
+              "diagnostic_only": true,
+              "paired_pct": null,
+              "paired_status": "not_applicable_disjoint_tensors",
+              "triple_pct": null,
+              "triple_status": "not_applicable_disjoint_tensors"
+            }
+          },
+          "simultaneous_research_page": {
+            "diagnostic_only": true,
+            "status": "shared_tensors_evaluated",
+            "shared_tensors": [
+              "blk.31.ffn_up.weight"
+            ],
+            "weft_eido_pct": 99.85,
+            "formal_verification_pct": 100.0
+          }
+        },
+        "formal_dataset_eval": null,
+        "adapter_sources": {
+          "corpus": "compiler_handoff",
+          "weft-eido": "compiler_handoff",
+          "formal-verification": "compiler_handoff"
+        }
+      },
+      "T_C2_mixed_zone_isolation": {
+        "passed": true,
+        "prompt_source": "public_non_vault_30",
+        "prompts_evaluated": 30,
+        "contested_hard_veto2_escalations": 0,
+        "formal_block_corruptions": 0,
+        "prose_rule_leaks": 0,
+        "internal_formal_block_corruptions": 0,
+        "internal_prose_rule_leaks": 0,
+        "external_grader_used": false,
+        "external_grader_details": null,
+        "failing_items": []
+      },
+      "T_C3_base_capability_retention": {
+        "passed": true,
+        "prompt_source": "public_non_vault_25",
+        "prompts_evaluated": 25,
+        "external_grader_used": false,
+        "w0_passed": 23,
+        "w0_accuracy_pct": 92.0,
+        "routed_triple_passed": 23,
+        "routed_triple_accuracy_pct": 92.0,
+        "drop_pp_vs_w0": 0.0,
+        "max_allowed_drop_pp": 1.5,
+        "naive_unweighted_sum_passed": 1,
+        "naive_unweighted_sum_accuracy_pct": 4.0,
+        "beats_naive_unweighted_summation": true
+      },
+      "T_C4_order_invariance_and_rollback": {
+        "passed": true,
+        "permutations_tested": 6,
+        "cpu_float64_max_matrix_diff": 0.0,
+        "cpu_float64_max_forward_diff": 4.440892098500626e-16,
+        "live_llama_order_max_logprob_diff": 0.0,
+        "per_slot_selective_rollback_logprob_diff": 0.0,
+        "full_stack_o1_rollback_ms": 4.602,
+        "full_stack_rollback_max_logprob_diff": 0.0
+      },
+      "T_C5_serving_budget": {
+        "passed": false,
+        "benchmark_protocol": "same_llama_server_instance_interleaved_5trials_np8_ctx8192",
+        "w0_median_tok_per_s": 25.75,
+        "triple_lora_median_tok_per_s": 34.27,
+        "w0_samples_tok_per_s": [
+          24.11,
+          23.28,
+          34.29,
+          25.75,
+          30.17
+        ],
+        "triple_lora_samples_tok_per_s": [
+          34.27,
+          35.75,
+          36.01,
+          30.67,
+          33.72
+        ],
+        "latency_overhead_pct": -33.1,
+        "max_allowed_overhead_pct": 15.0,
+        "anomaly_floor_pct": -5.0,
+        "benchmark_anomaly": true,
+        "live_slot_kv_ctx_tokens": 8192,
+        "kv_ctx_gate_passed": true,
+        "min_required_kv_ctx_tokens": 8192,
+        "m1_max_measured_pure_w0_rss_mib": 6910.23,
+        "m1_max_measured_stack_rss_mib": 7623.72,
+        "vram_measurement_kind": "analytical_projection_not_nvml",
+        "analytical_vram_projection_gib": 4.9753,
+        "analytical_vram_breakdown_gib": {
+          "vram_measurement_kind": "analytical_projection_not_nvml",
+          "layer_count_source": "config.json",
+          "full_attention_layers": 8,
+          "linear_attention_ssm_layers": 24,
+          "num_key_value_heads": 4,
+          "head_dim": 256,
+          "base_gguf_gib": 4.1746,
+          "kv_cache_dtype": "f16",
+          "kv_cache_per_slot_gib": 0.25,
+          "ssm_recurrent_state_per_slot_gib": 0.0502,
+          "three_f16_loras_mib": 0.541,
+          "cuda_compute_scratch_allowance_gib": 0.5,
+          "analytical_vram_projection_gib": 4.9753,
+          "analytical_windows_wddm_projection_gib": 6.1753,
+          "companion_q4_k_m_headless_projection_gib": 3.3534,
+          "companion_q4_k_m_windows_wddm_projection_gib": 4.5534,
+          "hard_vram_ceiling_gib": 7.2,
+          "rtx_3080_host_note": "Analytical byte-formula projection only (no NVIDIA NVML GPU attached to M1 Max execution host; Tailscale peer geminus SSH/RPC ports closed, charminar is AMD Radeon Vega Mobile iGPU)."
+        }
+      }
+    },
+    "signed_warp_ledger_receipts_verified": 12,
+    "exo_ledger_entries_verified": 56
   }
 }

@@ -4,34 +4,82 @@
 SECURITY INVARIANT: Never writes any prompt text, completion text, or secret needle
 from <workspace>/mcproof-vault/ to stdout or receipt files. Records only
 canary IDs, category/family/rung metadata, response SHA-256 digests across all 10 runs,
-pass/fail counts, sanitized rule categories, and timing.
+pass/fail counts, sanitized rule categories, and dynamically measured checkpoint/server provenance.
 """
 
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
+import re
+import shutil
 import socket
 import subprocess
 import sys
 import tempfile
 import time
+from typing import Any
 import urllib.error
 import urllib.request
-from typing import Any
 
 _VERIF_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _VERIF_DIR.parent
 VAULT_ROOT = Path(os.environ.get("MCPROOF_VAULT_DIR") or (_REPO_ROOT.parents[1] / "mcproof-vault"))
-_COMPILE_DIR = Path(os.environ.get("MCPROOF_COMPILE_DIR") or (_REPO_ROOT / "compile"))
-BASE_GGUF = _COMPILE_DIR / "checkpoints" / "Qwen3.5-4B-GGUF" / "Qwen3.5-4B-Q8_0.gguf"
-LLAMA_BIN = Path(os.environ.get("LLAMA_SERVER_BIN") or "/opt/homebrew/bin/llama-server")
+PINNED_BASE_GGUF_SHA256 = "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1"
 OUT_JSON = _VERIF_DIR / "canary_zero_flake_receipt.json"
 
-sys.path.insert(0, str(VAULT_ROOT / "harnesses"))
-import grade_canaries  # type: ignore[import-not-found]  # noqa: E402
+sys.path.insert(0, str(_VERIF_DIR))
+from graders import grade_canaries  # noqa: E402
+from leak_audit import load_vault_prompts, verify_zero_vault_leak_text  # noqa: E402
+
+
+def _resolve_base_gguf() -> Path:
+    env_p = os.environ.get("MCPROOF_BASE_GGUF")
+    if env_p:
+        return Path(env_p).expanduser().resolve()
+    for cand in (
+        _REPO_ROOT / "compile" / "checkpoints" / "Qwen3.5-4B-GGUF" / "Qwen3.5-4B-Q8_0.gguf",
+        _REPO_ROOT.parent / "compile" / "checkpoints" / "Qwen3.5-4B-GGUF" / "Qwen3.5-4B-Q8_0.gguf",
+    ):
+        if cand.is_file():
+            return cand.resolve()
+    raise FileNotFoundError("Qwen3.5-4B-Q8_0.gguf not found; set MCPROOF_BASE_GGUF")
+
+
+def _resolve_llama_bin() -> Path:
+    env_b = os.environ.get("LLAMA_SERVER_BIN")
+    if env_b:
+        return Path(env_b).expanduser().resolve()
+    found = shutil.which("llama-server")
+    if found:
+        return Path(found).resolve()
+    raise FileNotFoundError("llama-server binary not found on PATH; set LLAMA_SERVER_BIN")
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        while True:
+            chunk = fh.read(1 << 20)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _probe_llama_server_version(llama_bin: Path) -> str:
+    proc = subprocess.run([str(llama_bin), "--version"], capture_output=True, text=True, timeout=15, check=False)
+    combined = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    m = re.search(r"version:\s*([^\r\n]+)", combined)
+    if not m:
+        raise RuntimeError(f"Unable to parse `llama-server --version` output: {combined.strip()[:240]}")
+    ver_line = m.group(1).strip()
+    if "commit" not in ver_line:
+        raise RuntimeError(f"`llama-server --version` missing commit identifier: {ver_line!r}")
+    return ver_line
 
 
 def pick_free_port() -> int:
@@ -45,14 +93,23 @@ def sanitize_failure_code(code: str) -> str:
 
 
 def main() -> int:
+    base_gguf = _resolve_base_gguf()
+    llama_bin = _resolve_llama_bin()
+    measured_gguf_sha256 = _sha256_file(base_gguf)
+    if not hmac.compare_digest(measured_gguf_sha256, PINNED_BASE_GGUF_SHA256):
+        raise RuntimeError(
+            f"Served GGUF SHA-256 mismatch: measured {measured_gguf_sha256} != pinned {PINNED_BASE_GGUF_SHA256}"
+        )
+    measured_server_version = _probe_llama_server_version(llama_bin)
+
     specs = grade_canaries.load_canary_specs()
     prompts_by_id = {
         json.loads(ln)["id"]: json.loads(ln)["prompt"]
         for ln in (VAULT_ROOT / "canaries_16.jsonl").read_text(encoding="utf-8").splitlines()
         if ln.strip()
     }
-    canary_jsonl_sha = hashlib.sha256((VAULT_ROOT / "canaries_16.jsonl").read_bytes()).hexdigest()
-    warp_canary_json_sha = hashlib.sha256((VAULT_ROOT / "warp_canaries_16.json").read_bytes()).hexdigest()
+    canary_jsonl_sha = _sha256_file(VAULT_ROOT / "canaries_16.jsonl")
+    warp_canary_json_sha = _sha256_file(VAULT_ROOT / "warp_canaries_16.json")
 
     port = pick_free_port()
     base_url = f"http://127.0.0.1:{port}"
@@ -62,9 +119,9 @@ def main() -> int:
         slot_dir.mkdir()
         srv_log = Path(td) / "llama_server.log"
         cmd = [
-            str(LLAMA_BIN),
+            str(llama_bin),
             "-m",
-            str(BASE_GGUF),
+            str(base_gguf),
             "--host",
             "127.0.0.1",
             "--port",
@@ -107,6 +164,15 @@ def main() -> int:
                     time.sleep(0.15)
             if not ready:
                 raise RuntimeError("Timed out waiting for llama-server /health")
+
+            props_build_info: str | None = None
+            try:
+                with urllib.request.urlopen(f"{base_url}/props", timeout=5.0) as pr:
+                    props_obj = json.loads(pr.read().decode("utf-8"))
+                    if isinstance(props_obj, dict) and "build_info" in props_obj:
+                        props_build_info = str(props_obj["build_info"])
+            except OSError:
+                props_build_info = None
 
             n_runs = 10
             t_start = time.perf_counter()
@@ -170,10 +236,12 @@ def main() -> int:
         )
 
     receipt: dict[str, Any] = {
-        "schema": "verifier-canary-zero-flake-receipt/v0.1",
-        "checkpoint_gguf": BASE_GGUF.name,
-        "checkpoint_gguf_sha256": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1",
-        "llama_server_version": "0.5.0 (build 11146, commit 7fe450e19)",
+        "schema": "verifier-canary-zero-flake-receipt/v0.2",
+        "checkpoint_gguf": base_gguf.name,
+        "checkpoint_gguf_sha256": measured_gguf_sha256,
+        "checkpoint_gguf_verified_against_pin": True,
+        "llama_server_version": measured_server_version,
+        "llama_server_props_build_info": props_build_info,
         "decoding": {
             "temperature": 0.0,
             "top_p": 1.0,
@@ -205,14 +273,17 @@ def main() -> int:
         },
         "per_canary": per_canary_summary,
     }
-    OUT_JSON.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    serialized = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
+    verify_zero_vault_leak_text(serialized, load_vault_prompts(VAULT_ROOT), label="canary_zero_flake_receipt.json")
+    OUT_JSON.write_text(serialized, encoding="utf-8")
     print(
         json.dumps(
             {
                 "zero_flake_10_of_10_passed": receipt["zero_flake_10_of_10_passed"],
                 "flaky_id_count": receipt["flaky_id_count"],
+                "checkpoint_gguf_sha256": measured_gguf_sha256,
+                "llama_server_version": measured_server_version,
                 "single_sweep_median_ms": receipt["single_16_canary_sweep_ms_median"],
-                "b0_bare_base_summary": receipt["b0_bare_base_summary"],
             },
             indent=2,
         )

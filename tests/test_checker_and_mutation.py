@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from mcproof.mutation import run_checker_mutation_suite
-from mcproof.oracles import run_checker_oracle
+from mcproof.mutation import parse_f0_corruption_lines, run_checker_mutation_suite
+from mcproof.oracles import grade_family_completion, run_checker_oracle
 
-from helpers import expect_eq, expect_false, expect_in, expect_true
+from helpers import expect_eq, expect_false, expect_in, expect_true, requires_dep, requires_mde
 
 GENERATOR_SRC = """
 def solve_bezout(a: int, b: int) -> dict[str, int]:
@@ -56,21 +56,16 @@ PLANTED_MUTATIONS = [
 ]
 
 
-def test_sound_dual_oracle_exact_checker_passes() -> None:
-    rec = run_checker_oracle(
+def test_mutation_suite_standalone_sound_and_return_true_kill_floor() -> None:
+    ok_rep = run_checker_mutation_suite(
         SOUND_CHECKER_SRC,
-        generator_or_spec_source=GENERATOR_SRC,
         valid_cases=VALID_CASES,
         planted_mutations=PLANTED_MUTATIONS,
     )
-    expect_true(rec.passed, f"sound checker rejected: {rec.findings}")
-    expect_eq(rec.epistemic_status, "VERIFIED")
-    mut = rec.checks["mutation_suite"]
-    expect_eq(mut["mutations_killed"], 5)
-    expect_eq(mut["kill_rate_bps"], 10000)
+    expect_true(ok_rep.passed, f"sound checker rejected by mutation suite: {ok_rep.findings}")
+    expect_eq(ok_rep.mutations_killed, 5)
+    expect_eq(ok_rep.kill_rate_bps, 10000)
 
-
-def test_trivial_return_true_verifier_fails_mutation_kill_floor() -> None:
     trivial_src = """
 def verify(cert: dict[str, int]) -> bool:
     return True
@@ -85,6 +80,63 @@ def verify(cert: dict[str, int]) -> bool:
     expect_eq(mut_rep.kill_rate_bps, 0)
     expect_in("MUTATION_KILL_FLOOR_BREACH", {f["rule"] for f in mut_rep.findings})
 
+
+def test_mutation_driver_resilient_to_candidate_stdout_without_newline() -> None:
+    noisy_checker = SOUND_CHECKER_SRC + '\nprint("NO_NEWLINE_STDOUT_PAYLOAD", end="")\n'
+    noisy_call_checker = noisy_checker.replace(
+        "return True",
+        'print("INLINE_NO_NEWLINE", end=""); return True',
+    )
+    rep = run_checker_mutation_suite(
+        noisy_call_checker,
+        valid_cases=VALID_CASES,
+        planted_mutations=PLANTED_MUTATIONS,
+    )
+    expect_true(rep.passed, f"candidate print(..., end='') must not corrupt result.json: {rep.findings}")
+    expect_eq(rep.mutations_killed, 5)
+
+
+def test_f0_unparseable_corruption_output_reports_zero_over_zero_not_fabricated_four() -> None:
+    killed, total, failed_corrs, findings = parse_f0_corruption_lines("", 1, "unexpected crash")
+    expect_eq(killed, 0)
+    expect_eq(total, 0, "must never fabricate denominator 4 on unparseable output")
+    expect_eq(failed_corrs, [])
+    rules = {f["rule"] for f in findings}
+    expect_in("F0_CORRUPTION_OUTPUT_UNPARSEABLE", rules)
+    expect_in("F0_CORRUPTION_ESCAPED", rules)
+
+
+@requires_dep("soko")
+@requires_mde()
+def test_family_b_without_valid_cases_fails_closed() -> None:
+    rec = grade_family_completion("B", f"```python\n{SOUND_CHECKER_SRC}\n```", valid_cases=())
+    expect_false(rec.passed, "Family B without valid_cases fixtures must fail closed")
+    expect_in("MISSING_VALID_CASES", {f["rule"] for f in rec.findings})
+
+
+@requires_dep("soko")
+@requires_mde()
+def test_sound_dual_oracle_exact_checker_passes() -> None:
+    rec = run_checker_oracle(
+        SOUND_CHECKER_SRC,
+        generator_or_spec_source=GENERATOR_SRC,
+        valid_cases=VALID_CASES,
+        planted_mutations=PLANTED_MUTATIONS,
+    )
+    expect_true(rec.passed, f"sound checker rejected: {rec.findings}")
+    expect_eq(rec.epistemic_status, "VERIFIED")
+    mut = rec.checks["mutation_suite"]
+    expect_eq(mut["mutations_killed"], 5)
+    expect_eq(mut["kill_rate_bps"], 10000)
+
+
+@requires_dep("soko")
+@requires_mde()
+def test_trivial_return_true_verifier_fails_mutation_kill_floor() -> None:
+    trivial_src = """
+def verify(cert: dict[str, int]) -> bool:
+    return True
+"""
     full_rec = run_checker_oracle(
         trivial_src,
         valid_cases=VALID_CASES,
@@ -96,6 +148,8 @@ def verify(cert: dict[str, int]) -> bool:
     expect_in("MUTATION_KILL_FLOOR_BREACH", rules)
 
 
+@requires_dep("soko")
+@requires_mde()
 def test_bare_assert_checker_stripped_under_python_O_and_caught() -> None:
     bare_assert_src = """
 def verify(cert: dict[str, int]) -> bool:
@@ -114,6 +168,8 @@ def verify(cert: dict[str, int]) -> bool:
     expect_in("MUTATION_KILL_FLOOR_BREACH", rules)
 
 
+@requires_dep("soko")
+@requires_mde()
 def test_rejects_float_literal_true_division_and_mirrored_skeleton() -> None:
     float_src = """
 def verify(cert: dict[str, int]) -> bool:
@@ -121,15 +177,15 @@ def verify(cert: dict[str, int]) -> bool:
     ratio = cert["a"] / cert["g"]
     return abs(ratio - float(cert["a"] // cert["g"])) < tol
 """
-    rec_float = run_checker_oracle(float_src)
+    rec_float = run_checker_oracle(float_src, valid_cases=VALID_CASES, planted_mutations=PLANTED_MUTATIONS)
     expect_false(rec_float.passed, "float checker must fail")
     f_rules = {f["rule"] for f in rec_float.findings}
     expect_in("FLOAT_LITERAL_IN_EXACT_CHECKER", f_rules)
     expect_in("FLOAT_DIVISION_IN_EXACT_CHECKER", f_rules)
     expect_in("FLOAT_COERCION_CALL", f_rules)
 
-    # Mirrored alpha skeleton (renamed variables of GENERATOR_SRC)
     mirrored_src = GENERATOR_SRC.replace("solve_bezout", "verify").replace("old_r", "u_r").replace("old_s", "u_s")
     rec_mirror = run_checker_oracle(mirrored_src, generator_or_spec_source=GENERATOR_SRC)
     expect_false(rec_mirror.passed, "identical AST skeleton up to variable rename must fail")
     expect_in("IDENTICAL_ALPHA_SKELETON", {f["rule"] for f in rec_mirror.findings})
+    expect_in("MISSING_VALID_CASES", {f["rule"] for f in rec_mirror.findings})

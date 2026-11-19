@@ -38,9 +38,11 @@ def run_python_strict(
     stdin_text: str | None = None,
     timeout_sec: int = 60,
     extra_env: Mapping[str, str] | None = None,
+    isolated: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     """Execute Python with `-O -B -W error` so bare `assert`s are stripped and warnings fail closed."""
-    cmd = [sys.executable, "-O", "-B", "-W", "error", *script_or_args]
+    flags = ["-I", "-O", "-B", "-W", "error"] if isolated else ["-O", "-B", "-W", "error"]
+    cmd = [sys.executable, *flags, *script_or_args]
     return subprocess.run(
         cmd,
         cwd=cwd,
@@ -51,6 +53,96 @@ def run_python_strict(
         timeout=timeout_sec,
         check=False,
     )
+
+
+def run_candidate_python_confined(
+    script_or_args: Sequence[str],
+    *,
+    writable_dir: Path,
+    timeout_sec: int = 30,
+    sandbox_mode: str = "auto",
+) -> tuple[subprocess.CompletedProcess[str] | None, bool, str | None]:
+    """Run untrusted candidate Python inside Linux `bwrap` (no-net, ro-root, tmpfs home) when available.
+
+    Trust boundary: on hosts without Linux `bwrap` (macOS, Windows, unprivileged containers),
+    `sandbox_mode="auto"` falls back to isolated `-I -O -B -W error` with a disposable `HOME`/`USERPROFILE`
+    and records `python_sandboxed=False`; `sandbox_mode="bwrap"` fails closed with `PYTHON_SANDBOX_UNAVAILABLE`.
+    """
+    if sandbox_mode not in ("auto", "bwrap", "none"):
+        raise ValueError(f"unsupported sandbox_mode {sandbox_mode!r}")
+
+    isolated_home = writable_dir / "_isolated_home"
+    isolated_home.mkdir(parents=True, exist_ok=True)
+    clean_env = {
+        "PATH": os.environ.get("PATH", ""),
+        "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),
+        "HOME": str(isolated_home),
+        "USERPROFILE": str(isolated_home),
+        "TMPDIR": str(writable_dir),
+        "TEMP": str(writable_dir),
+        "TMP": str(writable_dir),
+        "PYTHONHASHSEED": "0",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "OMP_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+    }
+
+    bwrap_bin = shutil.which("bwrap")
+    can_bwrap = bwrap_bin is not None and sys.platform.startswith("linux")
+    if sandbox_mode in ("auto", "bwrap") and can_bwrap and bwrap_bin is not None:
+        w_str = str(writable_dir.resolve())
+        bwrap_cmd = [
+            bwrap_bin,
+            "--ro-bind",
+            "/",
+            "/",
+            "--dev",
+            "/dev",
+            "--proc",
+            "/proc",
+            "--tmpfs",
+            "/tmp",
+            "--bind",
+            w_str,
+            w_str,
+            "--unshare-net",
+            "--die-with-parent",
+            "--chdir",
+            w_str,
+            sys.executable,
+            "-I",
+            "-O",
+            "-B",
+            "-W",
+            "error",
+            *script_or_args,
+        ]
+        proc = subprocess.run(
+            bwrap_cmd,
+            cwd=writable_dir,
+            env=clean_env,
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+        if proc.returncode == 0 or sandbox_mode == "bwrap":
+            return proc, True, None
+        # Some containerized Linux runners forbid user namespaces inside bwrap; only auto mode falls back
+    elif sandbox_mode == "bwrap":
+        return None, False, "Linux bubblewrap (`bwrap`) is unavailable for `sandbox_mode='bwrap'`"
+
+    proc = subprocess.run(
+        [sys.executable, "-I", "-O", "-B", "-W", "error", *script_or_args],
+        cwd=writable_dir,
+        env=clean_env,
+        capture_output=True,
+        text=True,
+        timeout=timeout_sec,
+        check=False,
+    )
+    return proc, False, None
 
 
 def synthesize_adversarial_mutations(valid_cases: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -161,7 +253,11 @@ for idx, item in enumerate(payload["mutations"]):
     except (ValueError, TypeError, KeyError, ArithmeticError, LookupError, RuntimeError) as exc:
         mutation_outcomes.append({"name": name, "killed": True, "returned": None, "error": f"{type(exc).__name__}: {exc}"})
 
-print(json.dumps({"valid_outcomes": valid_outcomes, "mutation_outcomes": mutation_outcomes}))
+result_path = Path(payload["result_path"])
+result_path.write_text(
+    json.dumps({"valid_outcomes": valid_outcomes, "mutation_outcomes": mutation_outcomes}),
+    encoding="utf-8",
+)
 """
 
 
@@ -177,6 +273,7 @@ class MutationKillReport:
     kill_floor_bps: int
     survived_mutations: tuple[str, ...]
     findings: tuple[dict[str, Any], ...]
+    python_sandboxed: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -189,6 +286,7 @@ class MutationKillReport:
             "kill_rate_bps": self.kill_rate_bps,
             "kill_floor_bps": self.kill_floor_bps,
             "survived_mutations": list(self.survived_mutations),
+            "python_sandboxed": self.python_sandboxed,
             "findings": list(self.findings),
         }
 
@@ -202,8 +300,9 @@ def run_checker_mutation_suite(
     kill_floor_num: int = KILL_FLOOR_NUM,
     kill_floor_den: int = KILL_FLOOR_DEN,
     timeout_sec: int = 30,
+    sandbox_mode: str = "auto",
 ) -> MutationKillReport:
-    """Execute candidate checker under `python3 -O -B -W error` against valid inputs and planted mutations."""
+    """Execute candidate checker under `python3 -I -O -B -W error` against valid inputs and planted mutations."""
     findings: list[dict[str, Any]] = []
     floor_bps = (kill_floor_num * 10000) // kill_floor_den
 
@@ -223,6 +322,7 @@ def run_checker_mutation_suite(
             kill_floor_bps=floor_bps,
             survived_mutations=(),
             findings=tuple(findings),
+            python_sandboxed=False,
         )
 
     mutations = list(planted_mutations) if planted_mutations is not None else synthesize_adversarial_mutations(valid_cases)
@@ -242,6 +342,7 @@ def run_checker_mutation_suite(
             kill_floor_bps=floor_bps,
             survived_mutations=(),
             findings=tuple(findings),
+            python_sandboxed=False,
         )
 
     with tempfile.TemporaryDirectory(prefix="mcproof_mut_") as tmp_str:
@@ -249,6 +350,7 @@ def run_checker_mutation_suite(
         checker_file = tmp_dir / "candidate_checker.py"
         driver_file = tmp_dir / "driver.py"
         payload_file = tmp_dir / "payload.json"
+        result_file = tmp_dir / "result.json"
 
         checker_file.write_text(checker_source, encoding="utf-8")
         driver_file.write_text(_MUTATION_DRIVER_CODE, encoding="utf-8")
@@ -258,16 +360,21 @@ def run_checker_mutation_suite(
                 "entry_fn": entry_fn,
                 "valid_cases": list(valid_cases),
                 "mutations": mutations,
+                "result_path": str(result_file),
             }),
             encoding="utf-8",
         )
 
-        proc = run_python_strict([str(driver_file), str(payload_file)], cwd=tmp_dir, timeout_sec=timeout_sec)
-        if proc.returncode != 0:
-            tail = " | ".join(line.strip() for line in ((proc.stdout or "") + "\n" + (proc.stderr or "")).splitlines()[-5:] if line.strip())
+        proc, py_sandboxed, sb_err = run_candidate_python_confined(
+            [str(driver_file), str(payload_file)],
+            writable_dir=tmp_dir,
+            timeout_sec=timeout_sec,
+            sandbox_mode=sandbox_mode,
+        )
+        if sb_err is not None or proc is None:
             findings.append({
-                "rule": "STRICT_PYTHON_EXEC_ERROR",
-                "message": f"checker failed under `python3 -O -B -W error`: {tail}",
+                "rule": "PYTHON_SANDBOX_UNAVAILABLE",
+                "message": sb_err or "candidate sandbox unavailable",
             })
             return MutationKillReport(
                 passed=False,
@@ -280,9 +387,68 @@ def run_checker_mutation_suite(
                 kill_floor_bps=floor_bps,
                 survived_mutations=tuple(str(m.get("name", f"mut_{i}")) for i, m in enumerate(mutations)),
                 findings=tuple(findings),
+                python_sandboxed=False,
             )
 
-        data = json.loads(proc.stdout.strip().splitlines()[-1])
+        if proc.returncode != 0:
+            tail = " | ".join(line.strip() for line in ((proc.stdout or "") + "\n" + (proc.stderr or "")).splitlines()[-5:] if line.strip())
+            findings.append({
+                "rule": "STRICT_PYTHON_EXEC_ERROR",
+                "message": f"checker failed under `python3 -I -O -B -W error`: {tail}",
+            })
+            return MutationKillReport(
+                passed=False,
+                good_cases_total=len(valid_cases),
+                good_cases_passed=0,
+                mutations_total=len(mutations),
+                mutations_killed=0,
+                kill_fraction=f"0/{len(mutations)}",
+                kill_rate_bps=0,
+                kill_floor_bps=floor_bps,
+                survived_mutations=tuple(str(m.get("name", f"mut_{i}")) for i, m in enumerate(mutations)),
+                findings=tuple(findings),
+                python_sandboxed=py_sandboxed,
+            )
+
+        if not result_file.is_file():
+            findings.append({
+                "rule": "DRIVER_OUTPUT_MISSING_OR_CORRUPT",
+                "message": "mutation driver did not produce result.json",
+            })
+            return MutationKillReport(
+                passed=False,
+                good_cases_total=len(valid_cases),
+                good_cases_passed=0,
+                mutations_total=len(mutations),
+                mutations_killed=0,
+                kill_fraction=f"0/{len(mutations)}",
+                kill_rate_bps=0,
+                kill_floor_bps=floor_bps,
+                survived_mutations=tuple(str(m.get("name", f"mut_{i}")) for i, m in enumerate(mutations)),
+                findings=tuple(findings),
+                python_sandboxed=py_sandboxed,
+            )
+
+        try:
+            data = json.loads(result_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            findings.append({
+                "rule": "DRIVER_OUTPUT_MISSING_OR_CORRUPT",
+                "message": f"corrupt mutation driver result.json: {exc}",
+            })
+            return MutationKillReport(
+                passed=False,
+                good_cases_total=len(valid_cases),
+                good_cases_passed=0,
+                mutations_total=len(mutations),
+                mutations_killed=0,
+                kill_fraction=f"0/{len(mutations)}",
+                kill_rate_bps=0,
+                kill_floor_bps=floor_bps,
+                survived_mutations=tuple(str(m.get("name", f"mut_{i}")) for i, m in enumerate(mutations)),
+                findings=tuple(findings),
+                python_sandboxed=py_sandboxed,
+            )
 
     valid_outcomes = data["valid_outcomes"]
     mut_outcomes = data["mutation_outcomes"]
@@ -305,8 +471,8 @@ def run_checker_mutation_suite(
             survived.append(str(item["name"]))
 
     total_mut = len(mut_outcomes)
-    rate_bps = (killed * 10000) // total_mut
-    meets_floor = (killed * kill_floor_den) >= (total_mut * kill_floor_num)
+    rate_bps = (killed * 10000) // total_mut if total_mut > 0 else 0
+    meets_floor = (total_mut > 0) and ((killed * kill_floor_den) >= (total_mut * kill_floor_num))
     if not meets_floor:
         findings.append({
             "rule": "MUTATION_KILL_FLOOR_BREACH",
@@ -329,7 +495,28 @@ def run_checker_mutation_suite(
         kill_floor_bps=floor_bps,
         survived_mutations=tuple(survived),
         findings=tuple(findings),
+        python_sandboxed=py_sandboxed,
     )
+
+
+def parse_f0_corruption_lines(stdout_text: str, returncode: int, stderr_text: str = "") -> tuple[int, int, list[str], list[dict[str, Any]]]:
+    """Parse `run_gate_corruptions.py` output without fabricating a denominator when output is empty/unparseable."""
+    lines = stdout_text.splitlines()
+    killed = sum(1 for ln in lines if ln.startswith("PASS: corruption "))
+    failed_corrs = [ln for ln in lines if ln.startswith("FAIL: corruption ")]
+    total = killed + len(failed_corrs)
+    findings: list[dict[str, Any]] = []
+    if total == 0:
+        findings.append({
+            "rule": "F0_CORRUPTION_OUTPUT_UNPARSEABLE",
+            "message": f"run_gate_corruptions.py emitted zero parseable PASS/FAIL lines (exit {returncode}): {(stdout_text + stderr_text).strip()[:200]}",
+        })
+    if returncode != 0 or failed_corrs:
+        findings.append({
+            "rule": "F0_CORRUPTION_ESCAPED",
+            "message": f"run_gate_corruptions.py exited {returncode}: {(stdout_text + stderr_text).strip()[:240]}",
+        })
+    return killed, total, failed_corrs, findings
 
 
 def run_f0_gate_and_corruptions(f0_root: Path | None = None, *, timeout_sec: int = 60) -> MutationKillReport:
@@ -358,21 +545,16 @@ def run_f0_gate_and_corruptions(f0_root: Path | None = None, *, timeout_sec: int
             cwd=work_copy,
             timeout_sec=timeout_sec,
         )
-        lines = (corr_proc.stdout or "").splitlines()
-        killed = sum(1 for ln in lines if ln.startswith("PASS: corruption "))
-        failed_corrs = [ln for ln in lines if ln.startswith("FAIL: corruption ")]
-        total = killed + len(failed_corrs)
-        if total == 0:
-            total = 4
-        if corr_proc.returncode != 0 or failed_corrs:
-            findings.append({
-                "rule": "F0_CORRUPTION_ESCAPED",
-                "message": f"run_gate_corruptions.py exited {corr_proc.returncode}: {(corr_proc.stdout + corr_proc.stderr).strip()[:240]}",
-            })
+        killed, total, failed_corrs, corr_findings = parse_f0_corruption_lines(
+            corr_proc.stdout or "",
+            corr_proc.returncode,
+            corr_proc.stderr or "",
+        )
+        findings.extend(corr_findings)
 
     rate_bps = (killed * 10000) // total if total > 0 else 0
     floor_bps = (KILL_FLOOR_NUM * 10000) // KILL_FLOOR_DEN
-    meets_floor = (killed * KILL_FLOOR_DEN) >= (total * KILL_FLOOR_NUM)
+    meets_floor = (total > 0) and ((killed * KILL_FLOOR_DEN) >= (total * KILL_FLOOR_NUM))
     if not meets_floor:
         findings.append({
             "rule": "MUTATION_KILL_FLOOR_BREACH",

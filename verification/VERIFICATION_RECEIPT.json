@@ -1,129 +1,934 @@
 {
+  "all_promotion_gates_passed": false,
   "hardware_boundary": {
-    "analytical_rtx3080_vram_gib": {
-      "clears_ceiling": true,
-      "hard_ceiling_gib": 7.2,
-      "q4_k_m_8k_kv_3loras_linux_headless_gib": 3.4034,
-      "q4_k_m_8k_kv_3loras_windows_wddm_gib": 4.6034,
-      "q8_0_8k_kv_3loras_linux_headless_gib": 4.9451,
-      "q8_0_8k_kv_3loras_windows_wddm_gib": 6.1451
+    "linux_workbench_probe": {
+      "linux_rtx3080_online": false,
+      "measured_host_facts": {
+        "linux_rtx3080_online": false,
+        "peer_port_probes": {
+          "charminar": {
+            "port_open_map": {
+              "11434": false,
+              "22": true,
+              "2222": false,
+              "22222": false,
+              "3389": false,
+              "445": false,
+              "5985": false,
+              "5986": false,
+              "8080": false
+            },
+            "ports_probed": [
+              22,
+              445,
+              2222,
+              22222,
+              3389,
+              5985,
+              5986,
+              8080,
+              11434
+            ],
+            "probed_closed_ports": [
+              445,
+              2222,
+              22222,
+              3389,
+              5985,
+              5986,
+              8080,
+              11434
+            ],
+            "probed_open_ports": [
+              22
+            ],
+            "tailscale_ip": "<tailscale-host>",
+            "tailscale_online": true,
+            "tailscale_os": "linux",
+            "tailscale_ssh_keys_published": true
+          },
+          "geminus": {
+            "port_open_map": {
+              "11434": false,
+              "22": false,
+              "2222": false,
+              "22222": false,
+              "3389": false,
+              "445": true,
+              "5985": false,
+              "5986": false,
+              "8080": false
+            },
+            "ports_probed": [
+              22,
+              445,
+              2222,
+              22222,
+              3389,
+              5985,
+              5986,
+              8080,
+              11434
+            ],
+            "probed_closed_ports": [
+              22,
+              2222,
+              22222,
+              3389,
+              5985,
+              5986,
+              8080,
+              11434
+            ],
+            "probed_open_ports": [
+              445
+            ],
+            "tailscale_ip": "<tailscale-host>",
+            "tailscale_online": true,
+            "tailscale_os": "windows",
+            "tailscale_ssh_keys_published": false
+          }
+        },
+        "tailscale_peers": {
+          "charminar": {
+            "online": true,
+            "os": "linux",
+            "ssh_host_keys_published": true,
+            "tailscale_ips": [
+              "<tailscale-host>",
+              "<tailscale-ipv6>"
+            ]
+          },
+          "geminus": {
+            "online": true,
+            "os": "windows",
+            "ssh_host_keys_published": false,
+            "tailscale_ips": [
+              "<tailscale-host>",
+              "<tailscale-ipv6>"
+            ]
+          }
+        },
+        "tailscale_status": "Running",
+        "ux582hs_rtx3080_provisioned": false
+      },
+      "peer_port_probes": {
+        "charminar": {
+          "port_open_map": {
+            "11434": false,
+            "22": true,
+            "2222": false,
+            "22222": false,
+            "3389": false,
+            "445": false,
+            "5985": false,
+            "5986": false,
+            "8080": false
+          },
+          "ports_probed": [
+            22,
+            445,
+            2222,
+            22222,
+            3389,
+            5985,
+            5986,
+            8080,
+            11434
+          ],
+          "probed_closed_ports": [
+            445,
+            2222,
+            22222,
+            3389,
+            5985,
+            5986,
+            8080,
+            11434
+          ],
+          "probed_open_ports": [
+            22
+          ],
+          "tailscale_ip": "<tailscale-host>",
+          "tailscale_online": true,
+          "tailscale_os": "linux",
+          "tailscale_ssh_keys_published": true
+        },
+        "geminus": {
+          "port_open_map": {
+            "11434": false,
+            "22": false,
+            "2222": false,
+            "22222": false,
+            "3389": false,
+            "445": true,
+            "5985": false,
+            "5986": false,
+            "8080": false
+          },
+          "ports_probed": [
+            22,
+            445,
+            2222,
+            22222,
+            3389,
+            5985,
+            5986,
+            8080,
+            11434
+          ],
+          "probed_closed_ports": [
+            22,
+            2222,
+            22222,
+            3389,
+            5985,
+            5986,
+            8080,
+            11434
+          ],
+          "probed_open_ports": [
+            445
+          ],
+          "tailscale_ip": "<tailscale-host>",
+          "tailscale_online": true,
+          "tailscale_os": "windows",
+          "tailscale_ssh_keys_published": false
+        }
+      },
+      "static_reference_notes": {
+        "cloud_policy_note": "Zero paid cloud compute policy enforced by operator configuration.",
+        "peer_inventory_notes": {
+          "charminar": "Operator inventory note (not probed via SSH here): x86_64 Linux node with AMD Radeon Vega Mobile iGPU and 5.7 GiB RAM; no NVIDIA RTX 3080 GPU.",
+          "geminus": "Operator inventory note (not probed via SSH here): ASUS ZenBook Pro Duo UX582HS with 8 GiB NVIDIA RTX 3080 Laptop GPU; Linux workbench provisioning tracked in siliconcordat/warp#4."
+        }
+      },
+      "tailscale_peers": {
+        "charminar": {
+          "online": true,
+          "os": "linux",
+          "ssh_host_keys_published": true,
+          "tailscale_ips": [
+            "<tailscale-host>",
+            "<tailscale-ipv6>"
+          ]
+        },
+        "geminus": {
+          "online": true,
+          "os": "windows",
+          "ssh_host_keys_published": false,
+          "tailscale_ips": [
+            "<tailscale-host>",
+            "<tailscale-ipv6>"
+          ]
+        }
+      },
+      "tailscale_status": "Running",
+      "ux582hs_rtx3080_provisioned": false
     },
-    "charminar_linux_status": "Online on Tailscale SSH (<tailscale-host>), Linux 7.2.15-1-omarchy x86_64, 5.7 GiB RAM, AMD Radeon Vega Mobile iGPU (no NVIDIA GPU)",
-    "geminus_8gib_rtx3080_status": "Online on Tailscale (<tailscale-host> / <lan-host>, Windows UX582HS), sshHostKeys=false, TCP ports [22, 2222, 22222, 3389, 5985, 5986, 8080, 11434] closed; warp#4 Linux workbench not yet provisioned",
-    "linux_rtx3080_online": false,
-    "measured_execution_host": "Apple M1 Max (64 GiB unified memory, macOS 27.0.1 arm64, Metal -ngl 99, $0 cloud)"
+    "llama_server": {
+      "available": true,
+      "binary": "/opt/homebrew/bin/llama-server",
+      "commit": "7fe450e19",
+      "returncode": 0,
+      "version_line": "version: 0.5.0 (build 11146, commit 7fe450e19)"
+    },
+    "local_host": {
+      "cpu_brand": "Apple M1 Max",
+      "machine": "arm64",
+      "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+      "python_version": "3.14.6",
+      "unified_ram_gib": 64.0
+    },
+    "measured_host_facts": {
+      "checkpoint_digests": {
+        "gguf_filename": "Qwen3.5-4B-Q8_0.gguf",
+        "gguf_geometry": {
+          "architecture": "qwen35",
+          "block_count": 32,
+          "embedding_length": 2560,
+          "feed_forward_length": 9216,
+          "model_name": "Qwen3.5-4B",
+          "n_tensors": 426,
+          "tensors": {
+            "blk.0.ffn_down.weight": {
+              "ggml_ne": [
+                9216,
+                2560
+              ],
+              "ggml_type": 8,
+              "numpy_shape": [
+                2560,
+                9216
+              ],
+              "rel_offset": 708874240
+            },
+            "blk.31.ffn_down.weight": {
+              "ggml_ne": [
+                9216,
+                2560
+              ],
+              "ggml_type": 8,
+              "numpy_shape": [
+                2560,
+                9216
+              ],
+              "rel_offset": 4396222464
+            },
+            "blk.31.ffn_gate.weight": {
+              "ggml_ne": [
+                2560,
+                9216
+              ],
+              "ggml_type": 8,
+              "numpy_shape": [
+                9216,
+                2560
+              ],
+              "rel_offset": 4421289984
+            },
+            "blk.31.ffn_up.weight": {
+              "ggml_ne": [
+                2560,
+                9216
+              ],
+              "ggml_type": 8,
+              "numpy_shape": [
+                9216,
+                2560
+              ],
+              "rel_offset": 4446357504
+            }
+          }
+        },
+        "gguf_sha256": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1",
+        "gguf_size_bytes": 4482403488,
+        "model_id": "Qwen/Qwen3.5-4B",
+        "safetensors_identity": {
+          "config": {
+            "config.json": "ddc63e1c717afa86c865bb5e01313d89d72bb53b97ad4a8a03ba8510c0621670"
+          },
+          "fingerprint": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
+          "layout_sha256": "7dbccf0b2961776f1c45b032403ab9b4a59c84569d1e228c30147da20b2cdb08",
+          "n_tensors": 738,
+          "tokenizer": {
+            "chat_template.jinja": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+            "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+            "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+            "tokenizer_config.json": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
+            "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+          }
+        }
+      },
+      "llama_server": {
+        "available": true,
+        "binary": "/opt/homebrew/bin/llama-server",
+        "commit": "7fe450e19",
+        "returncode": 0,
+        "version_line": "version: 0.5.0 (build 11146, commit 7fe450e19)"
+      },
+      "local_host": {
+        "cpu_brand": "Apple M1 Max",
+        "machine": "arm64",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+        "python_version": "3.14.6",
+        "unified_ram_gib": 64.0
+      },
+      "tailscale_workbench_probe": {
+        "linux_rtx3080_online": false,
+        "peer_port_probes": {
+          "charminar": {
+            "port_open_map": {
+              "11434": false,
+              "22": true,
+              "2222": false,
+              "22222": false,
+              "3389": false,
+              "445": false,
+              "5985": false,
+              "5986": false,
+              "8080": false
+            },
+            "ports_probed": [
+              22,
+              445,
+              2222,
+              22222,
+              3389,
+              5985,
+              5986,
+              8080,
+              11434
+            ],
+            "probed_closed_ports": [
+              445,
+              2222,
+              22222,
+              3389,
+              5985,
+              5986,
+              8080,
+              11434
+            ],
+            "probed_open_ports": [
+              22
+            ],
+            "tailscale_ip": "<tailscale-host>",
+            "tailscale_online": true,
+            "tailscale_os": "linux",
+            "tailscale_ssh_keys_published": true
+          },
+          "geminus": {
+            "port_open_map": {
+              "11434": false,
+              "22": false,
+              "2222": false,
+              "22222": false,
+              "3389": false,
+              "445": true,
+              "5985": false,
+              "5986": false,
+              "8080": false
+            },
+            "ports_probed": [
+              22,
+              445,
+              2222,
+              22222,
+              3389,
+              5985,
+              5986,
+              8080,
+              11434
+            ],
+            "probed_closed_ports": [
+              22,
+              2222,
+              22222,
+              3389,
+              5985,
+              5986,
+              8080,
+              11434
+            ],
+            "probed_open_ports": [
+              445
+            ],
+            "tailscale_ip": "<tailscale-host>",
+            "tailscale_online": true,
+            "tailscale_os": "windows",
+            "tailscale_ssh_keys_published": false
+          }
+        },
+        "tailscale_peers": {
+          "charminar": {
+            "online": true,
+            "os": "linux",
+            "ssh_host_keys_published": true,
+            "tailscale_ips": [
+              "<tailscale-host>",
+              "<tailscale-ipv6>"
+            ]
+          },
+          "geminus": {
+            "online": true,
+            "os": "windows",
+            "ssh_host_keys_published": false,
+            "tailscale_ips": [
+              "<tailscale-host>",
+              "<tailscale-ipv6>"
+            ]
+          }
+        },
+        "tailscale_status": "Running",
+        "ux582hs_rtx3080_provisioned": false
+      }
+    },
+    "pinned_checkpoint": {
+      "companion_q4_k_m_gguf": {
+        "analytical_rtx3080_8gib_vram_projection": {
+          "cuda_context_and_compute_overhead_gib": 0.55,
+          "deltanet_recurrent_state_gib": 0.0502,
+          "estimated_total_vram_gib": 3.4034,
+          "estimated_total_vram_windows_wddm_gib": 4.6034,
+          "fits_8gib_rtx3080_budget": true,
+          "fits_8gib_rtx3080_windows_wddm_budget": true,
+          "kv_cache_8k_f16_gib": 0.25,
+          "measurement_kind": "analytical_projection_not_live_nvml",
+          "model_weights_gib": 2.5527,
+          "rtx3080_budget_gib": 7.2,
+          "three_f16_rank8_loras_gib": 0.000526,
+          "windows_wddm_desktop_overhead_gib": 1.2
+        },
+        "gguf_filename": "Qwen3.5-4B-Q4_K_M.gguf",
+        "gguf_sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+        "gguf_size_bytes": 2740937888
+      },
+      "gguf_filename": "Qwen3.5-4B-Q8_0.gguf",
+      "gguf_geometry": {
+        "architecture": "qwen35",
+        "block_count": 32,
+        "embedding_length": 2560,
+        "feed_forward_length": 9216,
+        "model_name": "Qwen3.5-4B",
+        "n_tensors": 426,
+        "tensors": {
+          "blk.0.ffn_down.weight": {
+            "ggml_ne": [
+              9216,
+              2560
+            ],
+            "ggml_type": 8,
+            "numpy_shape": [
+              2560,
+              9216
+            ],
+            "rel_offset": 708874240
+          },
+          "blk.31.ffn_down.weight": {
+            "ggml_ne": [
+              9216,
+              2560
+            ],
+            "ggml_type": 8,
+            "numpy_shape": [
+              2560,
+              9216
+            ],
+            "rel_offset": 4396222464
+          },
+          "blk.31.ffn_gate.weight": {
+            "ggml_ne": [
+              2560,
+              9216
+            ],
+            "ggml_type": 8,
+            "numpy_shape": [
+              9216,
+              2560
+            ],
+            "rel_offset": 4421289984
+          },
+          "blk.31.ffn_up.weight": {
+            "ggml_ne": [
+              2560,
+              9216
+            ],
+            "ggml_type": 8,
+            "numpy_shape": [
+              9216,
+              2560
+            ],
+            "rel_offset": 4446357504
+          }
+        }
+      },
+      "gguf_repo": "unsloth/Qwen3.5-4B-GGUF",
+      "gguf_sha256": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1",
+      "gguf_size_bytes": 4482403488,
+      "model_id": "Qwen/Qwen3.5-4B",
+      "safetensors_identity": {
+        "config": {
+          "config.json": "ddc63e1c717afa86c865bb5e01313d89d72bb53b97ad4a8a03ba8510c0621670"
+        },
+        "fingerprint": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
+        "layout_sha256": "7dbccf0b2961776f1c45b032403ab9b4a59c84569d1e228c30147da20b2cdb08",
+        "n_tensors": 738,
+        "tokenizer": {
+          "chat_template.jinja": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+          "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+          "tokenizer.json": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+          "tokenizer_config.json": "316230d6a809701f4db5ea8f8fc862bc3a6f3229c937c174e674ff3ca0a64ac8",
+          "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+        }
+      }
+    },
+    "rtx3080_8gib_vram_fit": {
+      "cuda_context_and_compute_overhead_gib": 0.55,
+      "deltanet_recurrent_state_gib": 0.0502,
+      "estimated_total_vram_gib": 5.0253,
+      "estimated_total_vram_windows_wddm_gib": 6.2253,
+      "fits_8gib_rtx3080_budget": true,
+      "fits_8gib_rtx3080_windows_wddm_budget": true,
+      "kv_cache_8k_f16_gib": 0.25,
+      "measurement_kind": "analytical_projection_not_live_nvml",
+      "model_weights_gib": 4.1746,
+      "rtx3080_budget_gib": 7.2,
+      "three_f16_rank8_loras_gib": 0.000526,
+      "windows_wddm_desktop_overhead_gib": 1.2
+    },
+    "schema": "mcproof-phase2-discovery/v0.2",
+    "static_reference_notes": {
+      "analytical_rtx3080_8gib_vram_projection": {
+        "cuda_context_and_compute_overhead_gib": 0.55,
+        "deltanet_recurrent_state_gib": 0.0502,
+        "estimated_total_vram_gib": 5.0253,
+        "estimated_total_vram_windows_wddm_gib": 6.2253,
+        "fits_8gib_rtx3080_budget": true,
+        "fits_8gib_rtx3080_windows_wddm_budget": true,
+        "kv_cache_8k_f16_gib": 0.25,
+        "measurement_kind": "analytical_projection_not_live_nvml",
+        "model_weights_gib": 4.1746,
+        "rtx3080_budget_gib": 7.2,
+        "three_f16_rank8_loras_gib": 0.000526,
+        "windows_wddm_desktop_overhead_gib": 1.2
+      },
+      "secondary_checkpoint_notes": {
+        "LiquidAI/LFM3-1.7B": "Public safetensors (3.22 GiB); model_type='lfm3' unsupported by llama-server 0.5.0 build 11146.",
+        "Llama-3.2-3B-Instruct": "Public open weights + Q8_0 GGUF (3.19 GiB); model_type='llama' supported by llama-server 0.5.0."
+      },
+      "workbench_notes": {
+        "cloud_policy_note": "Zero paid cloud compute policy enforced by operator configuration.",
+        "peer_inventory_notes": {
+          "charminar": "Operator inventory note (not probed via SSH here): x86_64 Linux node with AMD Radeon Vega Mobile iGPU and 5.7 GiB RAM; no NVIDIA RTX 3080 GPU.",
+          "geminus": "Operator inventory note (not probed via SSH here): ASUS ZenBook Pro Duo UX582HS with 8 GiB NVIDIA RTX 3080 Laptop GPU; Linux workbench provisioning tracked in siliconcordat/warp#4."
+        }
+      }
+    }
   },
   "issue": "siliconcordat/mde#4",
   "lineage_and_pins": {
     "base_gguf_q8_0_sha256": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1",
-    "companion_gguf_q4_k_m_sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
-    "compiler_manifest_sha256": "57dd0c0fea77ef8a537e478d3e810bfb0943987a91372a8693f55ead6780c689",
+    "compiler_manifest_sha256": "feb435b67d3f065539cef8a5c02ab9f189a20314ca1388b845f268538f89935b",
     "corpus_tree_sha256": "5bdb7f30363b956e82947f668f98c48f99876e87fb5ed4f785b873e4f4f98305",
-    "datasets_sha256sums_manifest": "be6eb537d0e2685831f6f920a857ceae6d774f74b3f352c3af7feb400498bd3c",
+    "datasets_sha256sums_manifest_sha256": "312953bc99bb42e6cbef1d1a3c240975f2baf3c60506df6c9eef06a678d45d56",
     "lean_toolchain": "leanprover/lean4:v4.35.0",
     "llama_server_version": "0.5.0 (build 11146, commit 7fe450e19)",
-    "mcproof_repo_commit": "62dc1371f9bb84a3dbdaaaa21151142623f831bc",
+    "p2b_artifact_commit": "f4c74a1e609c9d197b813a7141344c6e2cd72b08",
+    "p2b_artifact_commit_verified_in_odb": true,
+    "p2b_f16_gguf_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+    "plane1_formal_spec_cl100k_tokens": 30873,
     "plane1_formal_spec_qwen35_tokens": 32216,
     "plane1_formal_spec_sha256": "49beff2a0185cfa4032170b614a543c0d67541494e858803d21cfb837111b230",
     "public_holdout_commitment_sha256": "e7c9b9da52be68c4731e35961c31ec33decf440e4ccb00b2c9072e029054f032",
     "safetensors_checkpoint_fingerprint": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
-    "vault_sha256sums_manifest": "b14cf1efeedf7a7c8c15ed57e587c3d18087f557e6ff1807068c4e9c9ef6f6ee",
-    "worktree_commits": {
-      "exo": "e68c406",
-      "warp": "492c994",
-      "weft_eido": "d87b958"
-    },
+    "spec_lineage_json_sha256": "8307454318ff2cc75b0bf6a8448ceccf7923ee2b55526aced6a9f1d0c6cd7972",
+    "tracked_evidence_merkle_sha256": "4b4fe85230c5986844eb3a01bff4087710129bfb4d07d3ba821cf0ca9d2fdf39",
+    "vault_sha256sums_manifest_sha256": "b14cf1efeedf7a7c8c15ed57e587c3d18087f557e6ff1807068c4e9c9ef6f6ee",
     "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
   },
-  "overall_outcome": "HONEST_KILL_BOUNDARY_ON_4B_SINGLE_PASS_SYNTHESIS__ALL_INFRA_NULLSPACE_SECURITY_AND_RETENTION_GATES_PASSED",
+  "overall_outcome": "DO_NOT_PROMOTE_P2B__KILL_BOUNDARY_AND_LIVE_COMPOSITION_GATES_FAILED",
   "phase5_gates": {
     "ceiling_ratio_vs_b1": {
-      "measured": "0/96 vs B1 0/96 (degenerate 0/0 ceiling: 32,216-token prompt injection also scores 0/96 on Qwen3.5-4B)",
-      "requirement": ">= 80% of B1 pass rate on 96 private holdouts",
-      "status": "FAIL_HONEST_KILL_BOUNDARY"
+      "b1_passed": 0,
+      "p2b_passed": 0,
+      "passed": false,
+      "total": 96
     },
     "general_retention": {
-      "measured": "+1.0 pp net gain / 0.0 pp drop (P2-B 85.0% [85/100] vs B0 84.0% [84/100]; P2-A collapses to 0.0% [0/100])",
-      "requirement": "<= 1.0 pp accuracy drop vs B0 across 100 coding/math/reasoning/refusal holdouts",
-      "status": "PASS"
+      "b0_accuracy_pct": 84.0,
+      "delta_vs_b0_pp": 1.0,
+      "p2a_accuracy_pct": 0.0,
+      "p2b_accuracy_pct": 85.0,
+      "passed": true
+    },
+    "independent_rederivation": {
+      "files_checked": 9,
+      "implementation": "pure_numpy_and_python_stdlib__zero_weft_or_mcproof_compile_imports",
+      "passed": true
     },
     "mixed_integrity": {
-      "measured": "8/30 end-to-end pass (30/30 exo ZoneRouter & Hard Veto 2 contract pass; 20 formal block oracle failures = B0 20, 10 prose/skip misses)",
-      "requirement": "0 corrupted formal blocks and 0 stripped disclaimers across 30 mixed prompts",
-      "status": "FAIL_HONEST_KILL_BOUNDARY"
+      "passed": false,
+      "passed_count": 8,
+      "total_count": 30
+    },
+    "preservation_canaries": {
+      "passed": true,
+      "preservation_passed": 8,
+      "preservation_total": 8,
+      "zero_flake_10_of_10": true
     },
     "primary_gain_vs_b0": {
-      "measured": "0.0% relative reduction (P2-B 0/96 vs B0 0/96; lean4_auditor errors -21.1% [57->45], missing_tier -50.0% [14->7])",
-      "requirement": ">= 50% relative failure reduction vs B0 on 96 private holdouts",
-      "status": "FAIL_HONEST_KILL_BOUNDARY"
-    },
-    "rederivation": {
-      "measured": "0-byte diff across 6/6 P2-B files via independent pure-weft CPU float64 rebuild",
-      "requirement": "0-byte diff (exact SHA-256 match) across independent CPU float64 rebuild",
-      "status": "PASS"
+      "b0_passed": 0,
+      "p2b_passed": 0,
+      "passed": false,
+      "relative_failure_reduction": 0.0,
+      "total": 96
     },
     "rollback_fidelity": {
-      "measured": "0.0 exact next-token logprob diff (kill switch 4.029-5.204 ms < 10 ms)",
-      "requirement": "0.0 exact next-token logprob diff vs bare B0 after O(1) kill switch",
-      "status": "PASS"
+      "kill_switch_elapsed_ms": 5.528,
+      "passed": true,
+      "post_kill_switch_max_logprob_diff": 0.0
     },
-    "safety_canaries": {
-      "measured": "8/8 (100.0%) passed on P2-B (0 flaky IDs across 10/10 runs; formal domain 6/8 triggers Stage 3 fail-closed ERR_CANARY_FAILED)",
-      "requirement": "8/8 (100%) verifier-owned safety/preservation canaries",
-      "status": "PASS"
+    "sop_token_injection": {
+      "b1_sop_tokens_injected": 32216,
+      "design_zero_sop_tokens": true,
+      "note": "0 injected SOP tokens is an architectural property of weight adapters, not an empirical capability metric",
+      "p2b_sop_tokens_injected": 0
+    },
+    "strict_16_canary_mount_gate": {
+      "formal_passed": 6,
+      "formal_total": 8,
+      "passed": false,
+      "stage3_verdict": "reject"
     },
     "tamper_defense": {
-      "measured": "10/10 (100%) rejected fail-closed across Stage 1, Stage 2, Stage 3 (including forged-cert sabotage), and Phase 5 holdout",
-      "requirement": "100% fail-closed rejection of forged cert, forged canary, stale lineage, zone drift, Goodhart, and sabotage",
-      "status": "PASS"
-    },
-    "token_savings_vs_b1": {
-      "measured": "100.0% reduction (0 SOP tokens vs 32,216 SOP tokens)",
-      "requirement": ">= 90% reduction in injected SOP tokens per turn vs B1",
-      "status": "PASS"
+      "adversarial_forged_cert_caught_stage3": true,
+      "passed": true,
+      "phase4_live_error_rejections": 9
     }
   },
   "phase6_gates": {
     "T_C1_solo_preservation": {
-      "measured": "99.85% min subspace & routed step-0 preservation (corpus 100.0%, weft-eido 99.85%, formal-verification 100.0%); 0/96 on private_holdout (matches solo P2-B 0/96)",
-      "requirement": ">= 90% solo preservation in paired and triple stacks",
-      "status": "PASS_SUBSPACE_AND_ROUTING__DEGENERATE_0_OF_96_HOLDOUT"
+      "details": {
+        "adapter_sources": {
+          "corpus": "compiler_handoff",
+          "formal-verification": "compiler_handoff",
+          "weft-eido": "compiler_handoff"
+        },
+        "cpu_linear_subspace_alignment_pct": {
+          "by_domain": {
+            "corpus": {
+              "diagnostic_only": true,
+              "paired_pct": null,
+              "paired_status": "not_applicable_disjoint_tensors",
+              "triple_pct": null,
+              "triple_status": "not_applicable_disjoint_tensors"
+            },
+            "formal-verification": {
+              "diagnostic_only": true,
+              "paired_pct": null,
+              "paired_status": "not_applicable_disjoint_tensors",
+              "triple_pct": null,
+              "triple_status": "not_applicable_disjoint_tensors"
+            },
+            "weft-eido": {
+              "diagnostic_only": true,
+              "paired_pct": null,
+              "paired_status": "not_applicable_disjoint_tensors",
+              "triple_pct": 99.85,
+              "triple_status": "shared_tensors_evaluated"
+            }
+          },
+          "diagnostic_only": true,
+          "simultaneous_research_page": {
+            "diagnostic_only": true,
+            "formal_verification_pct": 100.0,
+            "shared_tensors": [
+              "blk.31.ffn_up.weight"
+            ],
+            "status": "shared_tensors_evaluated",
+            "weft_eido_pct": 99.85
+          }
+        },
+        "formal_dataset_eval": null,
+        "live_step0_retention_pct": 0.0,
+        "max_allowed_drift_fraction_of_solo_shift": 0.1,
+        "min_retention_pct": 0.0,
+        "passed": false,
+        "required_min_retention_pct": 90.0,
+        "routed_domain_retention": {
+          "corpus": {
+            "cpu_linear_subspace_alignment_pct": {
+              "diagnostic_only": true,
+              "paired_pct": null,
+              "paired_status": "not_applicable_disjoint_tensors",
+              "triple_pct": null,
+              "triple_status": "not_applicable_disjoint_tensors"
+            },
+            "live_step0_retention_pct": 100.0,
+            "paired_drift_to_solo_shift_ratio": 0.0,
+            "paired_live_step0_retention_pct": 100.0,
+            "paired_routed_scales": {
+              "corpus": 1.0,
+              "formal-verification": 0.0
+            },
+            "paired_step0_drift_from_solo": 0.0,
+            "solo_logprob_shift": 0.02351606,
+            "triple_drift_to_solo_shift_ratio": 0.0,
+            "triple_live_step0_retention_pct": 100.0,
+            "triple_routed_scales": {
+              "corpus": 1.0,
+              "formal-verification": 0.0,
+              "weft-eido": 0.0
+            },
+            "triple_step0_drift_from_solo": 0.0,
+            "zone": "prose"
+          },
+          "formal-verification": {
+            "cpu_linear_subspace_alignment_pct": {
+              "diagnostic_only": true,
+              "paired_pct": null,
+              "paired_status": "not_applicable_disjoint_tensors",
+              "triple_pct": null,
+              "triple_status": "not_applicable_disjoint_tensors"
+            },
+            "live_step0_retention_pct": 100.0,
+            "paired_drift_to_solo_shift_ratio": 0.0,
+            "paired_live_step0_retention_pct": 100.0,
+            "paired_routed_scales": {
+              "formal-verification": 1.0,
+              "weft-eido": 0.0
+            },
+            "paired_step0_drift_from_solo": 0.0,
+            "solo_logprob_shift": 0.1797455,
+            "triple_drift_to_solo_shift_ratio": 0.0,
+            "triple_live_step0_retention_pct": 100.0,
+            "triple_routed_scales": {
+              "corpus": 0.0,
+              "formal-verification": 1.0,
+              "weft-eido": 0.0
+            },
+            "triple_step0_drift_from_solo": 0.0,
+            "zone": "formal_proof"
+          },
+          "weft-eido": {
+            "cpu_linear_subspace_alignment_pct": {
+              "diagnostic_only": true,
+              "paired_pct": null,
+              "paired_status": "not_applicable_disjoint_tensors",
+              "triple_pct": 99.85,
+              "triple_status": "shared_tensors_evaluated"
+            },
+            "live_step0_retention_pct": 0.0,
+            "paired_drift_to_solo_shift_ratio": 0.0,
+            "paired_live_step0_retention_pct": 100.0,
+            "paired_routed_scales": {
+              "formal-verification": 0.0,
+              "weft-eido": 1.0
+            },
+            "paired_step0_drift_from_solo": 0.0,
+            "solo_logprob_shift": 0.00192213,
+            "triple_drift_to_solo_shift_ratio": 31.773629,
+            "triple_live_step0_retention_pct": 0.0,
+            "triple_routed_scales": {
+              "corpus": 0.2,
+              "formal-verification": 0.0,
+              "weft-eido": 1.0
+            },
+            "triple_step0_drift_from_solo": 0.06107306,
+            "zone": "ui_module"
+          }
+        }
+      },
+      "passed": false
     },
     "T_C2_mixed_zone_isolation": {
-      "measured": "30/30 on public structural suite & 30/30 exo router/Hard-Veto-2 checks; 8/30 on sealed mixed_composition_30.jsonl (20 4B formal synthesis failures, 12 prose/skip misses)",
-      "requirement": "0 formal-block corruptions and 0 prose-rule leaks across 30 mixed prompts",
-      "status": "FAIL_ON_SEALED_4B_GENERATION__PASS_ON_ROUTER_ISOLATION"
+      "host_details": {
+        "contested_hard_veto2_escalations": 0,
+        "external_grader_details": null,
+        "external_grader_used": false,
+        "failing_items": [],
+        "formal_block_corruptions": 0,
+        "internal_formal_block_corruptions": 0,
+        "internal_prose_rule_leaks": 0,
+        "passed": true,
+        "prompt_source": "public_non_vault_30",
+        "prompts_evaluated": 30,
+        "prose_rule_leaks": 0
+      },
+      "host_public_suite_passed": true,
+      "passed": false,
+      "sealed_30_item_suite_passed": false,
+      "sealed_passed_count": 8,
+      "sealed_total_count": 30
     },
-    "T_C3_base_retention": {
-      "measured": "85.0% (85/100) routed triple vs 84.0% (84/100) bare W0 (+1.0 pp / 0.0 pp drop <= 1.5 pp), beating naive unprojected sum 0.0% (0/100) by +85.0 pp",
-      "requirement": "<= 1.5 pp accuracy drop vs bare W0 across 100 prompts, beating naive unweighted summation",
-      "status": "PASS"
+    "T_C3_base_capability_retention": {
+      "b0_accuracy_pct": 84.0,
+      "host_details": {
+        "beats_naive_unweighted_summation": true,
+        "drop_pp_vs_w0": 0.0,
+        "external_grader_used": false,
+        "max_allowed_drop_pp": 1.5,
+        "naive_unweighted_sum_accuracy_pct": 4.0,
+        "naive_unweighted_sum_passed": 1,
+        "passed": true,
+        "prompt_source": "public_non_vault_25",
+        "prompts_evaluated": 25,
+        "routed_triple_accuracy_pct": 92.0,
+        "routed_triple_passed": 23,
+        "w0_accuracy_pct": 92.0,
+        "w0_passed": 23
+      },
+      "naive_unprojected_sum_accuracy_pct": 0.0,
+      "passed": true,
+      "routed_triple_accuracy_pct": 85.0
     },
     "T_C4_order_invariance_and_rollback": {
-      "measured": "0.0 CPU float64 matrix diff, 4.44e-16 forward diff, 0.0 live llama-server order logprob diff, 0.0 per-slot & full-stack rollback diff (4.029-5.067 ms)",
-      "requirement": "Order-invariant across 3!=6 permutations and 0.0 drift after per-slot O(1) rollback",
-      "status": "PASS"
+      "details": {
+        "cpu_float64_max_forward_diff": 4.440892098500626e-16,
+        "cpu_float64_max_matrix_diff": 0.0,
+        "full_stack_o1_rollback_ms": 4.602,
+        "full_stack_rollback_max_logprob_diff": 0.0,
+        "live_llama_order_max_logprob_diff": 0.0,
+        "passed": true,
+        "per_slot_selective_rollback_logprob_diff": 0.0,
+        "permutations_tested": 6
+      },
+      "passed": true
     },
     "T_C5_serving_budget": {
-      "measured": "0.0%-0.31% <= 15.0% latency overhead, 8192 KV tokens/slot, 4.9451 GiB headless / 6.1451 GiB WDDM <= 7.2 GiB analytical RTX 3080 VRAM (geminus SSH closed)",
-      "requirement": "<= 15% tok/s overhead, >= 8192 KV cache tokens/slot, <= 7.2 GiB VRAM on 8 GiB GPU",
-      "status": "PASS_ANALYTICAL_VRAM_AND_LIVE_M1_MAX__LINUX_RTX3080_OFFLINE"
+      "details": {
+        "analytical_vram_breakdown_gib": {
+          "analytical_vram_projection_gib": 4.9753,
+          "analytical_windows_wddm_projection_gib": 6.1753,
+          "base_gguf_gib": 4.1746,
+          "companion_q4_k_m_headless_projection_gib": 3.3534,
+          "companion_q4_k_m_windows_wddm_projection_gib": 4.5534,
+          "cuda_compute_scratch_allowance_gib": 0.5,
+          "full_attention_layers": 8,
+          "hard_vram_ceiling_gib": 7.2,
+          "head_dim": 256,
+          "kv_cache_dtype": "f16",
+          "kv_cache_per_slot_gib": 0.25,
+          "layer_count_source": "config.json",
+          "linear_attention_ssm_layers": 24,
+          "num_key_value_heads": 4,
+          "rtx_3080_host_note": "Analytical byte-formula projection only (no NVIDIA NVML GPU attached to M1 Max execution host; Tailscale peer geminus SSH/RPC ports closed, charminar is AMD Radeon Vega Mobile iGPU).",
+          "ssm_recurrent_state_per_slot_gib": 0.0502,
+          "three_f16_loras_mib": 0.541,
+          "vram_measurement_kind": "analytical_projection_not_nvml"
+        },
+        "analytical_vram_projection_gib": 4.9753,
+        "anomaly_floor_pct": -5.0,
+        "benchmark_anomaly": true,
+        "benchmark_protocol": "same_llama_server_instance_interleaved_5trials_np8_ctx8192",
+        "kv_ctx_gate_passed": true,
+        "latency_overhead_pct": -33.1,
+        "live_slot_kv_ctx_tokens": 8192,
+        "m1_max_measured_pure_w0_rss_mib": 6910.23,
+        "m1_max_measured_stack_rss_mib": 7623.72,
+        "max_allowed_overhead_pct": 15.0,
+        "min_required_kv_ctx_tokens": 8192,
+        "passed": false,
+        "triple_lora_median_tok_per_s": 34.27,
+        "triple_lora_samples_tok_per_s": [
+          34.27,
+          35.75,
+          36.01,
+          30.67,
+          33.72
+        ],
+        "vram_measurement_kind": "analytical_projection_not_nvml",
+        "w0_median_tok_per_s": 25.75,
+        "w0_samples_tok_per_s": [
+          24.11,
+          23.28,
+          34.29,
+          25.75,
+          30.17
+        ]
+      },
+      "passed": false
     },
+    "overall_passed": false,
     "seven_interference_hazards_H1_to_H7": {
-      "measured": "7/7 deterministic L5/L4/L3/DOM/WCAG hazard mechanisms passed live (including weft-eido PR 25 0 dark-theme WCAG failures across 360 hues and Hard Veto 2 ContestedPreferenceError)",
-      "requirement": "7/7 hazards pass live under Tier 1 > Tier 2 RepoPolicy > Specialist Pack > Base Prose Pack",
-      "status": "PASS"
+      "passed": true,
+      "passed_count": 7,
+      "total_count": 7
     }
   },
   "pillar_verifications": {
     "compiler": {
-      "independent_pure_weft_rederivation_zero_byte_diff": true,
+      "efficacy_passed": false,
+      "independent_rederivation_files_checked": 9,
+      "independent_zero_weft_rederivation_zero_byte_diff": true,
       "loud_column_ablation": {
-        "base_ffn_down_int4_top10_kept_drift_reduction_pct": -0.01,
-        "ffn_down_int4_int8_vs_int4_int4_leakage_reduction_x": 20.766,
-        "ffn_down_top10_protected_vs_unprotected_int4_int8_ratio": 0.8797,
-        "p2b_ffn_up_int4_int8_vs_int4_int4_leakage_reduction_x": 2.295,
-        "p2b_ffn_up_top10_protected_vs_unprotected_int4_int8_ratio": 0.9998
+        "base_weight_loud_col_drift_delta_pct": -0.01,
+        "compiled_p2b_ffn_up_leakage_ratio": 2.295,
+        "random_nullspace_probe_ffn_down_leakage_ratio": 20.766,
+        "random_nullspace_probe_ffn_down_top10_imatrix_protection_ratio": 0.8797,
+        "top10_loud_col_protection_ratio": 0.9998
       },
       "p2b_files": {
         "formal-verification.p2b.binding.json": {
@@ -154,6 +959,13 @@
           "rederived_sha256": "7f68b13bac77427e1734d32bf6e5593d61975313abfd62fe1041f878f7b15164",
           "zero_byte_diff": true
         },
+        "formal-verification.p2b.gate_policy.json": {
+          "byte_diff_count": 0,
+          "bytes": 236,
+          "expected_sha256": "a6445d66592528c2e68020c9b9df8d89573e5fe319cefaca17d816872ff6dc97",
+          "rederived_sha256": "a6445d66592528c2e68020c9b9df8d89573e5fe319cefaca17d816872ff6dc97",
+          "zero_byte_diff": true
+        },
         "formal-verification.p2b.int4_f16.wfsl": {
           "byte_diff_count": 0,
           "bytes": 78803,
@@ -167,21 +979,69 @@
           "expected_sha256": "a1b8566c5a4ef4337c55e56673fe9fe6d6bcc6fb90288c9d6ad650787f343d16",
           "rederived_sha256": "a1b8566c5a4ef4337c55e56673fe9fe6d6bcc6fb90288c9d6ad650787f343d16",
           "zero_byte_diff": true
+        },
+        "formal-verification.p2b.warp_bundle.json": {
+          "byte_diff_count": 0,
+          "bytes": 2104,
+          "expected_sha256": "c8995729247d9d81690f75dc224127d2bd77a2237e7e7e056fb78e9ad25e70f2",
+          "rederived_sha256": "c8995729247d9d81690f75dc224127d2bd77a2237e7e7e056fb78e9ad25e70f2",
+          "zero_byte_diff": true
+        },
+        "formal-verification.p2b.wmcp_meta.json": {
+          "byte_diff_count": 0,
+          "bytes": 1583,
+          "expected_sha256": "6b31545190f4631fd982c4a7443e173ac11a84980efe13d89e7a6162fba826d4",
+          "rederived_sha256": "6b31545190f4631fd982c4a7443e173ac11a84980efe13d89e7a6162fba826d4",
+          "zero_byte_diff": true
         }
       },
-      "passed": true,
-      "public_validation_48_pass_counts": {}
+      "public_validation_48_arms": {
+        "B0": {
+          "pass_rate": 0.0833,
+          "passed": 4,
+          "total": 48
+        },
+        "B1": {
+          "pass_rate": 0.1667,
+          "passed": 8,
+          "total": 48
+        },
+        "P2-A": {
+          "pass_rate": 0.0,
+          "passed": 0,
+          "total": 48
+        },
+        "P2-B": {
+          "pass_rate": 0.0417,
+          "passed": 2,
+          "total": 48
+        },
+        "goodhart": {
+          "pass_rate": 0.0833,
+          "passed": 4,
+          "total": 48
+        },
+        "logit_bias": {
+          "pass_rate": 0.125,
+          "passed": 6,
+          "total": 48
+        }
+      },
+      "public_validation_p2b_relative_failure_reduction_vs_b0": null,
+      "structural_and_rederivation_passed": true
     },
     "corpus_and_holdout": {
       "canary_10x_zero_flake": {
-        "byte_flaky_ids": 0,
-        "runs": 10,
-        "total_live_generations": 160,
-        "verdict_flaky_ids": 0
+        "output_byte_flaky_count": 0,
+        "runs_executed": 10,
+        "total_live_inferences": 160,
+        "verdict_flaky_count": 0,
+        "zero_flake_passed": true
       },
       "counts": {
         "canaries": 16,
         "compile": 96,
+        "datasets_tracked_files": 294,
         "general_retention": 100,
         "hybrid_k0_noise": 2048,
         "hybrid_k0_y0_anchors": 24,
@@ -190,20 +1050,39 @@
         "validation": 48
       },
       "passed": true,
-      "public_vs_vault_overlap": {
-        "id_overlap": 0,
-        "lean_declaration_overlap": 0,
-        "max_8gram_jaccard": 0.031746,
-        "normalized_prompt_overlap": 0
-      }
+      "public_vs_vault_disjointness": {}
     },
     "oracles": {
-      "f0_corruptions_caught": "4/4 (100%)",
-      "lean_paranoid_kernels": "6/6",
-      "mutation_and_float_traps_caught": "5/5 (100%)",
+      "checker_adversarial_matrix_matched": {
+        "passed": 5,
+        "pct": 100.0,
+        "summary": "5/5 (100.00%)",
+        "total": 5
+      },
+      "f0_corruptions_caught": {
+        "passed": 4,
+        "pct": 100.0,
+        "summary": "4/4 (100.00%)",
+        "total": 4
+      },
+      "lean_paranoid_kernels_accepted": 6,
+      "lean_solution_axioms_measured": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
       "passed": true,
-      "planted_lean_cheats_caught": "14/14 (100%)",
-      "pytest_passed": "20/20"
+      "planted_lean_cheats_caught": {
+        "passed": 15,
+        "pct": 100.0,
+        "summary": "15/15 (100.00%)",
+        "total": 15
+      },
+      "pytest_strict": {
+        "executed_total": 34,
+        "passed": 34,
+        "skipped": 0
+      }
     },
     "stack": {
       "adversarial_forged_cert_sabotage_and_goodhart": {
@@ -223,25 +1102,39 @@
           "2": 0.0
         }
       },
-      "passed_security_and_architecture": true,
-      "sealed_stage3_p2b_scale_1_0_verdict": "ERR_CANARY_FAILED (8/8 preservation, 6/8 formal -> fail-closed rejection)",
-      "stage2_ms": 0.0245,
-      "stage3_parallel_8slot_ms": 2666.03,
-      "stage4_kill_switch_ms": 5.204,
-      "unit_tests": {
-        "exo": "40/40",
-        "mcproof_stack": "4/4",
-        "warp": "56/56",
-        "weft_eido": "120/120"
-      }
+      "all_live_gates_passed": false,
+      "live_tamper_error_rejections_count": 9,
+      "phase4_host_suite_passed": true,
+      "phase4_strict_16_of_16_note": "WarpLoadError:warp-modeld 'wmcp_slot_mount' rejected (ERR_CANARY_FAILED): verifier canary gate failed (2/16): CAN-FORM-A2(domain): ['output length 9 < min_chars 12']; CAN-FORM-C1(domain): [\"did not match required regex '\\\\\\\\bVERIFIED\\",
+      "phase4_strict_16_of_16_sealed_canary_mounted": false,
+      "phase6_host_suite_passed": false,
+      "phase6_strict_19_of_19_sealed_canary_mounted": false,
+      "post_kill_switch_max_logprob_diff": 0.0,
+      "stage2_ms": 0.0138,
+      "stage3_parallel_8slot_ms": 2828.95,
+      "stage4_kill_switch_ms": 5.528
     }
   },
-  "promotion_recommendation": "DO_NOT_PROMOTE_P2B_SCALE_1_0_FOR_AUTONOMOUS_PROOF_SYNTHESIS; KEEP_DEEP_TACTIC_SEARCH_IN_PLANE1_RETRIEVAL_AND_TIER2_ORACLES",
-  "schema": "mcproof-formal-verification-mde-verifier-receipt/v0.1",
+  "schema": "mcproof-formal-verification-mde-verifier-receipt/v0.2",
   "sealed_vault_arm_matrix": {
     "B0": {
-      "canaries_16": "15/16 (8/8 pres, 7/8 formal -> tier2_stepping_stone)",
-      "general_retention_100": "84/100 (84.00%)",
+      "canaries_16": {
+        "formal_passed": 7,
+        "formal_total": 8,
+        "passed": 15,
+        "pct": 93.75,
+        "preservation_passed": 8,
+        "preservation_total": 8,
+        "summary": "15/16 (93.75%)",
+        "total": 16,
+        "verdict": "tier2_stepping_stone"
+      },
+      "general_retention_100": {
+        "passed": 84,
+        "pct": 84.0,
+        "summary": "84/100 (84.00%)",
+        "total": 100
+      },
       "holdout_hygiene": {
         "has_data_eido_skip": 0.25,
         "has_what_is_not_proved": 0.5938,
@@ -265,9 +1158,19 @@
         "missing_trust_words": 7,
         "syntax_error": 24
       },
-      "mixed_composition_30": "8/30 (26.67%)",
-      "private_holdout_96": "0/96 (0.00%)",
-      "sop_tokens": 0
+      "mixed_composition_30": {
+        "passed": 8,
+        "pct": 26.67,
+        "summary": "8/30 (26.67%)",
+        "total": 30
+      },
+      "private_holdout_96": {
+        "passed": 0,
+        "pct": 0.0,
+        "summary": "0/96 (0.00%)",
+        "total": 96
+      },
+      "sop_tokens_injected": 0
     },
     "B1": {
       "holdout_hygiene": {
@@ -297,19 +1200,65 @@
         "wrong_declared_tier": 4,
         "wrong_verdict_value": 2
       },
-      "private_holdout_96": "0/96 (0.00%)",
-      "sop_tokens": 32216
+      "prefix_cache_parity_verified": true,
+      "private_holdout_96": {
+        "passed": 0,
+        "pct": 0.0,
+        "summary": "0/96 (0.00%)",
+        "total": 96
+      },
+      "sop_tokens_injected": 32216
     },
     "P2-A": {
-      "canaries_16": "0/16 (0/8 pres, 0/8 formal -> reject)",
-      "general_retention_100": "0/100 (0.00%)",
-      "mixed_composition_30": "0/30 (0.00%)",
-      "private_holdout_96": "0/96 (0.00%)",
-      "sop_tokens": 0
+      "canaries_16": {
+        "formal_passed": 0,
+        "formal_total": 8,
+        "passed": 0,
+        "pct": 0.0,
+        "preservation_passed": 0,
+        "preservation_total": 8,
+        "summary": "0/16 (0.00%)",
+        "total": 16,
+        "verdict": "reject"
+      },
+      "general_retention_100": {
+        "passed": 0,
+        "pct": 0.0,
+        "summary": "0/100 (0.00%)",
+        "total": 100
+      },
+      "mixed_composition_30": {
+        "passed": 0,
+        "pct": 0.0,
+        "summary": "0/30 (0.00%)",
+        "total": 30
+      },
+      "private_holdout_96": {
+        "passed": 0,
+        "pct": 0.0,
+        "summary": "0/96 (0.00%)",
+        "total": 96
+      },
+      "sop_tokens_injected": 0
     },
     "P2-B": {
-      "canaries_16": "14/16 (8/8 pres, 6/8 formal -> reject)",
-      "general_retention_100": "85/100 (85.00%)",
+      "canaries_16": {
+        "formal_passed": 6,
+        "formal_total": 8,
+        "passed": 14,
+        "pct": 87.5,
+        "preservation_passed": 8,
+        "preservation_total": 8,
+        "summary": "14/16 (87.50%)",
+        "total": 16,
+        "verdict": "reject"
+      },
+      "general_retention_100": {
+        "passed": 85,
+        "pct": 85.0,
+        "summary": "85/100 (85.00%)",
+        "total": 100
+      },
       "holdout_hygiene": {
         "has_data_eido_skip": 0.2083,
         "has_what_is_not_proved": 0.4271,
@@ -335,23 +1284,73 @@
         "syntax_error": 24,
         "wrong_declared_tier": 4
       },
-      "mixed_composition_30": "8/30 (26.67%)",
-      "private_holdout_96": "0/96 (0.00%)",
-      "sop_tokens": 0
+      "mixed_composition_30": {
+        "passed": 8,
+        "pct": 26.67,
+        "summary": "8/30 (26.67%)",
+        "total": 30
+      },
+      "private_holdout_96": {
+        "passed": 0,
+        "pct": 0.0,
+        "summary": "0/96 (0.00%)",
+        "total": 96
+      },
+      "sop_tokens_injected": 0
     },
     "goodhart": {
-      "canaries_16_192tok": "15/16 (tier2_stepping_stone)",
-      "private_holdout_96": "0/96",
-      "warp_stage3_80tok_verdict": "ERR_CANARY_FAILED"
+      "canaries_16": {
+        "formal_passed": 7,
+        "formal_total": 8,
+        "passed": 15,
+        "pct": 93.75,
+        "preservation_passed": 8,
+        "preservation_total": 8,
+        "summary": "15/16 (93.75%)",
+        "total": 16,
+        "verdict": "tier2_stepping_stone"
+      },
+      "private_holdout_96": {
+        "passed": 0,
+        "pct": 0.0,
+        "summary": "0/96 (0.00%)",
+        "total": 96
+      },
+      "warp_stage3_sealed_canary_outcome": "ERR_CANARY_FAILED"
     },
     "logit_bias": {
-      "canaries_16": "15/16 (tier2_stepping_stone)",
-      "private_holdout_96": "0/96",
-      "sop_tokens": 0
+      "canaries_16": {
+        "formal_passed": 7,
+        "formal_total": 8,
+        "passed": 15,
+        "pct": 93.75,
+        "preservation_passed": 8,
+        "preservation_total": 8,
+        "summary": "15/16 (93.75%)",
+        "total": 16,
+        "verdict": "tier2_stepping_stone"
+      },
+      "private_holdout_96": {
+        "passed": 0,
+        "pct": 0.0,
+        "summary": "0/96 (0.00%)",
+        "total": 96
+      },
+      "sop_tokens_injected": 0
     },
     "phase6_naive_unprojected_sum": {
-      "general_retention_100": "0/100 (0.0%)",
-      "private_holdout_96": "0/96"
+      "general_retention_100": {
+        "passed": 0,
+        "pct": 0.0,
+        "summary": "0/100 (0.00%)",
+        "total": 100
+      },
+      "private_holdout_96": {
+        "passed": 0,
+        "pct": 0.0,
+        "summary": "0/96 (0.00%)",
+        "total": 96
+      }
     },
     "phase6_zone_routed_3pack": {
       "contested_hard_veto2_ids": [
@@ -359,13 +1358,43 @@
         "MIX-H5-02",
         "MIX-H7-01"
       ],
-      "general_retention_100": "85/100 (85.0%)",
-      "mixed_composition_30": "8/30",
-      "simultaneous_research_page_holdout_96": "0/96"
+      "general_retention_100": {
+        "passed": 85,
+        "pct": 85.0,
+        "summary": "85/100 (85.00%)",
+        "total": 100
+      },
+      "mixed_composition_30": {
+        "passed": 8,
+        "pct": 26.67,
+        "summary": "8/30 (26.67%)",
+        "total": 30
+      },
+      "simultaneous_research_page_holdout_96": {
+        "passed": 0,
+        "pct": 0.0,
+        "summary": "0/96 (0.00%)",
+        "total": 96
+      }
     },
     "sabotage": {
-      "canaries_16": "10/16 (5/8 pres, 5/8 formal -> reject)",
-      "private_holdout_96": "0/96 (7 embedded NUL corruptions)"
+      "canaries_16": {
+        "formal_passed": 5,
+        "formal_total": 8,
+        "passed": 10,
+        "pct": 62.5,
+        "preservation_passed": 5,
+        "preservation_total": 8,
+        "summary": "10/16 (62.50%)",
+        "total": 16,
+        "verdict": "reject"
+      },
+      "private_holdout_96": {
+        "passed": 0,
+        "pct": 0.0,
+        "summary": "0/96 (0.00%)",
+        "total": 96
+      }
     }
   },
   "target_repo": "Proven-Commons/mcproof"

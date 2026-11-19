@@ -4,15 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import socket
+import struct
 import subprocess
 import sys
 import time
-from typing import Any, Mapping, Sequence
+from typing import Any, BinaryIO, Mapping, Sequence
 import urllib.error
 import urllib.request
 
@@ -32,6 +35,61 @@ DOMAIN_TO_LLAMA_ID: dict[str, int] = {
     "weft-eido": 1,
     "formal-verification": 2,
 }
+
+GGUF_MAGIC = b"GGUF"
+GGUF_VERSION = 3
+
+# Standard llama.cpp `llama_ftype` values stored in GGUF `general.file_type`.
+GGUF_FILE_TYPE_TO_QUANTIZATION: dict[int, str] = {
+    0: "F32",
+    1: "F16",
+    2: "Q4_0",
+    3: "Q4_1",
+    7: "Q8_0",
+    8: "Q5_0",
+    9: "Q5_1",
+    10: "Q2_K",
+    11: "Q3_K_S",
+    12: "Q3_K_M",
+    13: "Q3_K_L",
+    14: "Q4_K_S",
+    15: "Q4_K_M",
+    16: "Q5_K_S",
+    17: "Q5_K_M",
+    18: "Q6_K",
+    19: "IQ2_XXS",
+    20: "IQ2_XS",
+    21: "Q2_K_S",
+    22: "IQ3_XS",
+    23: "IQ3_XXS",
+    24: "IQ1_S",
+    25: "IQ4_NL",
+    26: "IQ3_S",
+    27: "IQ3_M",
+    28: "IQ2_S",
+    29: "IQ2_M",
+    30: "IQ4_XS",
+    31: "IQ1_M",
+    32: "BF16",
+}
+
+_GGUF_SCALAR_FORMATS: dict[int, tuple[int, str]] = {
+    0: (1, "<B"),
+    1: (1, "<b"),
+    2: (2, "<H"),
+    3: (2, "<h"),
+    4: (4, "<I"),
+    5: (4, "<i"),
+    6: (4, "<f"),
+    7: (1, "<?"),
+    10: (8, "<Q"),
+    11: (8, "<q"),
+    12: (8, "<d"),
+}
+
+_COMMIT_TOKEN_RE = re.compile(r"^[0-9a-fA-F]{7,64}$")
+_HOME_PATH_RE = re.compile(r"/(?:Users|home)/[^/,\s:\"]+")
+_TMP_PATH_RE = re.compile(r"(?:/private)?/var/folders/[^/]+/[^/]+/T/[^/,\s:\"]+|(?:/private)?/tmp/[^/,\s:\"]+")
 
 
 def ensure(condition: bool, message: str) -> None:
@@ -61,6 +119,137 @@ def canonical_json_bytes(payload: Any) -> bytes:
 
 def sha256_json(payload: Any) -> str:
     return sha256_bytes(canonical_json_bytes(payload))
+
+
+def sanitize_receipt_paths(payload: Any) -> Any:
+    """Scrub workstation home, lab root, and ephemeral temp paths from receipt objects."""
+    if isinstance(payload, Mapping):
+        return {str(k): sanitize_receipt_paths(v) for k, v in payload.items()}
+    if isinstance(payload, list):
+        return [sanitize_receipt_paths(v) for v in payload]
+    if isinstance(payload, tuple):
+        return [sanitize_receipt_paths(v) for v in payload]
+    if isinstance(payload, str):
+        s = payload
+        repo_prefix = str(MCPROOF_REPO_ROOT.resolve()) + "/"
+        if repo_prefix in s:
+            s = s.replace(repo_prefix, "")
+        lab_prefix = str(LAB_ROOT.resolve())
+        if lab_prefix and lab_prefix != "/" and lab_prefix in s:
+            s = s.replace(lab_prefix, "<workspace>/mcproof-lab")
+        s = _TMP_PATH_RE.sub("<tmpdir>", s)
+        s = _HOME_PATH_RE.sub("<workspace>", s)
+        return s
+    return payload
+
+
+def _read_exact_gguf(fh: BinaryIO, n: int) -> bytes:
+    raw = fh.read(n)
+    if len(raw) != n:
+        raise ValueError(f"Truncated GGUF header (expected {n} bytes, got {len(raw)})")
+    return raw
+
+
+def _read_gguf_string(fh: BinaryIO, *, max_len: int = 16 * 1024 * 1024) -> str:
+    (slen,) = struct.unpack("<Q", _read_exact_gguf(fh, 8))
+    if slen > max_len:
+        raise ValueError(f"GGUF string length exceeds safety cap: {slen}")
+    return _read_exact_gguf(fh, slen).decode("utf-8", errors="replace")
+
+
+def _read_or_skip_gguf_value(fh: BinaryIO, vtype: int, *, keep: bool, file_size: int) -> Any:
+    if vtype in _GGUF_SCALAR_FORMATS:
+        nbytes, fmt = _GGUF_SCALAR_FORMATS[vtype]
+        raw = _read_exact_gguf(fh, nbytes)
+        if not keep:
+            return None
+        val = struct.unpack(fmt, raw)[0]
+        if vtype == 7:
+            return bool(val)
+        if vtype in (6, 12):
+            return float(val)
+        return int(val)
+    if vtype == 8:  # GGUF_TYPE_STRING
+        if keep:
+            return _read_gguf_string(fh)
+        (slen,) = struct.unpack("<Q", _read_exact_gguf(fh, 8))
+        if fh.tell() + slen > file_size:
+            raise ValueError("GGUF string extends past EOF")
+        fh.seek(slen, 1)
+        return None
+    if vtype == 9:  # GGUF_TYPE_ARRAY
+        elem_type, count = struct.unpack("<IQ", _read_exact_gguf(fh, 12))
+        if count > 1_000_000:
+            raise ValueError(f"GGUF array count exceeds safety cap: {count}")
+        if elem_type in _GGUF_SCALAR_FORMATS:
+            skip = _GGUF_SCALAR_FORMATS[elem_type][0] * count
+            if fh.tell() + skip > file_size:
+                raise ValueError("GGUF scalar array extends past EOF")
+            fh.seek(skip, 1)
+            return f"<array:{count}>" if keep else None
+        if elem_type == 8:
+            for _ in range(count):
+                (slen,) = struct.unpack("<Q", _read_exact_gguf(fh, 8))
+                if fh.tell() + slen > file_size:
+                    raise ValueError("GGUF string array extends past EOF")
+                fh.seek(slen, 1)
+            return f"<str_array:{count}>" if keep else None
+        for _ in range(count):
+            _read_or_skip_gguf_value(fh, elem_type, keep=False, file_size=file_size)
+        return f"<nested_array:{count}>" if keep else None
+    raise ValueError(f"Unsupported GGUF metadata value type: {vtype}")
+
+
+def read_gguf_header_metadata(path: str | Path) -> dict[str, Any]:
+    """Read GGUF v3 header KV metadata and derive `has_ssm` without loading tensor payloads."""
+    gguf_path = Path(path)
+    if not gguf_path.is_file():
+        raise FileNotFoundError(f"GGUF file not found: {gguf_path}")
+    file_size = gguf_path.stat().st_size
+    with gguf_path.open("rb") as fh:
+        magic, version, n_tensors, n_kv = struct.unpack("<4sIQQ", _read_exact_gguf(fh, 24))
+        if magic != GGUF_MAGIC:
+            raise ValueError(f"Invalid GGUF magic in {gguf_path.name}: {magic!r}")
+        if version != GGUF_VERSION:
+            raise ValueError(f"Unsupported GGUF version in {gguf_path.name}: {version}")
+        if n_tensors > 100_000 or n_kv > 100_000:
+            raise ValueError(f"GGUF header counts exceed safety cap: tensors={n_tensors}, kv={n_kv}")
+
+        meta: dict[str, Any] = {}
+        for _ in range(n_kv):
+            key = _read_gguf_string(fh)
+            (vtype,) = struct.unpack("<I", _read_exact_gguf(fh, 4))
+            keep = not key.startswith("tokenizer.")
+            val = _read_or_skip_gguf_value(fh, vtype, keep=keep, file_size=file_size)
+            if keep:
+                meta[key] = val
+
+    arch = str(meta.get("general.architecture", "unknown"))
+    has_ssm_keys = any(".ssm." in k or k.endswith(".ssm") or k.startswith("ssm.") for k in meta)
+    explicit_ssm = meta.get("has_ssm") if type(meta.get("has_ssm")) is bool else False
+    meta["has_ssm"] = bool(explicit_ssm or has_ssm_keys or arch in ("qwen35", "qwen3_5", "qwen3next"))
+    meta["_n_tensors"] = int(n_tensors)
+    return meta
+
+
+def parse_gguf_quantization(gguf_or_meta: str | Path | Mapping[str, Any]) -> str:
+    """Parse quantization string strictly from GGUF `general.file_type` header enum (fail closed)."""
+    meta = (
+        read_gguf_header_metadata(gguf_or_meta)
+        if isinstance(gguf_or_meta, (str, Path))
+        else gguf_or_meta
+    )
+    raw_ft = meta.get("general.file_type")
+    if type(raw_ft) is not int:
+        raise ValueError(
+            f"GGUF header missing integer 'general.file_type' metadata (got {raw_ft!r}); refusing filename guess"
+        )
+    quant = GGUF_FILE_TYPE_TO_QUANTIZATION.get(raw_ft)
+    if quant is None:
+        raise ValueError(
+            f"Unknown GGUF general.file_type enum value {raw_ft}; refusing filename guess"
+        )
+    return quant
 
 
 @dataclass(frozen=True)
@@ -141,14 +330,12 @@ class StackPaths:
             qwen35_gguf = (
                 LAB_ROOT / "compile" / "checkpoints" / "Qwen3.5-4B-GGUF" / "Qwen3.5-4B-Q8_0.gguf"
             )
-            fallback_qwen25 = (
-                Path.home()
-                / ".ollama"
-                / "models"
-                / "blobs"
-                / "sha256-183715c435899236895da3869489cc30ac241476b4971a20285b1a462818a5b4"
+            ensure(
+                qwen35_gguf.is_file(),
+                f"expected Qwen3.5-4B GGUF checkpoint missing at {qwen35_gguf}; "
+                "pass explicit --base-gguf or set MCPROOF_BASE_GGUF",
             )
-            base_gguf = qwen35_gguf.resolve() if qwen35_gguf.is_file() else fallback_qwen25.resolve()
+            base_gguf = qwen35_gguf.resolve()
         ensure(base_gguf.is_file(), f"base GGUF checkpoint not found: {base_gguf}")
 
         st_candidate = LAB_ROOT / "compile" / "checkpoints" / "Qwen3.5-4B"
@@ -181,7 +368,11 @@ class StackPaths:
 
 
 def load_canary_suite(paths: StackPaths, canary_path: str | Path | None, *, min_preservation: int = 8) -> tuple[Any, str]:
-    """Load verifier CanarySuite from either .json (warp_canaries_*.json) or .jsonl (canaries_16.jsonl)."""
+    """Load verifier CanarySuite from either .json (warp_canaries_*.json) or .jsonl (canaries_16.jsonl).
+
+    Honors caller's `min_preservation` without silent weakening for explicit canary files.
+    """
+    ensure(type(min_preservation) is int and min_preservation >= 1, "min_preservation must be a positive int")
     paths.inject_sys_path()
     from warp_modeld.canary import CanarySuite
 
@@ -192,14 +383,102 @@ def load_canary_suite(paths: StackPaths, canary_path: str | Path | None, *, min_
         )
     resolved = Path(canary_path).expanduser().resolve()
     if resolved.suffix.lower() == ".jsonl":
-        return CanarySuite.from_jsonl_file(resolved, min_preservation=min(4, min_preservation)), f"jsonl:{resolved.name}"
-    return CanarySuite.from_verifier_file(resolved, min_preservation=min(4, min_preservation)), f"json:{resolved.name}"
+        return CanarySuite.from_jsonl_file(resolved, min_preservation=min_preservation), f"jsonl:{resolved.name}"
+    return CanarySuite.from_verifier_file(resolved, min_preservation=min_preservation), f"json:{resolved.name}"
+
+
+def build_canary_command(
+    paths: StackPaths,
+    canary_path: str | Path | None = None,
+    *,
+    min_preservation: int = 8,
+    max_tokens: int = 80,
+) -> list[str]:
+    """Build an opaque Stage 3 canary command emitting full per-canary `outcomes` with >= `min_preservation` items."""
+    ensure(type(min_preservation) is int and min_preservation >= 1, "min_preservation must be a positive int")
+    suite_file = (
+        Path(canary_path).expanduser().resolve()
+        if canary_path is not None
+        else paths.synthetic_canaries_path
+    )
+    ensure(suite_file.is_file(), f"canary file missing for build_canary_command: {suite_file}")
+    script = (
+        "import json, sys\n"
+        f"sys.path[:0] = [{str(paths.warp_src)!r}]\n"
+        "from pathlib import Path\n"
+        "from warp_modeld.canary import CanarySuite\n"
+        "from warp_modeld.llama_client import LlamaServerClient\n"
+        "suite_p = Path(sys.argv[1])\n"
+        "min_pres = int(sys.argv[2])\n"
+        "max_tok = int(sys.argv[3])\n"
+        "url = sys.argv[4]\n"
+        "lora = json.loads(sys.argv[5])\n"
+        "domains = json.loads(sys.argv[6])\n"
+        "slot_id = int(sys.argv[7])\n"
+        "suite = CanarySuite.from_jsonl_file(suite_p, min_preservation=min_pres) if suite_p.suffix.lower() == '.jsonl' "
+        "else CanarySuite.from_verifier_file(suite_p, min_preservation=min_pres)\n"
+        "selected = suite.select_for_domains(domains)\n"
+        "client = LlamaServerClient(url, timeout_seconds=30.0, require_localhost=True)\n"
+        "outcomes = []\n"
+        "pres_total = 0\n"
+        "pres_passed = 0\n"
+        "for spec in selected:\n"
+        "    client.erase_slot(slot_id)\n"
+        "    msgs = ([{'role': 'system', 'content': spec.system_prompt}] if spec.system_prompt else []) + "
+        "[{'role': 'user', 'content': spec.prompt}]\n"
+        "    resp = client.chat_completion(msgs, lora=lora, temperature=0.0, top_p=1.0, seed=42, "
+        "max_tokens=spec.max_tokens or max_tok, cache_prompt=False, id_slot=slot_id)\n"
+        "    txt = resp['choices'][0]['message']['content']\n"
+        "    fails = spec.evaluate(txt)\n"
+        "    ok = len(fails) == 0\n"
+        "    if spec.category == 'preservation':\n"
+        "        pres_total += 1\n"
+        "        if ok:\n"
+        "            pres_passed += 1\n"
+        "    outcomes.append({'canary_id': spec.canary_id, 'category': spec.category, 'passed': ok, 'failures': fails})\n"
+        "client.erase_slot(slot_id)\n"
+        "all_ok = pres_total >= min_pres and pres_passed == pres_total and all(o['passed'] for o in outcomes)\n"
+        "print(json.dumps({'suite_sha256': suite.suite_sha256, 'passed': all_ok, "
+        "'preservation_passed': pres_passed, 'preservation_total': pres_total, 'outcomes': outcomes}))\n"
+        "raise SystemExit(0 if all_ok else 1)\n"
+    )
+    return [
+        sys.executable,
+        "-c",
+        script,
+        str(suite_file),
+        str(min_preservation),
+        str(int(max_tokens)),
+        "{server_url}",
+        "{lora_json}",
+        "{domains_json}",
+        "{slot_id}",
+    ]
 
 
 def pick_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
         return int(sock.getsockname()[1])
+
+
+def parse_llama_server_version_output(combined_output: str) -> dict[str, str]:
+    """Extract `version_line` and `commit` from `llama-server --version` output; fail closed if missing."""
+    version_line: str | None = None
+    commit: str | None = None
+    for line in combined_output.splitlines():
+        if "version:" in line.lower():
+            version_line = line.strip()
+            if "commit " in line:
+                candidate = line.split("commit ", 1)[1].rstrip(")").strip()
+                if candidate and _COMMIT_TOKEN_RE.match(candidate):
+                    commit = candidate.lower()
+            break
+    ensure(
+        version_line is not None and commit is not None,
+        f"failed to parse commit from llama-server --version output: {combined_output.strip()!r}",
+    )
+    return {"version_line": str(version_line), "commit": str(commit)}
 
 
 def query_llama_server_version(llama_bin: Path) -> dict[str, str]:
@@ -211,15 +490,11 @@ def query_llama_server_version(llama_bin: Path) -> dict[str, str]:
         check=False,
     )
     combined = (proc.stdout or "") + "\n" + (proc.stderr or "")
-    version_line = "unknown"
-    commit = "7fe450e19"
-    for line in combined.splitlines():
-        if "version:" in line.lower():
-            version_line = line.strip()
-            if "commit " in line:
-                commit = line.split("commit ", 1)[1].rstrip(")").strip()
-            break
-    return {"version_line": version_line, "commit": commit}
+    ensure(
+        proc.returncode == 0,
+        f"llama-server --version exited with code {proc.returncode}: {combined.strip()}",
+    )
+    return parse_llama_server_version_output(combined)
 
 
 def measure_process_rss_mib(pid: int) -> float:
@@ -336,7 +611,10 @@ class LiveLlamaProcess:
                         if isinstance(payload, dict) and payload.get("status") == "ok":
                             self.boot_ms = (time.perf_counter() - t0) * 1000.0
                             return self.base_url
-            except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
+            except urllib.error.HTTPError as he:
+                he.close()
+                time.sleep(0.15)
+            except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
                 time.sleep(0.15)
 
         self.stop()
@@ -374,17 +652,32 @@ class LiveLlamaProcess:
         self.stop()
 
 
+def assert_nonempty_completion_probs(
+    probs: Sequence[Mapping[str, Any]],
+    *,
+    label: str = "completion_probabilities",
+) -> None:
+    """Fail-closed check ensuring non-empty completion probabilities with step-0 top_logprobs."""
+    if not isinstance(probs, Sequence) or isinstance(probs, (str, bytes)) or len(probs) == 0:
+        raise ValueError(f"{label} must be a non-empty list of token probability entries")
+    top0 = probs[0].get("top_logprobs")
+    if not isinstance(top0, Sequence) or isinstance(top0, (str, bytes)) or len(top0) == 0:
+        raise ValueError(f"{label}[0] is missing non-empty top_logprobs")
+
+
 def step0_logprob_shift(probs_a: Sequence[Mapping[str, Any]], probs_b: Sequence[Mapping[str, Any]]) -> float:
-    """Finite step-0 logprob shift even when greedy token trajectories diverge."""
-    if not probs_a or not probs_b:
-        return 0.0
+    """Finite step-0 logprob shift even when greedy token trajectories diverge.
+
+    Raises `ValueError` when either probability list or step-0 `top_logprobs` is empty.
+    """
+    assert_nonempty_completion_probs(probs_a, label="probs_a")
+    assert_nonempty_completion_probs(probs_b, label="probs_b")
     p0_a = probs_a[0]
     p0_b = probs_b[0]
     if int(p0_a["id"]) == int(p0_b["id"]):
         return abs(float(p0_a["logprob"]) - float(p0_b["logprob"]))
-    # Look up p0_b['id'] inside p0_a['top_logprobs'] if present, else report positive logprob delta + 1.0
     ref_id = int(p0_b["id"])
-    for cand in p0_a.get("top_logprobs") or ():
+    for cand in p0_a["top_logprobs"]:
         if isinstance(cand, Mapping) and int(cand.get("id", -1)) == ref_id:
             return abs(float(cand["logprob"]) - float(p0_b["logprob"]))
     return abs(float(p0_a["logprob"]) - float(p0_b["logprob"])) + 1.0
@@ -410,7 +703,17 @@ def compute_mcproof_plane1_tree_sha256(
 
 
 def max_logprob_diff(probs_a: Sequence[Mapping[str, Any]], probs_b: Sequence[Mapping[str, Any]]) -> float:
-    """Compute exact maximum absolute top-k next-token logprob difference across generated steps."""
+    """Compute exact maximum absolute top-k next-token logprob difference across generated steps.
+
+    Raises `ValueError` if either probability sequence is empty.
+    Returns `float("inf")` if step counts differ, chosen token IDs differ, `top_logprobs` is missing
+    or empty, `len(top_a) != len(top_b)`, or top-k token-ID sets differ. Compares all top-k entries
+    by exact token-ID dictionary lookup regardless of ordering.
+    """
+    if not isinstance(probs_a, Sequence) or isinstance(probs_a, (str, bytes)) or len(probs_a) == 0:
+        raise ValueError("probs_a must be a non-empty list of token probability entries")
+    if not isinstance(probs_b, Sequence) or isinstance(probs_b, (str, bytes)) or len(probs_b) == 0:
+        raise ValueError("probs_b must be a non-empty list of token probability entries")
     if len(probs_a) != len(probs_b):
         return float("inf")
     max_d = 0.0
@@ -420,11 +723,178 @@ def max_logprob_diff(probs_a: Sequence[Mapping[str, Any]], probs_b: Sequence[Map
         max_d = max(max_d, abs(float(step_a["logprob"]) - float(step_b["logprob"])))
         top_a = step_a.get("top_logprobs")
         top_b = step_b.get("top_logprobs")
-        if isinstance(top_a, list) and isinstance(top_b, list) and len(top_a) == len(top_b):
-            for ta, tb in zip(top_a, top_b):
-                if int(ta["id"]) == int(tb["id"]):
-                    max_d = max(max_d, abs(float(ta["logprob"]) - float(tb["logprob"])))
+        if not isinstance(top_a, list) or not isinstance(top_b, list) or len(top_a) == 0:
+            return float("inf")
+        if len(top_a) != len(top_b):
+            return float("inf")
+        map_a: dict[int, float] = {}
+        for item_a in top_a:
+            if not isinstance(item_a, Mapping) or "id" not in item_a or "logprob" not in item_a:
+                return float("inf")
+            tid_a = int(item_a["id"])
+            if tid_a in map_a:
+                return float("inf")
+            map_a[tid_a] = float(item_a["logprob"])
+        map_b: dict[int, float] = {}
+        for item_b in top_b:
+            if not isinstance(item_b, Mapping) or "id" not in item_b or "logprob" not in item_b:
+                return float("inf")
+            tid_b = int(item_b["id"])
+            if tid_b in map_b:
+                return float("inf")
+            map_b[tid_b] = float(item_b["logprob"])
+        if set(map_a.keys()) != set(map_b.keys()):
+            return float("inf")
+        for tid, lp_a in map_a.items():
+            max_d = max(max_d, abs(lp_a - map_b[tid]))
     return max_d
+
+
+def stamp_bundle_checkpoint(bundle: Mapping[str, Any], ckpt: Any) -> dict[str, Any]:
+    """Ensure an exo-built AdapterBundle dict carries the full CheckpointFingerprint (including `has_ssm_recurrent`)."""
+    out = dict(bundle)
+    ckpt_dict = dict(ckpt.to_dict())
+    ckpt_dict.pop("config_bundle_sha256", None)
+    out["checkpoint"] = ckpt_dict
+    return out
+
+
+def _resolve_artifact_path(raw_path: str | Path, *, manifest_dir: Path | None) -> Path:
+    cand = Path(raw_path).expanduser()
+    if cand.is_absolute():
+        return cand.resolve()
+    repo_cand = MCPROOF_REPO_ROOT / cand
+    if repo_cand.exists():
+        return repo_cand.resolve()
+    if manifest_dir is not None:
+        mdir_cand = manifest_dir / cand
+        if mdir_cand.exists():
+            return mdir_cand.resolve()
+    return cand.resolve()
+
+
+def verify_rederivation_receipt(
+    receipt_path: Path | None,
+    *,
+    expected_gguf_sha256: str | None = None,
+) -> bool:
+    """Return True ONLY when `rederivation_receipt.json` exists and attests 0-byte diff across all files."""
+    if receipt_path is None or not receipt_path.is_file():
+        return False
+    try:
+        doc = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(doc, Mapping) or doc.get("zero_byte_diff_all") is not True:
+        return False
+    files_map = doc.get("files")
+    if not isinstance(files_map, Mapping) or len(files_map) == 0:
+        return False
+    matched_target = expected_gguf_sha256 is None
+    for entry in files_map.values():
+        if not isinstance(entry, Mapping):
+            return False
+        if entry.get("zero_byte_diff") is not True or entry.get("byte_diff_count") != 0:
+            return False
+        exp_sha = str(entry.get("expected_sha256") or "")
+        red_sha = str(entry.get("rederived_sha256") or "")
+        if len(exp_sha) != 64 or not hmac.compare_digest(exp_sha, red_sha):
+            return False
+        if expected_gguf_sha256 is not None and hmac.compare_digest(red_sha, expected_gguf_sha256):
+            matched_target = True
+    return matched_target
+
+
+def verify_supplied_checkpoint_against_served_gguf(
+    supplied_ckpt: Any,
+    *,
+    served_gguf_sha256: str,
+    live_quantization: str,
+    live_has_ssm: bool,
+    safetensors_dir: Path | None,
+    phase2_report_path: Path | None,
+    identify_checkpoint_fn: Any,
+) -> None:
+    """Fail-closed check binding compiler-supplied CheckpointFingerprint to the actually served GGUF."""
+    ensure(
+        supplied_ckpt.has_ssm_recurrent == live_has_ssm,
+        f"supplied checkpoint has_ssm_recurrent={supplied_ckpt.has_ssm_recurrent} "
+        f"disagrees with served GGUF has_ssm={live_has_ssm}",
+    )
+    if hmac.compare_digest(str(supplied_ckpt.weights_sha256), served_gguf_sha256):
+        return
+
+    ensure(
+        safetensors_dir is not None and safetensors_dir.is_dir(),
+        f"supplied checkpoint weights_sha256 ({supplied_ckpt.weights_sha256}) != served GGUF "
+        f"({served_gguf_sha256}) and safetensors_dir is unavailable for cross-binding verification",
+    )
+    ensure(
+        phase2_report_path is not None and phase2_report_path.is_file(),
+        "phase2_hardware_checkpoint_report.json is required to bind Safetensors checkpoint fingerprint to served GGUF",
+    )
+
+    st_ident = identify_checkpoint_fn(safetensors_dir, full=True)
+    live_st_weights_sha = str(
+        getattr(st_ident, "weights_sha256", None) or getattr(st_ident, "fingerprint", "")
+    )
+    ensure(
+        len(live_st_weights_sha) == 64
+        and hmac.compare_digest(live_st_weights_sha, str(supplied_ckpt.weights_sha256)),
+        f"Safetensors weights digest ({live_st_weights_sha}) != supplied checkpoint ({supplied_ckpt.weights_sha256})",
+    )
+    ensure(
+        hmac.compare_digest(str(st_ident.layout_sha256), str(supplied_ckpt.layout_sha256)),
+        "Safetensors layout_sha256 mismatch against supplied checkpoint",
+    )
+
+    p2_doc = json.loads(phase2_report_path.read_text(encoding="utf-8"))
+    ensure(isinstance(p2_doc, Mapping), "phase2_hardware_checkpoint_report.json must be a JSON object")
+    pinned_ck = p2_doc.get("pinned_checkpoint") if isinstance(p2_doc.get("pinned_checkpoint"), Mapping) else p2_doc
+    ensure(isinstance(pinned_ck, Mapping), "phase2 report missing pinned_checkpoint mapping")
+
+    report_primary_gguf = str(pinned_ck.get("gguf_sha256") or "")
+    companion_q4 = pinned_ck.get("companion_q4_k_m_gguf")
+    report_q4_gguf = (
+        str(companion_q4.get("gguf_sha256") or "")
+        if isinstance(companion_q4, Mapping)
+        else ""
+    )
+    gguf_bound = hmac.compare_digest(report_primary_gguf, served_gguf_sha256) or (
+        live_quantization == "Q4_K_M"
+        and len(report_q4_gguf) == 64
+        and hmac.compare_digest(report_q4_gguf, served_gguf_sha256)
+    )
+    ensure(
+        gguf_bound,
+        f"phase2_hardware_checkpoint_report.json gguf_sha256 ({report_primary_gguf}) "
+        f"does not bind served GGUF ({served_gguf_sha256})",
+    )
+
+    st_id_doc = pinned_ck.get("safetensors_identity")
+    ensure(isinstance(st_id_doc, Mapping), "phase2 report missing safetensors_identity mapping")
+    report_st_sha = str(st_id_doc.get("weights_sha256") or st_id_doc.get("fingerprint") or "")
+    ensure(
+        len(report_st_sha) == 64 and hmac.compare_digest(report_st_sha, str(supplied_ckpt.weights_sha256)),
+        f"phase2 report safetensors_identity ({report_st_sha}) != supplied checkpoint ({supplied_ckpt.weights_sha256})",
+    )
+
+
+def cross_check_supplied_runtime_flags(supplied_flags: Any, live_flags: Any) -> None:
+    """Fail-closed check ensuring supplied `wmcp_meta.runtime_flags` matches live binary/GGUF flags."""
+    for field_name in (
+        "llama_server_commit",
+        "quantization",
+        "ctx_size",
+        "kv_cache_type",
+        "lora_init_without_apply",
+    ):
+        got_val = getattr(supplied_flags, field_name)
+        live_val = getattr(live_flags, field_name)
+        ensure(
+            got_val == live_val,
+            f"wmcp_meta.runtime_flags.{field_name} mismatch: supplied {got_val!r} != live {live_val!r}",
+        )
 
 
 @dataclass(frozen=True)
@@ -461,6 +931,8 @@ def build_checkpoint_and_weft_suite(
     formal_gguf_override: Path | None = None,
     plane1_formal_spec_path: Path | None = None,
     rank: int = 8,
+    ctx_size: int = 8192,
+    kv_cache_type: str = "f16",
 ) -> dict[str, Any]:
     """Assemble verified CheckpointFingerprint, Plane 1 files, 3 domain packs, and negative controls.
 
@@ -470,38 +942,50 @@ def build_checkpoint_and_weft_suite(
     paths.inject_sys_path()
     from warp_modeld.certificate import CertificateBounds, RationalBound
     from warp_modeld.fingerprint import CheckpointFingerprint, Plane1Lineage, RuntimeFlags as WarpRuntimeFlags
-    from weft.binding import ADAPTER_CLASS_1, RuntimeFlags as WeftRuntimeFlags
+    from weft.binding import ADAPTER_CLASS_1, RuntimeFlags as WeftRuntimeFlags, identify_checkpoint
     from weft.certificate import GatePolicy, build_certificate
     from weft.compiler import BetaEditConfig, BetaEditNullspaceProjector, verify_rederivation
     from weft.gguf_lora import read_gguf_lora, read_gguf_model_geometry, write_gguf_lora
     from weft.quant import quantize_array, sha256_factor_pair
     from weft.slab_wire import verify_slab_wire, write_slab_wire
 
+    gguf_meta = read_gguf_header_metadata(base_gguf)
+    live_quantization = parse_gguf_quantization(gguf_meta)
+    has_ssm = bool(gguf_meta.get("has_ssm", False))
+
     geom = read_gguf_model_geometry(base_gguf)
     arch = str(geom["architecture"])
     last_blk = max(0, int(geom["block_count"]) - 1)
-    # Prefer wide-output ffn_up.weight (d_in = d_model = 2560 on Qwen3.5-4B) for stack companion packs
-    # so exact float64 covariance eigendecomposition runs in <0.5s while matching weft E5/E6 geometry;
-    # @compiler's supplied P2-B GGUF may target any tensor (including ffn_down) and is loaded directly.
     target_tensor = f"blk.{last_blk}.ffn_up.weight"
     if target_tensor not in geom["tensors"]:
         target_tensor = f"blk.{last_blk}.ffn_down.weight"
     ensure(target_tensor in geom["tensors"], f"no FFN tensor found in {base_gguf.name}")
     d_out, d_in = geom["tensors"][target_tensor]["numpy_shape"]
 
-    base_weights_sha = sha256_file(base_gguf)
+    served_gguf_sha256 = sha256_file(base_gguf)
     st_dir = paths.default_safetensors_dir
     if st_dir is not None and (st_dir / "config.json").is_file() and base_gguf == paths.default_base_gguf:
         cfg_sha = sha256_file(st_dir / "config.json")
-        tok_sha = sha256_file(st_dir / "tokenizer.json") if (st_dir / "tokenizer.json").is_file() else sha256_json({"tok": base_gguf.name})
+        tok_sha = (
+            sha256_file(st_dir / "tokenizer.json")
+            if (st_dir / "tokenizer.json").is_file()
+            else sha256_json({"tok": base_gguf.name})
+        )
         tmpl_sha = (
             sha256_file(st_dir / "chat_template.jinja")
             if (st_dir / "chat_template.jinja").is_file()
             else sha256_json({"tmpl": base_gguf.name})
         )
     else:
-        cfg_sha = sha256_json({"arch": arch, "blocks": geom["block_count"], "emb": geom["embedding_length"], "ffn": geom["feed_forward_length"]})
-        tok_sha = sha256_json({"tokenizer": "gguf-embedded", "weights_sha256": base_weights_sha})
+        cfg_sha = sha256_json(
+            {
+                "arch": arch,
+                "blocks": geom["block_count"],
+                "emb": geom["embedding_length"],
+                "ffn": geom["feed_forward_length"],
+            }
+        )
+        tok_sha = sha256_json({"tokenizer": "gguf-embedded", "weights_sha256": served_gguf_sha256})
         tmpl_sha = sha256_json({"chat_template": "gguf-embedded", "enable_thinking": False})
 
     layout_sha = sha256_json(
@@ -514,37 +998,37 @@ def build_checkpoint_and_weft_suite(
         }
     )
 
-    has_ssm = arch in ("qwen35", "qwen3_5", "qwen3next")
     ckpt = CheckpointFingerprint(
         model_id=geom["model_name"] or base_gguf.stem,
         layout_sha256=layout_sha,
-        weights_sha256=base_weights_sha,
+        weights_sha256=served_gguf_sha256,
         config_sha256=cfg_sha,
         tokenizer_sha256=tok_sha,
         chat_template_sha256=tmpl_sha,
-        safetensors_provenance_sha256=base_weights_sha,
-        has_ssm_recurrent=False,  # llama-server /slots exposes unified KV+DeltaNet erase via slot id
+        safetensors_provenance_sha256=served_gguf_sha256,
+        has_ssm_recurrent=has_ssm,
     )
 
     llama_ver = query_llama_server_version(paths.llama_server_bin)
-    warp_flags = WarpRuntimeFlags(
+    live_warp_flags = WarpRuntimeFlags(
         llama_server_commit=llama_ver["commit"],
-        quantization="Q8_0" if "Q8_0" in base_gguf.name.upper() else "Q4_K_M",
-        ctx_size=8192,
-        kv_cache_type="f16",
+        quantization=live_quantization,
+        ctx_size=int(ctx_size),
+        kv_cache_type=str(kv_cache_type),
         ctx_checkpoints=0,
         swa_checkpoints=0,
         lora_init_without_apply=True,
         rope_args="",
         chat_template_args='{"enable_thinking":false}',
     )
+    warp_flags = live_warp_flags
     weft_flags = WeftRuntimeFlags(
-        quantization_mode="Q8_0_base_f16_lora",
+        quantization_mode=f"{live_quantization}_base_f16_lora",
         mamba_cache_mode="deltanet_slot_erase" if has_ssm else "none",
         enable_thinking=False,
         tool_call_parser="qwen3_xml",
         rope_scaling="mrope_default",
-        ctx_size=8192,
+        ctx_size=int(ctx_size),
     )
 
     # Align Plane 1 lineage and _meta strictly with spec/lineage.json (#13 & #15)
@@ -628,12 +1112,11 @@ def build_checkpoint_and_weft_suite(
 
     handoff_data: dict[str, Any] = {}
     manifest_dir: Path | None = None
-    if compiler_manifest_path is not None and compiler_manifest_path.is_file():
+    if compiler_manifest_path is not None:
+        ensure(compiler_manifest_path.is_file(), f"compiler manifest not found: {compiler_manifest_path}")
         manifest_dir = compiler_manifest_path.parent
         handoff_data = json.loads(compiler_manifest_path.read_text(encoding="utf-8"))
 
-    # Normalize @compiler's MANIFEST.json (`mcproof-phase2-phase3-manifest/v0.1`),
-    # `composition_manifest.json`, generic `adapters` dict, or direct `--formal-gguf` CLI flag.
     normalized_supplied: dict[str, dict[str, Any]] = {}
     if isinstance(handoff_data.get("adapters"), dict):
         for dom_k, dom_v in handoff_data["adapters"].items():
@@ -685,28 +1168,55 @@ def build_checkpoint_and_weft_suite(
         fv_entry["gguf_path"] = str(formal_gguf_override.resolve())
         normalized_supplied["formal-verification"] = fv_entry
 
-    # Load any pre-built warp_bundle dicts from @compiler and align CheckpointFingerprint & RuntimeFlags!
+    # Load pre-built warp_bundle dicts from @compiler and strictly verify checkpoint & runtime_flags!
     loaded_warp_bundles: dict[str, dict[str, Any]] = {}
     for dom_k, entry in normalized_supplied.items():
         wb_dict = entry.get("warp_bundle")
         if not isinstance(wb_dict, dict) and entry.get("warp_bundle_path"):
-            wb_p = Path(str(entry["warp_bundle_path"])).expanduser().resolve()
-            if wb_p.is_file():
-                wb_dict = json.loads(wb_p.read_text(encoding="utf-8"))
+            wb_p = _resolve_artifact_path(str(entry["warp_bundle_path"]), manifest_dir=manifest_dir)
+            ensure(wb_p.is_file(), f"supplied warp_bundle_path missing: {wb_p}")
+            wb_dict = json.loads(wb_p.read_text(encoding="utf-8"))
         if isinstance(wb_dict, dict):
             loaded_warp_bundles[dom_k] = wb_dict
 
+    phase2_report_path: Path | None = None
+    if handoff_data.get("phase2_report"):
+        phase2_report_path = _resolve_artifact_path(str(handoff_data["phase2_report"]), manifest_dir=manifest_dir)
+    elif manifest_dir is not None and (manifest_dir / "phase2_hardware_checkpoint_report.json").is_file():
+        phase2_report_path = (manifest_dir / "phase2_hardware_checkpoint_report.json").resolve()
+
     ref_wb = loaded_warp_bundles.get("formal-verification") or next(iter(loaded_warp_bundles.values()), None)
     if ref_wb is not None and isinstance(ref_wb.get("checkpoint"), dict):
-        ckpt = CheckpointFingerprint.from_dict(ref_wb["checkpoint"])
-        base_weights_sha = ckpt.weights_sha256
+        supplied_ckpt = CheckpointFingerprint.from_dict(ref_wb["checkpoint"])
+        verify_supplied_checkpoint_against_served_gguf(
+            supplied_ckpt,
+            served_gguf_sha256=served_gguf_sha256,
+            live_quantization=live_quantization,
+            live_has_ssm=has_ssm,
+            safetensors_dir=st_dir,
+            phase2_report_path=phase2_report_path,
+            identify_checkpoint_fn=identify_checkpoint,
+        )
+        ckpt = supplied_ckpt
 
-    fv_meta_path = (normalized_supplied.get("formal-verification") or {}).get("wmcp_meta_path")
-    if fv_meta_path and Path(str(fv_meta_path)).is_file():
-        wmcp_doc = json.loads(Path(str(fv_meta_path)).read_text(encoding="utf-8"))
+    fv_meta_raw = (normalized_supplied.get("formal-verification") or {}).get("wmcp_meta_path")
+    if fv_meta_raw:
+        fv_meta_p = _resolve_artifact_path(str(fv_meta_raw), manifest_dir=manifest_dir)
+        ensure(fv_meta_p.is_file(), f"supplied wmcp_meta_path missing: {fv_meta_p}")
+        wmcp_doc = json.loads(fv_meta_p.read_text(encoding="utf-8"))
         rf_dict = ((wmcp_doc.get("_meta") or {}).get("gg.siliconcordat/mde") or {}).get("runtime_flags")
-        if isinstance(rf_dict, dict):
-            warp_flags = WarpRuntimeFlags.from_dict(rf_dict)
+        ensure(isinstance(rf_dict, dict), f"wmcp_meta missing _meta.gg.siliconcordat/mde.runtime_flags: {fv_meta_p}")
+        supplied_flags = WarpRuntimeFlags.from_dict(rf_dict)
+        cross_check_supplied_runtime_flags(supplied_flags, live_warp_flags)
+        warp_flags = supplied_flags
+
+    rederiv_receipt_path: Path | None = None
+    if handoff_data.get("rederivation_receipt_path"):
+        rederiv_receipt_path = _resolve_artifact_path(
+            str(handoff_data["rederivation_receipt_path"]), manifest_dir=manifest_dir
+        )
+    elif manifest_dir is not None and (manifest_dir / "rederivation_receipt.json").is_file():
+        rederiv_receipt_path = (manifest_dir / "rederivation_receipt.json").resolve()
 
     # Shared Hybrid K0 covariance (seeded copyright-free random noise + register preservation keys)
     rng_k0 = np.random.default_rng(20261119)
@@ -730,13 +1240,13 @@ def build_checkpoint_and_weft_suite(
         max_safety_dot_sq_num=1,
         max_safety_dot_sq_den=10,
     )
-    # Adopt @compiler's calibrated integer GatePolicy if present alongside P2-B!
     gp_candidates: list[Path] = []
     if handoff_data.get("gate_policy_path"):
-        gp_candidates.append(Path(str(handoff_data["gate_policy_path"])).expanduser().resolve())
+        gp_candidates.append(_resolve_artifact_path(str(handoff_data["gate_policy_path"]), manifest_dir=manifest_dir))
     fv_cert_p = (normalized_supplied.get("formal-verification") or {}).get("certificate_path")
     if fv_cert_p:
-        gp_candidates.append(Path(str(fv_cert_p)).resolve().parent / "formal-verification.p2b.gate_policy.json")
+        resolved_fv_cert = _resolve_artifact_path(str(fv_cert_p), manifest_dir=manifest_dir)
+        gp_candidates.append(resolved_fv_cert.parent / "formal-verification.p2b.gate_policy.json")
     if manifest_dir is not None:
         gp_candidates.append(manifest_dir / "p2b" / "formal-verification.p2b.gate_policy.json")
     for gp_path in gp_candidates:
@@ -804,7 +1314,8 @@ def build_checkpoint_and_weft_suite(
 
         supplied_entry = normalized_supplied.get(domain)
         if isinstance(supplied_entry, dict) and supplied_entry.get("gguf_path"):
-            gguf_path = Path(str(supplied_entry["gguf_path"])).expanduser().resolve()
+            gguf_path = _resolve_artifact_path(str(supplied_entry["gguf_path"]), manifest_dir=manifest_dir)
+            ensure(gguf_path.is_file(), f"supplied GGUF LoRA missing: {gguf_path}")
             parsed_lora = read_gguf_lora(gguf_path)
             b_keys = sorted(k for k in parsed_lora.tensors if k.endswith(".lora_b"))
             ensure(len(b_keys) >= 1, f"supplied GGUF LoRA has no .lora_b tensor: {gguf_path}")
@@ -818,20 +1329,26 @@ def build_checkpoint_and_weft_suite(
             t_base = b_keys[0][: -len(".lora_b")]
             fb, fa = layer_factors_map[t_base]
             gguf_sha = sha256_file(gguf_path)
+            if supplied_entry.get("gguf_sha256"):
+                ensure(
+                    hmac.compare_digest(gguf_sha, str(supplied_entry["gguf_sha256"])),
+                    f"supplied GGUF sha256 mismatch for {domain}: disk {gguf_sha} != manifest {supplied_entry['gguf_sha256']}",
+                )
             wb_for_dom = loaded_warp_bundles.get(domain)
 
             cert_dict_loaded: dict[str, Any] | None = None
             if isinstance(supplied_entry.get("certificate"), dict):
                 cert_dict_loaded = dict(supplied_entry["certificate"])
-            elif supplied_entry.get("certificate_path") and Path(str(supplied_entry["certificate_path"])).is_file():
-                cert_dict_loaded = json.loads(Path(str(supplied_entry["certificate_path"])).read_text(encoding="utf-8"))
+            elif supplied_entry.get("certificate_path"):
+                cert_p = _resolve_artifact_path(str(supplied_entry["certificate_path"]), manifest_dir=manifest_dir)
+                if cert_p.is_file():
+                    cert_dict_loaded = json.loads(cert_p.read_text(encoding="utf-8"))
 
             if cert_dict_loaded is not None:
                 cert_dict = cert_dict_loaded
                 factor_digest = str(cert_dict["factor_digest"])
                 cert_sha = sha256_json(cert_dict)
             elif wb_for_dom is not None and isinstance(wb_for_dom.get("certificate"), dict):
-                # Reconstruct weft certificate fields from warp certificate when standalone warp_bundle is provided
                 wc = wb_for_dom["certificate"]
                 b_bytes, b_q = quantize_array(fb, "f16", axis=0)
                 a_bytes, a_q = quantize_array(fa, "f16", axis=1)
@@ -880,9 +1397,14 @@ def build_checkpoint_and_weft_suite(
                 cert_dict = json.loads(cert_obj.canonical_json())
                 cert_sha = cert_obj.sha256()
 
-            if supplied_entry.get("binding_path") and Path(str(supplied_entry["binding_path"])).is_file():
-                weft_manifest = json.loads(Path(str(supplied_entry["binding_path"])).read_text(encoding="utf-8"))
-            else:
+            binding_loaded = False
+            weft_manifest: dict[str, Any] = {}
+            if supplied_entry.get("binding_path"):
+                bind_p = _resolve_artifact_path(str(supplied_entry["binding_path"]), manifest_dir=manifest_dir)
+                if bind_p.is_file():
+                    weft_manifest = json.loads(bind_p.read_text(encoding="utf-8"))
+                    binding_loaded = True
+            if not binding_loaded:
                 weft_manifest = {
                     "schema": "weft-binding/v0.1",
                     "adapter_name": aid,
@@ -908,14 +1430,41 @@ def build_checkpoint_and_weft_suite(
                     "certificate_sha256": cert_sha,
                 }
 
-            # Ensure warp_bundle_dict carries exact current lineage & runtime_flags_sha256
             if wb_for_dom is not None:
-                wb_for_dom = dict(wb_for_dom)
+                if wb_for_dom.get("checkpoint"):
+                    dom_ckpt = CheckpointFingerprint.from_dict(wb_for_dom["checkpoint"])
+                    ensure(
+                        dom_ckpt == ckpt,
+                        f"warp_bundle checkpoint mismatch for {domain}: {dom_ckpt} != {ckpt}",
+                    )
+                if wb_for_dom.get("runtime_flags_sha256"):
+                    ensure(
+                        hmac.compare_digest(str(wb_for_dom["runtime_flags_sha256"]), warp_flags.canonical_digest()),
+                        f"warp_bundle runtime_flags_sha256 mismatch for {domain}: "
+                        f"{wb_for_dom['runtime_flags_sha256']} != {warp_flags.canonical_digest()}",
+                    )
+                wb_for_dom = stamp_bundle_checkpoint(wb_for_dom, ckpt)
                 wb_for_dom["adapter_path"] = str(gguf_path)
                 wb_for_dom["adapter_sha256"] = gguf_sha
                 wb_for_dom["source_lineage"] = lineage.to_dict()
                 wb_for_dom["runtime_flags_sha256"] = warp_flags.canonical_digest()
                 wb_for_dom["zone_manifest_id"] = zone_manifest_id
+
+            slab_i4_i8: Path | None = None
+            if supplied_entry.get("slab_int4_int8_path"):
+                slab_i4_i8 = _resolve_artifact_path(
+                    str(supplied_entry["slab_int4_int8_path"]), manifest_dir=manifest_dir
+                )
+            slab_i4_f16: Path | None = None
+            if supplied_entry.get("slab_int4_f16_path"):
+                slab_i4_f16 = _resolve_artifact_path(
+                    str(supplied_entry["slab_int4_f16_path"]), manifest_dir=manifest_dir
+                )
+
+            rederived_zero_byte_ok = verify_rederivation_receipt(
+                rederiv_receipt_path,
+                expected_gguf_sha256=gguf_sha,
+            )
 
             artifacts[domain] = CompiledDomainArtifact(
                 domain=domain,
@@ -924,16 +1473,8 @@ def build_checkpoint_and_weft_suite(
                 gguf_path=gguf_path,
                 gguf_sha256=gguf_sha,
                 gguf_bytes=gguf_path.stat().st_size,
-                slab_int4_int8_path=(
-                    Path(str(supplied_entry["slab_int4_int8_path"])).expanduser().resolve()
-                    if supplied_entry.get("slab_int4_int8_path")
-                    else None
-                ),
-                slab_int4_f16_path=(
-                    Path(str(supplied_entry["slab_int4_f16_path"])).expanduser().resolve()
-                    if supplied_entry.get("slab_int4_f16_path")
-                    else None
-                ),
+                slab_int4_int8_path=slab_i4_i8,
+                slab_int4_f16_path=slab_i4_f16,
                 weft_certificate_dict=cert_dict,
                 weft_certificate_sha256=cert_sha,
                 weft_manifest_dict=weft_manifest,
@@ -941,7 +1482,7 @@ def build_checkpoint_and_weft_suite(
                 factor_a=fa,
                 target_tensor=t_base,
                 layer_factors=layer_factors_map,
-                rederived_zero_byte_ok=bool(handoff_data.get("rederivation_zero_byte_diff", True)),
+                rederived_zero_byte_ok=rederived_zero_byte_ok,
                 source_kind="compiler_handoff",
                 warp_bundle_dict=wb_for_dom,
             )
@@ -949,8 +1490,6 @@ def build_checkpoint_and_weft_suite(
 
         # Deterministic CPU float64 BetaEdit compilation onto real base_gguf geometry
         rng_dom = np.random.default_rng(domain_seeds[domain])
-        # Keep residual norms tiny so active F16 LoRA shifts logprobs measurably (verifiable > 0 shift)
-        # without destabilizing base Qwen3.5-4B generation on shadow canaries or mixed prompts!
         edit_keys = rng_dom.standard_normal((d_in, eff_rank)).astype(np.float64) / np.sqrt(float(d_in))
         pres_keys = rng_dom.standard_normal((d_in, 8)).astype(np.float64) / np.sqrt(float(d_in))
         residuals = rng_dom.standard_normal((d_out, eff_rank)).astype(np.float64) * 0.015
@@ -1000,7 +1539,6 @@ def build_checkpoint_and_weft_suite(
             )
             ensure(rederived_ok, f"deterministic stage_edit replay failed for {domain}")
 
-        # Also emit asymmetric int4/int8 and int4/f16 weft-slab/v0.1 containers pinned to zone_manifest_id!
         slab_paths: dict[str, Path] = {}
         for b_dt, a_dt, tag in (("int4", "int8", "int4_int8"), ("int4", "f16", "int4_f16")):
             _, proj_asym = _get_shared_projector(b_dt, a_dt)
@@ -1017,14 +1555,14 @@ def build_checkpoint_and_weft_suite(
             write_slab_wire(
                 patch_asym,
                 target_tensor=target_tensor,
-                base_weights_sha256=base_weights_sha,
+                base_weights_sha256=ckpt.weights_sha256,
                 zone_manifest_id=zone_manifest_id,
                 output_path=slab_p,
             )
             slab_ok, slab_probs, _ = verify_slab_wire(
                 slab_p,
                 expected_zone_manifest_id=zone_manifest_id,
-                expected_base_weights_sha256=base_weights_sha,
+                expected_base_weights_sha256=ckpt.weights_sha256,
             )
             ensure(slab_ok, f"weft-slab/v0.1 verification failed for {domain} ({tag}): {slab_probs}")
             slab_paths[tag] = slab_p
@@ -1060,11 +1598,14 @@ def build_checkpoint_and_weft_suite(
             "schema": "weft-binding/v0.1",
             "adapter_name": aid,
             "adapter_class": ADAPTER_CLASS_1,
-            "layout_sha256": layout_sha,
-            "checkpoint_fingerprint": base_weights_sha,
+            "layout_sha256": ckpt.layout_sha256,
+            "checkpoint_fingerprint": ckpt.weights_sha256,
             "n_tensors": int(geom["n_tensors"]),
-            "config_hashes": {"config.json": cfg_sha},
-            "tokenizer_hashes": {"tokenizer.json": tok_sha, "chat_template.jinja": tmpl_sha},
+            "config_hashes": {"config.json": ckpt.config_sha256},
+            "tokenizer_hashes": {
+                "tokenizer.json": ckpt.tokenizer_sha256,
+                "chat_template.jinja": ckpt.chat_template_sha256,
+            },
             "plane1_hashes": {rel_p1: p1_hashes[rel_p1]},
             "derivation_recipe": {
                 "compiler": "weft-betaedit-f64/0.1.0",
@@ -1094,13 +1635,11 @@ def build_checkpoint_and_weft_suite(
             factor_a=staged_f16.factor_a,
             target_tensor=target_tensor,
             layer_factors={target_tensor: (staged_f16.factor_b, staged_f16.factor_a)},
-            rederived_zero_byte_ok=True,
+            rederived_zero_byte_ok=bool(rederived_ok),
             source_kind="stack_deterministic_weft",
             warp_bundle_dict=None,
         )
 
-    # Load @compiler's real negative_controls_summary.json if present alongside MANIFEST.json,
-    # otherwise synthesize deterministic weft Experiment E2 sabotage + behavioral corruptor controls!
     compiler_sabotage: dict[str, Any] | None = None
     compiler_goodhart: dict[str, Any] | None = None
     if manifest_dir is not None and (manifest_dir / "controls" / "negative_controls_summary.json").is_file():
@@ -1108,8 +1647,9 @@ def build_checkpoint_and_weft_suite(
         if isinstance(nc_doc.get("sabotage_patch"), dict) and nc_doc["sabotage_patch"].get("gguf_path"):
             sp = nc_doc["sabotage_patch"]
             sp_cert_dict = dict(sp["certificate"])
+            sp_gguf_p = _resolve_artifact_path(str(sp["gguf_path"]), manifest_dir=manifest_dir)
             compiler_sabotage = {
-                "gguf_path": Path(str(sp["gguf_path"])).resolve(),
+                "gguf_path": sp_gguf_p,
                 "gguf_sha256": str(sp["gguf_sha256"]),
                 "weft_certificate_dict": sp_cert_dict,
                 "weft_certificate_sha256": sha256_json(sp_cert_dict),
@@ -1119,8 +1659,9 @@ def build_checkpoint_and_weft_suite(
         if isinstance(nc_doc.get("goodhart_patch"), dict) and nc_doc["goodhart_patch"].get("gguf_path"):
             gp = nc_doc["goodhart_patch"]
             gp_cert_dict = dict(gp["certificate"])
+            gp_gguf_p = _resolve_artifact_path(str(gp["gguf_path"]), manifest_dir=manifest_dir)
             compiler_goodhart = {
-                "gguf_path": Path(str(gp["gguf_path"])).resolve(),
+                "gguf_path": gp_gguf_p,
                 "gguf_sha256": str(gp["gguf_sha256"]),
                 "weft_certificate_dict": gp_cert_dict,
                 "weft_certificate_sha256": sha256_json(gp_cert_dict),
@@ -1128,10 +1669,7 @@ def build_checkpoint_and_weft_suite(
                 "source": "compiler_controls",
             }
 
-    # Also build deterministic negative controls (low-norm high-leakage sabotage + Goodhart overfit)
-    # matching weft Experiment E2 so Stage 2 / Stage 3 / private-holdout rejection is verified live!
     cov_sab = 500.0 * (k0_mat @ k0_mat.T)
-    # Low Frobenius norm (~0.8 < cap 50.0), intentionally aligned WITH top K0 direction + safety direction!
     k0_top = k0_mat[:, :1]
     k0_top = k0_top / max(float(np.linalg.norm(k0_top)), 1e-12)
     b_sab_raw = b_safe * max(float(np.linalg.norm(b_safe)), 1.0)
@@ -1146,7 +1684,6 @@ def build_checkpoint_and_weft_suite(
         (int(a_sab_q.shape[0]), int(a_sab_q.shape[1])),
         "f16",
     )
-    # Amplify covariance sensitivity on sabotage cert so Stage 2 catches K0/safety violation deterministically
     sab_cert = build_certificate(
         b_sab_q,
         a_sab_q,
@@ -1166,8 +1703,6 @@ def build_checkpoint_and_weft_suite(
         extra_metadata={"weft.domain": "formal-verification", "weft.control": "sabotage_low_norm"},
     )
 
-    # Destructive corruptor LoRA (large random factor inside K0 nullspace that passes norm if scaled down
-    # or corrupts generation so Stage 3 shadow canaries catch behavioral sabotage live on llama-server!)
     rng_corrupt = np.random.default_rng(99991)
     b_corrupt = rng_corrupt.standard_normal((d_out, 4)).astype(np.float64) * 18.0
     a_corrupt = rng_corrupt.standard_normal((4, d_in)).astype(np.float64) * 2.5
@@ -1182,7 +1717,10 @@ def build_checkpoint_and_weft_suite(
 
     return {
         "base_gguf": base_gguf,
-        "base_weights_sha256": base_weights_sha,
+        "served_gguf_sha256": served_gguf_sha256,
+        "base_weights_sha256": ckpt.weights_sha256,
+        "gguf_quantization": live_quantization,
+        "has_ssm_recurrent": has_ssm,
         "geometry": {
             "architecture": arch,
             "model_name": geom["model_name"],

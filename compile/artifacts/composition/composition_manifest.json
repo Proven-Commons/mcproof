@@ -29,9 +29,9 @@
   },
   "weft-eido": {
     "adapter_id": "mde:weft-eido",
-    "binding_sha256": "f9719fe2e7ec9586cdf989095a4086f9365127baa6b32e47534c1550649c2983",
+    "binding_sha256": "109251e654cdad696e79f6d32529496e8740dfeacfc55c65c051683c85989d2b",
     "certificate": {
-      "factor_digest": "98f37ec34b8e6dce45cf9cd5d31ed3c628652d086480d11d7392ab060a4e7b74",
+      "factor_digest": "8a765a344493f8846f73da4f77d7630a4658e75c92d334a972e42302c73fff2b",
       "frobenius_sq_scaled": 6149746,
       "leakage_energy_scaled": 8291719,
       "max_safety_dot_sq_scaled": 878,
@@ -40,12 +40,12 @@
       "radix_scale_exp2": 24,
       "spectral_norm_sq_scaled": 1941403
     },
-    "certificate_sha256": "2dda92d7903895770f1b952a9a0aba21affe710ab502027d1c01948f6c430e74",
+    "certificate_sha256": "3bd61454a59ddc4511c81b19aeee12c8565de08df1e56436d8b29255de91af3d",
     "gguf_path": "compile/artifacts/composition/weft-eido.f16.gguf",
-    "gguf_sha256": "29f1b18c7061edcafe74d85271eb3738029258f1a29b9353087629693400b4bb",
+    "gguf_sha256": "71bedfeee40d0b11a559f73d1c720822a1281452859f43a250bf86bc2755bb86",
     "llama_adapter_id": 1,
     "slab_path": "compile/artifacts/composition/weft-eido.f16.wfsl",
-    "slab_sha256": "f5ab89b1bd52aeb5b3582f175a31534da9d8d9cb0e94bd64de91aaf65c1d79af",
+    "slab_sha256": "615f893f0c28663d029ebd27e83c037d286c6808e6cdf8690710253476786c93",
     "warp_bundle_path": "compile/artifacts/composition/weft-eido.warp_bundle.json"
   }
 }

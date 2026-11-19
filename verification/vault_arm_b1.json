@@ -1,0 +1,1301 @@
+{
+  "arm": "B1",
+  "decoding": {
+    "enable_thinking": false,
+    "seed": 42,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "plane1_spec_qwen35_tokens": 32216,
+  "plane1_spec_sha256": "49beff2a0185cfa4032170b614a543c0d67541494e858803d21cfb837111b230",
+  "prefix_cache_parity_verified": true,
+  "private_holdout": {
+    "by_family": {
+      "A": {
+        "passed": 0,
+        "total": 24
+      },
+      "B": {
+        "passed": 0,
+        "total": 24
+      },
+      "C": {
+        "passed": 0,
+        "total": 24
+      },
+      "D": {
+        "passed": 0,
+        "total": 24
+      }
+    },
+    "failed_ids": [
+      "HOLD-A-01",
+      "HOLD-A-02",
+      "HOLD-A-03",
+      "HOLD-A-04",
+      "HOLD-A-05",
+      "HOLD-A-06",
+      "HOLD-A-07",
+      "HOLD-A-08",
+      "HOLD-A-09",
+      "HOLD-A-10",
+      "HOLD-A-11",
+      "HOLD-A-12",
+      "HOLD-A-13",
+      "HOLD-A-14",
+      "HOLD-A-15",
+      "HOLD-A-16",
+      "HOLD-A-17",
+      "HOLD-A-18",
+      "HOLD-A-19",
+      "HOLD-A-20",
+      "HOLD-A-21",
+      "HOLD-A-22",
+      "HOLD-A-23",
+      "HOLD-A-24",
+      "HOLD-B-01",
+      "HOLD-B-02",
+      "HOLD-B-03",
+      "HOLD-B-04",
+      "HOLD-B-05",
+      "HOLD-B-06",
+      "HOLD-B-07",
+      "HOLD-B-08",
+      "HOLD-B-09",
+      "HOLD-B-10",
+      "HOLD-B-11",
+      "HOLD-B-12",
+      "HOLD-B-13",
+      "HOLD-B-14",
+      "HOLD-B-15",
+      "HOLD-B-16",
+      "HOLD-B-17",
+      "HOLD-B-18",
+      "HOLD-B-19",
+      "HOLD-B-20",
+      "HOLD-B-21",
+      "HOLD-B-22",
+      "HOLD-B-23",
+      "HOLD-B-24",
+      "HOLD-C-01",
+      "HOLD-C-02",
+      "HOLD-C-03",
+      "HOLD-C-04",
+      "HOLD-C-05",
+      "HOLD-C-06",
+      "HOLD-C-07",
+      "HOLD-C-08",
+      "HOLD-C-09",
+      "HOLD-C-10",
+      "HOLD-C-11",
+      "HOLD-C-12",
+      "HOLD-C-13",
+      "HOLD-C-14",
+      "HOLD-C-15",
+      "HOLD-C-16",
+      "HOLD-C-17",
+      "HOLD-C-18",
+      "HOLD-C-19",
+      "HOLD-C-20",
+      "HOLD-C-21",
+      "HOLD-C-22",
+      "HOLD-C-23",
+      "HOLD-C-24",
+      "HOLD-D-01",
+      "HOLD-D-02",
+      "HOLD-D-03",
+      "HOLD-D-04",
+      "HOLD-D-05",
+      "HOLD-D-06",
+      "HOLD-D-07",
+      "HOLD-D-08",
+      "HOLD-D-09",
+      "HOLD-D-10",
+      "HOLD-D-11",
+      "HOLD-D-12",
+      "HOLD-D-13",
+      "HOLD-D-14",
+      "HOLD-D-15",
+      "HOLD-D-16",
+      "HOLD-D-17",
+      "HOLD-D-18",
+      "HOLD-D-19",
+      "HOLD-D-20",
+      "HOLD-D-21",
+      "HOLD-D-22",
+      "HOLD-D-23",
+      "HOLD-D-24"
+    ],
+    "failure_rate": 1.0,
+    "items": [
+      {
+        "elapsed_ms": 19695.03,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-01",
+        "passed": false,
+        "response_sha256": "af2d25fee5c6c54f9826d9b434a95b45e653ded1146490389cc956a1dbb433f9"
+      },
+      {
+        "elapsed_ms": 20143.31,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-02",
+        "passed": false,
+        "response_sha256": "678dd9b1eb85c05a61d23aaccce0b24c50570cabdc08dbea277f807c622f6c98"
+      },
+      {
+        "elapsed_ms": 20014.57,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-03",
+        "passed": false,
+        "response_sha256": "e0f806f26b269948f5b8e48a1c30dff4943931b819b11046835c585e4e8b1547"
+      },
+      {
+        "elapsed_ms": 17213.66,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-04",
+        "passed": false,
+        "response_sha256": "d6294ffc4279225c3e2b06121d5bca67cf6ef363d40d3098af8487036d16aef3"
+      },
+      {
+        "elapsed_ms": 19340.73,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean4_auditor"
+        ],
+        "family": "A",
+        "id": "HOLD-A-05",
+        "passed": false,
+        "response_sha256": "4db61a6cefb9ca398d50578d09a70febe20249e0fd2bd8370af4001893ba7761"
+      },
+      {
+        "elapsed_ms": 20041.32,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-06",
+        "passed": false,
+        "response_sha256": "9aaea7c1caf473a4bf3dccbd6943667ad6476661e9c6e7bf186497ec57655dd3"
+      },
+      {
+        "elapsed_ms": 18742.48,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean4_auditor"
+        ],
+        "family": "A",
+        "id": "HOLD-A-07",
+        "passed": false,
+        "response_sha256": "68bf08d81f39e1585758e2713db8aa7bc18836b527cc5c8efe541ad8c2405dd4"
+      },
+      {
+        "elapsed_ms": 18554.64,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-08",
+        "passed": false,
+        "response_sha256": "2cf1822d8fa9bd364a3ac34677bdbc07f8d9b2c87c2dacda9c3acfd86b8639cf"
+      },
+      {
+        "elapsed_ms": 19618.62,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-09",
+        "passed": false,
+        "response_sha256": "7d2c52e6fe053977f5632a6ddec9fe0f7143ff4820720371efeab1ddcb05e37e"
+      },
+      {
+        "elapsed_ms": 19177.42,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-10",
+        "passed": false,
+        "response_sha256": "e2b1f7e50adf2f8dc0cdbef90cfdb3dabce62d6316186ed2bd44391a344fff39"
+      },
+      {
+        "elapsed_ms": 19391.72,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean4_auditor",
+          "lean4_auditor",
+          "lean4_auditor"
+        ],
+        "family": "A",
+        "id": "HOLD-A-11",
+        "passed": false,
+        "response_sha256": "3ca19daf3a21f4f178cbdd9219debb51aeb7bffcb2d1c81b09d38e303750d3f4"
+      },
+      {
+        "elapsed_ms": 15516.1,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-12",
+        "passed": false,
+        "response_sha256": "4d9ed5d986eddb670256be82fd1047affc0b5765844417931a1cd02e2a400572"
+      },
+      {
+        "elapsed_ms": 19399.93,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-13",
+        "passed": false,
+        "response_sha256": "c73f3257210239f0743e3a4f42b2983c0c59b9a378f946cbea87c1d79bf205cf"
+      },
+      {
+        "elapsed_ms": 19866.24,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-14",
+        "passed": false,
+        "response_sha256": "8944eaf9938f48635e22fe410623a474d516115d3f01ac0720aa2b7ea5d4d321"
+      },
+      {
+        "elapsed_ms": 19465.7,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-15",
+        "passed": false,
+        "response_sha256": "9fcab9d222a66fe855817f2898c76975a57ac42ff779d31ca2f32392439fe0a2"
+      },
+      {
+        "elapsed_ms": 19426.69,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean4_auditor"
+        ],
+        "family": "A",
+        "id": "HOLD-A-16",
+        "passed": false,
+        "response_sha256": "cedd9699029df2ec2f78308f48e3e7710933b2c664c331af728d23ea6eda0baa"
+      },
+      {
+        "elapsed_ms": 19659.61,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-17",
+        "passed": false,
+        "response_sha256": "b986b991b689f80abe28075090541c802e4474ce1b5b9d04469387b35d76f6dd"
+      },
+      {
+        "elapsed_ms": 19393.44,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-18",
+        "passed": false,
+        "response_sha256": "ec20ad1f434f9446f4db4374b72791697089b71417ac64f226649d808839e95a"
+      },
+      {
+        "elapsed_ms": 19273.52,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-19",
+        "passed": false,
+        "response_sha256": "aa830c5244d346c4970b55579011001e964eaf998c66441e45e2ec9e30706bcc"
+      },
+      {
+        "elapsed_ms": 19351.15,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-20",
+        "passed": false,
+        "response_sha256": "213fee0d8137640b6586ae713bb260efb26283c371fb562cccd5d78e2a17aebe"
+      },
+      {
+        "elapsed_ms": 19564.19,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean4_auditor"
+        ],
+        "family": "A",
+        "id": "HOLD-A-21",
+        "passed": false,
+        "response_sha256": "02f66a2a4f08f4177c4129c7a76792c249dced2035ca88c22bb318464da78365"
+      },
+      {
+        "elapsed_ms": 19362.47,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean4_auditor"
+        ],
+        "family": "A",
+        "id": "HOLD-A-22",
+        "passed": false,
+        "response_sha256": "effc58bc361cde5af4c53bae21f3bc69042448fb125125d77c147154412f0877"
+      },
+      {
+        "elapsed_ms": 14790.69,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-23",
+        "passed": false,
+        "response_sha256": "74019d97dcbb9de8c916c531c1b00817320c6333cdd0cb7126a3642479bdfbf7"
+      },
+      {
+        "elapsed_ms": 11759.61,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "lean_compile_failed"
+        ],
+        "family": "A",
+        "id": "HOLD-A-24",
+        "passed": false,
+        "response_sha256": "77572b13b04f5bcfc8ef1487e79e8d75b316c081540889d66fb73aa09bdc5e71"
+      },
+      {
+        "elapsed_ms": 15552.52,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-01",
+        "passed": false,
+        "response_sha256": "c600065316e6c56f3cac2cfc1a1755c0c65fbd4d4016777dd660438c66d8f18a"
+      },
+      {
+        "elapsed_ms": 22929.9,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-02",
+        "passed": false,
+        "response_sha256": "79983a01279f9881501f2c156e05ee8d4823780308f3d0f2991d5b7aee088075"
+      },
+      {
+        "elapsed_ms": 23740.33,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-03",
+        "passed": false,
+        "response_sha256": "a2f7ddccf31b8b5ee38619378581787e8db93a05574b1b87447c6c46921a3f99"
+      },
+      {
+        "elapsed_ms": 21918.76,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-04",
+        "passed": false,
+        "response_sha256": "09150464b1c1ae67f2ab0884247aabd482edaf60070b7f85e8023d35ca0a864d"
+      },
+      {
+        "elapsed_ms": 22067.76,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-05",
+        "passed": false,
+        "response_sha256": "89fec4eb6f9f901a6b3088367128c4b1e325d55970590ef072ec9af5e8f4e2da"
+      },
+      {
+        "elapsed_ms": 24524.2,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-06",
+        "passed": false,
+        "response_sha256": "3e61ae3dcb8521c5ae4ecf0096b6574083e32781d15bcc655ef8a4c31ce01eb1"
+      },
+      {
+        "elapsed_ms": 11703.75,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-07",
+        "passed": false,
+        "response_sha256": "efc62a1bda0e16bc05765757806b9670cb0e2d9506aed4604f0202bfb110e1a8"
+      },
+      {
+        "elapsed_ms": 11688.28,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-08",
+        "passed": false,
+        "response_sha256": "420867166d5a2b870ecb35649dcb192cee096a20462b220eb31214abae216b13"
+      },
+      {
+        "elapsed_ms": 11700.94,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-09",
+        "passed": false,
+        "response_sha256": "1e16dea09846fa549b1f47eee5b3149575b26c009bd4f3807f11cb04b9815c03"
+      },
+      {
+        "elapsed_ms": 11797.47,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-10",
+        "passed": false,
+        "response_sha256": "335c3b9882a5292910f785ad96ae4963dafbdf1fbcd17f7ada98c8e97848a375"
+      },
+      {
+        "elapsed_ms": 11807.66,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-11",
+        "passed": false,
+        "response_sha256": "fe277e7412a9cf0bfc8f7939da0a2ec7df7fd8e963e0c1659a8974f1a68f0942"
+      },
+      {
+        "elapsed_ms": 11653.75,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-12",
+        "passed": false,
+        "response_sha256": "4886e728c2910dc120c800465b799209497bd420edf774b513a8dbcbf0090af6"
+      },
+      {
+        "elapsed_ms": 11925.04,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-13",
+        "passed": false,
+        "response_sha256": "a906dca336cc45a85e16128b5ededb2588f547955200d0667c25aaa4278705d3"
+      },
+      {
+        "elapsed_ms": 11941.97,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-14",
+        "passed": false,
+        "response_sha256": "cdb1d243fd0829e65a9414d2ad7ab3aa510683f150706b5f396d24e173cbe193"
+      },
+      {
+        "elapsed_ms": 12166.19,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-15",
+        "passed": false,
+        "response_sha256": "6dc529b8d245401f4848f4b53b9fa4a4644f6f4bf2313ffdf65b4ffe04f170b3"
+      },
+      {
+        "elapsed_ms": 12133.84,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-16",
+        "passed": false,
+        "response_sha256": "a5f90d7ff06395eb43ebfb3c80e537170767ea9b060ed40491fbadd68ff10391"
+      },
+      {
+        "elapsed_ms": 11868.77,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-17",
+        "passed": false,
+        "response_sha256": "e0056cb1342b7f85af908e91486f5d9758c1154722a02eb6fe8e55a2f95cce1d"
+      },
+      {
+        "elapsed_ms": 18160.3,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-18",
+        "passed": false,
+        "response_sha256": "56a28c52de146040c0f0741bdff6b2a5420f8e4c3a874d894490a5ae2cbca274"
+      },
+      {
+        "elapsed_ms": 25040.44,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-19",
+        "passed": false,
+        "response_sha256": "321595b3dcb37f592b9e20bca2c069f8a9cae5d1fb44fa44fe1869bfa88fd3f9"
+      },
+      {
+        "elapsed_ms": 23837.35,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-20",
+        "passed": false,
+        "response_sha256": "81651b82926f6f92a2f861b4aefcbcee394aa22782596f907d3cfd0ba1c188ce"
+      },
+      {
+        "elapsed_ms": 24835.56,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-21",
+        "passed": false,
+        "response_sha256": "a99465106b4de6fe7215d7bc7e757989e11077675885f295557017727945c526"
+      },
+      {
+        "elapsed_ms": 24340.33,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-22",
+        "passed": false,
+        "response_sha256": "1fbe074b37d564c6f4183e4de30ff1d085447b12d4768dcbac19e2c39b65c638"
+      },
+      {
+        "elapsed_ms": 24163.98,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-23",
+        "passed": false,
+        "response_sha256": "cacd80b743debc25547a1b3b04cde95d324f947de26761a99b09d170afac4636"
+      },
+      {
+        "elapsed_ms": 23759.56,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "syntax_error"
+        ],
+        "family": "B",
+        "id": "HOLD-B-24",
+        "passed": false,
+        "response_sha256": "e3eb801312f9123c08e7291a1ec5f4f5c60b3d4c838b1e1a3b8dd683a2f4f0e4"
+      },
+      {
+        "elapsed_ms": 23518.28,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "missing_required_boundary_fact"
+        ],
+        "family": "C",
+        "id": "HOLD-C-01",
+        "passed": false,
+        "response_sha256": "138fed86e6b305808baa0049bf86a1df8ea3833f67c93fbcecbf9d09cc3e1890"
+      },
+      {
+        "elapsed_ms": 23583.19,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "missing_required_boundary_fact"
+        ],
+        "family": "C",
+        "id": "HOLD-C-02",
+        "passed": false,
+        "response_sha256": "5b9bb9064def924cd9b7d06f56a4273cf71d0e1076d403c325456e10e12d52aa"
+      },
+      {
+        "elapsed_ms": 23543.16,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "missing_required_boundary_fact"
+        ],
+        "family": "C",
+        "id": "HOLD-C-03",
+        "passed": false,
+        "response_sha256": "dbfe31df5d34649b298286c17b9693b3d50556ac710c5d6a180a1ce080f21d1a"
+      },
+      {
+        "elapsed_ms": 23986.77,
+        "error_categories": [
+          "missing_trust_words"
+        ],
+        "family": "C",
+        "id": "HOLD-C-04",
+        "passed": false,
+        "response_sha256": "8dc68eb3313364ee8f054136616b4354c84eb1c7b3589115da44ef642d847ad1"
+      },
+      {
+        "elapsed_ms": 24036.74,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "missing_expected_tier_label",
+          "inflated_claim_statement"
+        ],
+        "family": "C",
+        "id": "HOLD-C-05",
+        "passed": false,
+        "response_sha256": "3fc66a54e235dc03319fed75ee55276d516e64d0e34a83d58ffa35ea940a9d54"
+      },
+      {
+        "elapsed_ms": 23834.54,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "missing_expected_tier_label"
+        ],
+        "family": "C",
+        "id": "HOLD-C-06",
+        "passed": false,
+        "response_sha256": "5adb7f0c3c27702ad7cbca11aac44bf713b2c1302292cb9f648269ac44bb9a0f"
+      },
+      {
+        "elapsed_ms": 22892.23,
+        "error_categories": [
+          "missing_trust_words",
+          "missing_required_boundary_fact"
+        ],
+        "family": "C",
+        "id": "HOLD-C-07",
+        "passed": false,
+        "response_sha256": "015fa3cce09316d82cc984552e7f8e7bd0b3913959c69f54e9daab8bf1d2e0f5"
+      },
+      {
+        "elapsed_ms": 22032.61,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section"
+        ],
+        "family": "C",
+        "id": "HOLD-C-08",
+        "passed": false,
+        "response_sha256": "ab1ea23e7f7f3e1eaad61ce7385ff9765ca03efd2779feb95566c4da97496336"
+      },
+      {
+        "elapsed_ms": 21985.13,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "missing_verdict_json_block"
+        ],
+        "family": "C",
+        "id": "HOLD-C-09",
+        "passed": false,
+        "response_sha256": "737990398da634216e557d757be5da560afd486c24be0c78f96d224a4dac33b3"
+      },
+      {
+        "elapsed_ms": 22061.46,
+        "error_categories": [
+          "missing_or_empty_section"
+        ],
+        "family": "C",
+        "id": "HOLD-C-10",
+        "passed": false,
+        "response_sha256": "be1c990925c4f351b6032d9109f1ed9590806084ccc5771b1ce2ea63a1b0f137"
+      },
+      {
+        "elapsed_ms": 22108.28,
+        "error_categories": [
+          "missing_or_empty_section",
+          "wrong_declared_tier",
+          "inflated_forbidden_tier",
+          "wrong_verdict_value"
+        ],
+        "family": "C",
+        "id": "HOLD-C-11",
+        "passed": false,
+        "response_sha256": "b7fbf1149d8dff89b410f42dc8c9d866f969ea416db8245476c96e5e3078816b"
+      },
+      {
+        "elapsed_ms": 22357.1,
+        "error_categories": [
+          "missing_or_empty_section",
+          "wrong_verdict_value"
+        ],
+        "family": "C",
+        "id": "HOLD-C-12",
+        "passed": false,
+        "response_sha256": "61a34c8dad4bab1366713d75c3449db43eac7efe7e24300df50bdc9bf65d4253"
+      },
+      {
+        "elapsed_ms": 18843.14,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "wrong_declared_tier",
+          "inflated_forbidden_tier",
+          "missing_verdict_json_block"
+        ],
+        "family": "C",
+        "id": "HOLD-C-13",
+        "passed": false,
+        "response_sha256": "f9160ca773c0898762772e470c870011ff6a8258edee4d8eea9c3939903d7eda"
+      },
+      {
+        "elapsed_ms": 13472.59,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "wrong_declared_tier",
+          "missing_verdict_json_block"
+        ],
+        "family": "C",
+        "id": "HOLD-C-14",
+        "passed": false,
+        "response_sha256": "d6aaab812c96946f7312267a17fb5552e80c796659c8eb9ad84f3b646d60eae8"
+      },
+      {
+        "elapsed_ms": 24724.12,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "missing_verdict_json_block"
+        ],
+        "family": "C",
+        "id": "HOLD-C-15",
+        "passed": false,
+        "response_sha256": "668ed044881944b56a3533e7c8443ed0d3968c803d1970e658b74e2120220ddc"
+      },
+      {
+        "elapsed_ms": 25349.33,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "wrong_declared_tier",
+          "missing_verdict_json_block"
+        ],
+        "family": "C",
+        "id": "HOLD-C-16",
+        "passed": false,
+        "response_sha256": "686774d9f11311549a618a82996d3584d9d60bd09875d52510b5e82417d3030f"
+      },
+      {
+        "elapsed_ms": 24615.87,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "missing_expected_tier_label",
+          "missing_f0_ledger_json_block"
+        ],
+        "family": "C",
+        "id": "HOLD-C-17",
+        "passed": false,
+        "response_sha256": "ce61450ad587abeabbb387a60028527c319607ac2c15efd175ec0541e8748cb1"
+      },
+      {
+        "elapsed_ms": 24460.54,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "missing_expected_tier_label",
+          "missing_f0_ledger_json_block"
+        ],
+        "family": "C",
+        "id": "HOLD-C-18",
+        "passed": false,
+        "response_sha256": "a0dbc31103630109d187be3aaa633b174ed4841138e798a67c894a2bdbcd5900"
+      },
+      {
+        "elapsed_ms": 24556.01,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "missing_f0_ledger_json_block"
+        ],
+        "family": "C",
+        "id": "HOLD-C-19",
+        "passed": false,
+        "response_sha256": "3b472e5a869f3058b04722d4dcbc0b939db33f93d132f19e3117fbdaf7d70cf9"
+      },
+      {
+        "elapsed_ms": 24098.03,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "missing_expected_tier_label",
+          "missing_f0_ledger_json_block"
+        ],
+        "family": "C",
+        "id": "HOLD-C-20",
+        "passed": false,
+        "response_sha256": "e5b2751cb91e0b6ca40a0d7ff6d620dda57613b36b80099ea596edcfb2ab4869"
+      },
+      {
+        "elapsed_ms": 24178.73,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "missing_expected_tier_label",
+          "missing_f0_ledger_json_block"
+        ],
+        "family": "C",
+        "id": "HOLD-C-21",
+        "passed": false,
+        "response_sha256": "c2b40fda3e0ae2a16c2aacbe9974e1eb13f2bc0dcb029594083a8c8ef7858175"
+      },
+      {
+        "elapsed_ms": 24292.56,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "missing_expected_tier_label",
+          "missing_f0_ledger_json_block"
+        ],
+        "family": "C",
+        "id": "HOLD-C-22",
+        "passed": false,
+        "response_sha256": "51d8aa3651d00fe498a151a24bd37e484d5026b4104b335c958cb0ae565f1942"
+      },
+      {
+        "elapsed_ms": 24727.15,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_or_empty_section",
+          "missing_expected_tier_label",
+          "missing_f0_ledger_json_block"
+        ],
+        "family": "C",
+        "id": "HOLD-C-23",
+        "passed": false,
+        "response_sha256": "6625a3bbe5740df0032509275b39efa2532a3a2468098f57762df38452a886b5"
+      },
+      {
+        "elapsed_ms": 24553.54,
+        "error_categories": [
+          "missing_or_empty_section",
+          "missing_expected_tier_label",
+          "f0_gate",
+          "f0_gate",
+          "f0_gate"
+        ],
+        "family": "C",
+        "id": "HOLD-C-24",
+        "passed": false,
+        "response_sha256": "ec2cf52190aab2ac2a50ef0461bbe1b62ec79d5f6da1c045f64593ecc3c998e0"
+      },
+      {
+        "elapsed_ms": 16913.78,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha"
+        ],
+        "family": "D",
+        "id": "HOLD-D-01",
+        "passed": false,
+        "response_sha256": "40a2e219c0185353ef468120be202372296338fb3d3e59cc87c10864ed66e562"
+      },
+      {
+        "elapsed_ms": 13111.06,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "mde_guard"
+        ],
+        "family": "D",
+        "id": "HOLD-D-02",
+        "passed": false,
+        "response_sha256": "31023aee40d5842d0cf783d369ba28fd30ccb7aecd0332128c95e66c36a460e0"
+      },
+      {
+        "elapsed_ms": 17094.26,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "lean_compile_failed"
+        ],
+        "family": "D",
+        "id": "HOLD-D-03",
+        "passed": false,
+        "response_sha256": "8fa960438e6c9d688602a797a76bbca1744df3882bf3be36e31a39f9b37f0898"
+      },
+      {
+        "elapsed_ms": 14559.41,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "lean_compile_failed"
+        ],
+        "family": "D",
+        "id": "HOLD-D-04",
+        "passed": false,
+        "response_sha256": "134c38b310118deaf609c9561345ef59f3de2690886565a6729255bb79ea986f"
+      },
+      {
+        "elapsed_ms": 18791.83,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "lean_compile_failed"
+        ],
+        "family": "D",
+        "id": "HOLD-D-05",
+        "passed": false,
+        "response_sha256": "bf1a3688671e6bb7018de96868dd1a2352cebb237dd22eb94f19381c1dec6c5b"
+      },
+      {
+        "elapsed_ms": 16908.66,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha"
+        ],
+        "family": "D",
+        "id": "HOLD-D-06",
+        "passed": false,
+        "response_sha256": "7ef6c96b8ac90c63a9f94cd30d210c087a93296675cb83ee51bae5f20d9be92d"
+      },
+      {
+        "elapsed_ms": 15977.56,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "lean_compile_failed"
+        ],
+        "family": "D",
+        "id": "HOLD-D-07",
+        "passed": false,
+        "response_sha256": "8f4e9019e5a63a7dd5d7a0f965dde2b00e8d8143641356fb2ac301cb181da186"
+      },
+      {
+        "elapsed_ms": 14413.24,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "lean_compile_failed"
+        ],
+        "family": "D",
+        "id": "HOLD-D-08",
+        "passed": false,
+        "response_sha256": "dc7211e8a09144fac189d29a7233fbd6ddcd7585efece1c414ff52294b8e826d"
+      },
+      {
+        "elapsed_ms": 16885.39,
+        "error_categories": [
+          "lean4_auditor",
+          "missing_trust_words"
+        ],
+        "family": "D",
+        "id": "HOLD-D-09",
+        "passed": false,
+        "response_sha256": "f16c0e6772f2448ffabad14fb60f95cc6d2d986431c399d586cee8d265e81f4d"
+      },
+      {
+        "elapsed_ms": 17430.4,
+        "error_categories": [
+          "missing_fenced_lean_block"
+        ],
+        "family": "D",
+        "id": "HOLD-D-10",
+        "passed": false,
+        "response_sha256": "e9da19f80337356954a58191fe89214366c1f73b63a53312f8fc620c655d68f9"
+      },
+      {
+        "elapsed_ms": 18059.8,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "lean_compile_failed"
+        ],
+        "family": "D",
+        "id": "HOLD-D-11",
+        "passed": false,
+        "response_sha256": "fa4c910cff5790688e1569136f366e557696f2f53c4bfa7dd36fc96d61f3af25"
+      },
+      {
+        "elapsed_ms": 17035.33,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "lean_compile_failed"
+        ],
+        "family": "D",
+        "id": "HOLD-D-12",
+        "passed": false,
+        "response_sha256": "046f8fcb98e450217c2fd7b5725cf3070e87bcdf160fd36cd5a3327ffe136c20"
+      },
+      {
+        "elapsed_ms": 20366.3,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "lean_compile_failed"
+        ],
+        "family": "D",
+        "id": "HOLD-D-13",
+        "passed": false,
+        "response_sha256": "2f1b010d3ef9e83a8617e9c5e9321fd0f90eb2141ce5233ed05331b1c0df9c6b"
+      },
+      {
+        "elapsed_ms": 18347.6,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "lean4_auditor"
+        ],
+        "family": "D",
+        "id": "HOLD-D-14",
+        "passed": false,
+        "response_sha256": "7ecafd83c06545a92f36a08dc5847dde542a7dca0a6f661be4c5e3fe7c4fd23a"
+      },
+      {
+        "elapsed_ms": 16470.69,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "lean_compile_failed"
+        ],
+        "family": "D",
+        "id": "HOLD-D-15",
+        "passed": false,
+        "response_sha256": "2a05a5b7597d48e970dd049d67a601f7dfc498f5dc3af76924f2a8355fbf8753"
+      },
+      {
+        "elapsed_ms": 14089.68,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha"
+        ],
+        "family": "D",
+        "id": "HOLD-D-16",
+        "passed": false,
+        "response_sha256": "b9ecc54ade54017c4f6b019a6576dd2cb8742c2d94643d38731c2f8a002ab258"
+      },
+      {
+        "elapsed_ms": 18166.77,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "lean_compile_failed",
+          "mde_guard"
+        ],
+        "family": "D",
+        "id": "HOLD-D-17",
+        "passed": false,
+        "response_sha256": "2e384a2cf5b76cf52d2a324b546a6ead79634abe7ce0dabd092f30777a2be6fd"
+      },
+      {
+        "elapsed_ms": 16578.05,
+        "error_categories": [
+          "missing_data_eido_skip_container",
+          "corrupted_or_truncated_40char_sha",
+          "lean_compile_failed",
+          "mde_guard"
+        ],
+        "family": "D",
+        "id": "HOLD-D-18",
+        "passed": false,
+        "response_sha256": "31f8a52c2831eb03bdbe006ef89937410efd66cdbf3080fd4301c7bce34a9061"
+      },
+      {
+        "elapsed_ms": 19051.25,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "lean_compile_failed"
+        ],
+        "family": "D",
+        "id": "HOLD-D-19",
+        "passed": false,
+        "response_sha256": "e6a1547dd8deb3fd15fb6fd59d0d8a6ec7414fb3cccc82f3a5687e10af2a2097"
+      },
+      {
+        "elapsed_ms": 17231.91,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "lean_compile_failed"
+        ],
+        "family": "D",
+        "id": "HOLD-D-20",
+        "passed": false,
+        "response_sha256": "90d7da15dbfc17679fc9cb19e26f1ab00aee03bf8fc8621aaf31e2081cfac791"
+      },
+      {
+        "elapsed_ms": 23721.07,
+        "error_categories": [
+          "lean_compile_failed"
+        ],
+        "family": "D",
+        "id": "HOLD-D-21",
+        "passed": false,
+        "response_sha256": "a08355f584c05b08ceb51384c9999e6c23a3bd355022993d0471a5a90ee916f4"
+      },
+      {
+        "elapsed_ms": 19758.79,
+        "error_categories": [
+          "lean_compile_failed"
+        ],
+        "family": "D",
+        "id": "HOLD-D-22",
+        "passed": false,
+        "response_sha256": "363f0d8266d3fb7b0ddd40f7acabfda8d12be04a4d98ba32700f14a5780208f2"
+      },
+      {
+        "elapsed_ms": 19493.25,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "lean_compile_failed"
+        ],
+        "family": "D",
+        "id": "HOLD-D-23",
+        "passed": false,
+        "response_sha256": "7580b5a51355c7b88d6e5e6278ab609c0a960b2318e2e33a6e772bc81f58afe3"
+      },
+      {
+        "elapsed_ms": 18645.43,
+        "error_categories": [
+          "corrupted_or_truncated_40char_sha",
+          "lean_compile_failed",
+          "mde_guard"
+        ],
+        "family": "D",
+        "id": "HOLD-D-24",
+        "passed": false,
+        "response_sha256": "292cfc8c671421a957bfc808e55cc0ed09ebfd8b69c9fe853837d0ed9e734e8b"
+      }
+    ],
+    "mean_elapsed_ms": 19238.9,
+    "pass_rate": 0.0,
+    "sop_injected_tokens": 32216,
+    "split": "private_holdout_96",
+    "surface_hygiene_rates": {
+      "has_data_eido_skip": 0.2708,
+      "has_what_is_not_proved": 0.4167,
+      "has_what_you_must_trust": 0.3333,
+      "uses_fraction_or_exact_int": 0.3646,
+      "zero_em_dash": 1.0,
+      "zero_float_call": 0.9896,
+      "zero_sorry_admit_native_decide": 0.7396
+    },
+    "top_error_categories": {
+      "corrupted_or_truncated_40char_sha": 20,
+      "f0_gate": 3,
+      "inflated_forbidden_tier": 2,
+      "lean4_auditor": 10,
+      "lean_compile_failed": 35,
+      "mde_guard": 4,
+      "missing_expected_tier_label": 9,
+      "missing_f0_ledger_json_block": 7,
+      "missing_or_empty_section": 136,
+      "missing_required_boundary_fact": 4,
+      "missing_trust_words": 3,
+      "missing_verdict_json_block": 5,
+      "syntax_error": 24,
+      "wrong_declared_tier": 4,
+      "wrong_verdict_value": 2
+    },
+    "total_count": 96,
+    "total_passed": 0
+  },
+  "schema": "verifier-vault-arm-receipt/v0.1"
+}

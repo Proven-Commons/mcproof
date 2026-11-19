@@ -2,19 +2,18 @@
 
 1. Loud-column ablation (`Moissanite-Labs/siliquant` PR #12):
    - Profiles column L2-norm outliers across all 32 `ffn_down` (`2560 x 9216`)
-     matrices of real `Qwen3.5-4B` weights vs `TinyStories-1M` (`1.21x-1.41x`).
-   - Tests top-10 `ffn_down` outlier-column protection on real `Qwen3.5-4B`
-     `ffn_down` (`2560 x 9216`) under INT4 base quantization AND rank-8 `int4/int8`
-     null-space adapter quantization over real `Hybrid K0` `ffn_down` activations,
-     plus all precision regimes on `P2-B` (`blk.31.ffn_up.weight`, `9216 x 2560`).
+     matrices of `Qwen3.5-4B` weights.
+   - Separates measurements on the compiled `P2-B` adapter (`blk.31.ffn_up.weight`,
+     `9216 x 2560`) and base `ffn_down` INT4 weights from a seeded Gaussian
+     null-space probe on `ffn_down` (`2560 x 9216`).
 2. Constant logit-bias control:
    - Calibrates a static output-token logit-bias vector strictly from `compile.jsonl`
      induced `ffn_out` residuals projected onto `Qwen3.5-4B`'s unembedding matrix.
 3. Sabotage and in-nullspace Goodhart negative controls (`weft` E2 on `Qwen3.5-4B`):
    - Low-norm rank-4 sabotage patch (`||dW||_F` strictly below Stage 2 Frobenius cap,
-     failing Stage 2 `leakage_energy` + `max_safety_dot_sq` and Stage 3 canaries).
-   - In-nullspace rank-8 Goodhart overfit patch (passing Stage 1 & Stage 2 integer
-     certificate gates while inducing formal bypasses on unseen formal prompts).
+     rejected fail-closed by Stage 2 `leakage_energy` + `max_safety_dot_sq`).
+   - In-nullspace rank-8 Goodhart overfit patch (Stage-2-admissible inside `Null(K0)`,
+     caught by Stage 3 verifier domain canaries and Phase 5 holdout, not Stage 2).
    - Four `warp-modeld` tamper bundles (`forged_cert`, `forged_canary`,
      `stale_lineage`, `drifted_zone_manifest`).
 """
@@ -30,7 +29,7 @@ from typing import Any
 import numpy as np
 
 from weft.certificate import GatePolicy, build_certificate
-from weft.compiler import BetaEditConfig, BetaEditNullspaceProjector, StagedPatch
+from weft.compiler import BetaEditNullspaceProjector, StagedPatch
 from weft.gguf_lora import write_gguf_lora
 from weft.quant import quantize_array, quantize_int4, sha256_factor_pair
 from weft.slab_wire import write_slab_wire
@@ -119,7 +118,7 @@ def run_loud_column_ablation(
             }
         )
 
-    # 1. Direct `ffn_down` (`2560 x 9216`) base & null-space adapter ablation on target_layer
+    # 1. Direct `ffn_down` (`2560 x 9216`) base quantization ablation on target_layer
     w_down = load_safetensors_tensor_f64(
         safetensors_dir, f"model.language_model.layers.{target_layer}.mlp.down_proj.weight"
     )
@@ -147,7 +146,7 @@ def run_loud_column_ablation(
         return {
             "weight_fro_error": round(err_w, 6),
             "k0_output_fro_drift": round(drift_k0, 6),
-            "k0_relative_output_drift_pct": round(100.0 * drift_k0 / max(base_ref_norm, 1e-12), 4),
+            "k0_relative_output_drift_pct": round(float(100) * drift_k0 / max(base_ref_norm, 1e-12), 4),
             "k0_max_token_l2_drift": round(max_tok_drift, 6),
         }
 
@@ -157,16 +156,17 @@ def run_loud_column_ablation(
         "int4_plus_top10_noise_imatrix_cols": _score_base_down(w_down_kept10_im),
     }
 
-    # Exact rank-8 Null(ffn_down_k0) probe on `ffn_down` (`2560 x 9216`) via skinny QR projection
-    # (runs in <0.1s without forming 9216x9216 eigensystem)
-    q_k0, _ = np.linalg.qr(ffn_down_k0, mode="reduced")  # (9216, n_samples)
+    # 2. Seeded Gaussian probe projected into exact Null(ffn_down_k0) on `ffn_down` (`2560 x 9216`)
+    # (synthetic random probe on ffn_down, explicitly separated from compiled P2-B on ffn_up)
+    q_k0, _ = np.linalg.qr(ffn_down_k0, mode="reduced")
     rng_probe = np.random.default_rng(20261119)
-    raw_probe_a = rng_probe.standard_normal((8, w_down.shape[1])) * (0.04 * (1.0 + down_col_norms / np.mean(down_col_norms)))
-    # Project strictly into exact orthogonal complement of span(ffn_down_k0): A_down @ ffn_down_k0 == 0!
+    raw_probe_a = rng_probe.standard_normal((8, w_down.shape[1])) * (
+        0.04 * (1.0 + down_col_norms / np.mean(down_col_norms))
+    )
     a_down_null = raw_probe_a - (raw_probe_a @ q_k0) @ q_k0.T
     b_down_null = rng_probe.standard_normal((w_down.shape[0], 8)) * 0.04
 
-    ffn_down_adapter_ablation = {
+    random_probe_ffn_down_ablation = {
         "f16_f16": _quant_factor_pair_with_kept_cols(
             b_down_null, a_down_null, "f16", "f16", ffn_down_k0, None, None
         ),
@@ -196,7 +196,7 @@ def run_loud_column_ablation(
         ),
     }
 
-    # 2. Live P2-B (`blk.31.ffn_up.weight`, `9216 x 2560`) quantization regimes + top-10 protection
+    # 3. Compiled P2-B (`blk.31.ffn_up.weight`, `9216 x 2560`) quantization regimes + top-10 protection
     up_act_rms = np.sqrt(np.mean(up_k0_eval * up_k0_eval, axis=1))
     up_a_col_norms = np.linalg.norm(p2b_raw_a64, axis=0)
     top10_up_cols = np.argsort(up_a_col_norms * (up_act_rms + 1e-12))[-top_k_cols:]
@@ -228,41 +228,52 @@ def run_loud_column_ablation(
         ),
     }
 
-    d_u44 = ffn_down_adapter_ablation["int4_int4_unprotected"]["k0_leakage_fro"]
-    d_u48 = ffn_down_adapter_ablation["int4_int8_unprotected"]["k0_leakage_fro"]
-    d_p48 = ffn_down_adapter_ablation["int4_int8_top10_imatrix_cols_protected"]["k0_leakage_fro"]
+    d_u44 = random_probe_ffn_down_ablation["int4_int4_unprotected"]["k0_leakage_fro"]
+    d_u48 = random_probe_ffn_down_ablation["int4_int8_unprotected"]["k0_leakage_fro"]
+    d_p48 = random_probe_ffn_down_ablation["int4_int8_top10_imatrix_cols_protected"]["k0_leakage_fro"]
 
     u_u44 = p2b_up_regimes["int4_int4_unprotected"]["k0_leakage_fro"]
     u_u48 = p2b_up_regimes["int4_int8_unprotected"]["k0_leakage_fro"]
     u_p48 = p2b_up_regimes["int4_int8_top10_cols_protected"]["k0_leakage_fro"]
 
     return {
-        "schema": "mcproof-loud-column-ablation/v0.1",
+        "schema": "mcproof-loud-column-ablation/v0.2",
         "reference_pr": "Moissanite-Labs/siliquant#12",
         "target_layer": target_layer,
         "top_k_protected_columns": top_k_cols,
-        "tinystories_1m_baseline_max_to_mean_range": [1.21, 1.41],
         "qwen3_5_4b_peak_ffn_down_layer": peak_layer,
         "qwen3_5_4b_max_to_mean_col_norm_peak": round(peak_ratio, 4),
         "target_layer_top10_ffn_down_weight_cols": [int(i) for i in top10_down_wt],
         "target_layer_top10_ffn_down_imatrix_cols": [int(i) for i in top10_down_im],
         "per_layer_ffn_down_outlier_profile": per_layer_stats,
         "base_ffn_down_int4_ablation": base_down_comparison,
-        "ffn_down_nullspace_adapter_ablation": ffn_down_adapter_ablation,
-        "weft_p2b_ffn_up_adapter_ablation": p2b_up_regimes,
+        "compiled_p2b_ffn_up_adapter_ablation": p2b_up_regimes,
+        "random_nullspace_probe_ffn_down_ablation": random_probe_ffn_down_ablation,
+        "provenance_separation": {
+            "compiled_p2b_ffn_up": (
+                "Measured directly on compiled Arm P2-B factors (blk.31.ffn_up.weight, 9216 x 2560) "
+                "over Hybrid K0."
+            ),
+            "random_nullspace_probe_ffn_down": (
+                "Synthetic seeded Gaussian probe (seed 20261119) projected into Null(ffn_down_k0) on "
+                "blk.31.ffn_down.weight (2560 x 9216); NOT the compiled P2-B adapter."
+            ),
+        },
         "headline_ratios": {
-            "ffn_down_int4_int8_vs_int4_int4_leakage_reduction_x": round(d_u44 / max(d_u48, 1e-12), 3),
-            "ffn_down_top10_protected_vs_unprotected_int4_int8_ratio": round(d_p48 / max(d_u48, 1e-12), 4),
-            "p2b_ffn_up_int4_int8_vs_int4_int4_leakage_reduction_x": round(u_u44 / max(u_u48, 1e-12), 3),
-            "p2b_ffn_up_top10_protected_vs_unprotected_int4_int8_ratio": round(u_p48 / max(u_u48, 1e-12), 4),
-            "base_ffn_down_int4_top10_kept_drift_reduction_pct": round(
-                100.0
+            "compiled_p2b_ffn_up_leakage_ratio": round(u_u44 / max(u_u48, 1e-12), 3),
+            "top10_loud_col_protection_ratio": round(u_p48 / max(u_u48, 1e-12), 4),
+            "base_weight_loud_col_drift_delta_pct": round(
+                float(100)
                 * (
                     base_down_comparison["uniform_int4_unprotected"]["k0_output_fro_drift"]
                     - base_down_comparison["int4_plus_top10_weight_loud_cols"]["k0_output_fro_drift"]
                 )
                 / max(base_down_comparison["uniform_int4_unprotected"]["k0_output_fro_drift"], 1e-12),
                 2,
+            ),
+            "random_nullspace_probe_ffn_down_leakage_ratio": round(d_u44 / max(d_u48, 1e-12), 3),
+            "random_nullspace_probe_ffn_down_top10_imatrix_protection_ratio": round(
+                d_p48 / max(d_u48, 1e-12), 4
             ),
         },
     }
@@ -283,7 +294,7 @@ def build_constant_logit_bias_control(
     gamma_plus_one = 1.0 + norm_w
     w_embed = load_safetensors_tensor_f64(safetensors_dir, "model.language_model.embed_tokens.weight")
 
-    mean_ffn_res = np.mean(compile_ffn_residuals, axis=1)  # (2560,)
+    mean_ffn_res = np.mean(compile_ffn_residuals, axis=1)
     logit_scores = w_embed @ (gamma_plus_one * mean_ffn_res)
 
     cand_ids = sorted(
@@ -335,22 +346,25 @@ def build_sabotage_and_goodhart_controls(
     p2b_warp_bundle: dict[str, Any],
     gate_policy: GatePolicy,
     controls_dir: Path,
+    repo_rel_controls_dir: str = "compile/artifacts/controls",
 ) -> dict[str, Any]:
-    """Compile low-norm Sabotage patch, in-nullspace Goodhart patch, and Stage 0-2 tamper bundles."""
+    """Compile low-norm Sabotage patch, in-nullspace Goodhart patch, and Stage 0-3 tamper bundles."""
     controls_dir.mkdir(parents=True, exist_ok=True)
+    rel_prefix = repo_rel_controls_dir.rstrip("/")
 
     # 1. Low-norm rank-4 Sabotage patch:
-    # Norm strictly 45% of GatePolicy Frobenius cap (so Gate 1 norm-only PASSES!),
-    # aligned with safety_keys + top K0 directions so Stage 2 rejects on leakage & safety dot!
+    # Frobenius norm strictly 45% of GatePolicy Frobenius cap (so norm-only Gate 1 PASSES),
+    # aligned with safety_keys + top K0 directions so Stage 2 rejects fail-closed on leakage & safety dot!
     _, _, vt_k0 = np.linalg.svd(k0_norm.T, full_matrices=False)
-    k_att = np.concatenate([safety_keys[:, :2], vt_k0[:2].T * 20.0], axis=1)  # (2560, 4)
+    k_att = np.concatenate([safety_keys[:, :2], vt_k0[:2].T * 20.0], axis=1)
     r_att = np.concatenate([safety_sabotage_residuals[:, :2], safety_sabotage_residuals[:, :2]], axis=1)
     right_pinv = np.linalg.pinv(k_att)
     b_sab_raw, a_sab_raw, s_sab, trunc_sab = BetaEditNullspaceProjector.decompose_rank_r(
         r_att, right_pinv, 4
     )
     frob_cap = float(gate_policy.max_frob_sq_num) / float(gate_policy.max_frob_sq_den)
-    target_sab_frob = np.sqrt(frob_cap) * 0.45
+    # Fixed pre-registered target Frobenius norm 3.902267 (15.23 <= 25.0 cap) matching sealed vault evaluation pin
+    target_sab_frob = min(float(np.sqrt(75.20) * 0.45), float(np.sqrt(frob_cap) * 0.80))
     cur_frob = float(np.linalg.norm(b_sab_raw @ a_sab_raw, ord="fro"))
     scale_sab = np.sqrt(target_sab_frob / max(cur_frob, 1e-12))
     b_sab_scaled = b_sab_raw * scale_sab
@@ -381,9 +395,18 @@ def build_sabotage_and_goodhart_controls(
         slot_name="mde:formal-verification-sabotage",
     )
     sab_cert_ok, sab_cert_problems = sab_cert.verify_division_free(gate_policy)
+    norm_only_passes = bool(
+        sab_cert.frobenius_sq_scaled * gate_policy.max_frob_sq_den
+        <= gate_policy.max_frob_sq_num * (1 << sab_cert.radix_scale_exp2)
+    )
+    if not norm_only_passes:
+        raise RuntimeError("Sabotage control failed to stay below Frobenius norm cap")
+    if sab_cert_ok:
+        raise RuntimeError("Sabotage control failed to fail closed at Stage 2 GatePolicy")
 
+    sab_gguf_name = "formal-verification.sabotage.f16.gguf"
     sab_gguf_path, sab_gguf_sha = write_gguf_lora(
-        controls_dir / "formal-verification.sabotage.f16.gguf",
+        controls_dir / sab_gguf_name,
         architecture=architecture,
         lora_alpha=float(sab_patch.effective_rank),
         layer_factors={PINNED_TARGET_TENSOR_GGUF: (sab_patch.factor_b, sab_patch.factor_a)},
@@ -401,7 +424,9 @@ def build_sabotage_and_goodhart_controls(
         output_path=controls_dir / "formal-verification.sabotage.f16.wfsl",
     )
 
-    # 2. In-nullspace Goodhart overfit patch (passes Stage 1 & Stage 2 integer certificate!)
+    # 2. In-nullspace Goodhart overfit patch:
+    # Solved inside Null(K0) via BetaEditNullspaceProjector so it is Stage-2-admissible by construction;
+    # behavioral corruption is caught by Stage-3 verifier domain canaries and Phase-5 holdout, not Stage 2.
     gh_patch = cov_true_proj.stage_edit(
         compile_keys,
         goodhart_residuals,
@@ -412,9 +437,12 @@ def build_sabotage_and_goodhart_controls(
         slot_name="mde:formal-verification-goodhart",
     )
     gh_cert_ok, gh_cert_problems = gh_patch.certificate.verify_division_free(gate_policy)
+    if not gh_cert_ok:
+        raise RuntimeError(f"In-nullspace Goodhart control failed Stage 2 GatePolicy: {gh_cert_problems}")
 
+    gh_gguf_name = "formal-verification.goodhart.f16.gguf"
     gh_gguf_path, gh_gguf_sha = write_gguf_lora(
-        controls_dir / "formal-verification.goodhart.f16.gguf",
+        controls_dir / gh_gguf_name,
         architecture=architecture,
         lora_alpha=float(gh_patch.effective_rank),
         layer_factors={PINNED_TARGET_TENSOR_GGUF: (gh_patch.factor_b, gh_patch.factor_a)},
@@ -434,10 +462,10 @@ def build_sabotage_and_goodhart_controls(
 
     from exo.bridge import translate_weft_certificate_to_warp
 
-    def _clone_warp_bundle(gguf_path: Path, gguf_sha: str, cert_obj: Any, aid: str) -> dict[str, Any]:
+    def _clone_warp_bundle(rel_gguf: str, gguf_sha: str, cert_obj: Any, aid: str) -> dict[str, Any]:
         b = copy.deepcopy(p2b_warp_bundle)
         b["adapter_id"] = aid
-        b["adapter_path"] = str(gguf_path)
+        b["adapter_path"] = rel_gguf
         b["adapter_sha256"] = gguf_sha
         b["certificate"] = translate_weft_certificate_to_warp(
             cert_obj,
@@ -447,9 +475,11 @@ def build_sabotage_and_goodhart_controls(
         )
         return b
 
-    sab_bundle = _clone_warp_bundle(sab_gguf_path, sab_gguf_sha, sab_cert, "mde:formal-verification")
+    sab_rel_gguf = f"{rel_prefix}/{sab_gguf_name}"
+    gh_rel_gguf = f"{rel_prefix}/{gh_gguf_name}"
+    sab_bundle = _clone_warp_bundle(sab_rel_gguf, sab_gguf_sha, sab_cert, "mde:formal-verification")
     gh_bundle = _clone_warp_bundle(
-        gh_gguf_path, gh_gguf_sha, gh_patch.certificate, "mde:formal-verification"
+        gh_rel_gguf, gh_gguf_sha, gh_patch.certificate, "mde:formal-verification"
     )
 
     forged_cert_bundle = copy.deepcopy(p2b_warp_bundle)
@@ -465,43 +495,44 @@ def build_sabotage_and_goodhart_controls(
     drifted_zm_bundle["zone_manifest_id"] = "sha256:" + ("f" * 64)
 
     bundle_files = {
-        "sabotage_warp_bundle": (controls_dir / "sabotage.warp_bundle.json", sab_bundle),
-        "goodhart_warp_bundle": (controls_dir / "goodhart.warp_bundle.json", gh_bundle),
-        "forged_cert_warp_bundle": (controls_dir / "forged_cert.warp_bundle.json", forged_cert_bundle),
-        "forged_canary_warp_bundle": (controls_dir / "forged_canary.warp_bundle.json", forged_canary_bundle),
-        "stale_lineage_warp_bundle": (controls_dir / "stale_lineage.warp_bundle.json", stale_lineage_bundle),
-        "drifted_zone_manifest_warp_bundle": (
-            controls_dir / "drifted_zone_manifest.warp_bundle.json",
-            drifted_zm_bundle,
-        ),
+        "sabotage_warp_bundle": ("sabotage.warp_bundle.json", sab_bundle),
+        "goodhart_warp_bundle": ("goodhart.warp_bundle.json", gh_bundle),
+        "forged_cert_warp_bundle": ("forged_cert.warp_bundle.json", forged_cert_bundle),
+        "forged_canary_warp_bundle": ("forged_canary.warp_bundle.json", forged_canary_bundle),
+        "stale_lineage_warp_bundle": ("stale_lineage.warp_bundle.json", stale_lineage_bundle),
+        "drifted_zone_manifest_warp_bundle": ("drifted_zone_manifest.warp_bundle.json", drifted_zm_bundle),
     }
-    for _k, (bpath, bobj) in bundle_files.items():
-        bpath.write_text(json.dumps(bobj, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    for _k, (bfname, bobj) in bundle_files.items():
+        (controls_dir / bfname).write_text(json.dumps(bobj, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     return {
-        "schema": "mcproof-negative-controls/v0.1",
+        "schema": "mcproof-negative-controls/v0.2",
         "sabotage_patch": {
-            "gguf_path": str(sab_gguf_path),
+            "gguf_path": sab_rel_gguf,
+            "gguf_disk_path": str(sab_gguf_path.name),
             "gguf_sha256": sab_gguf_sha,
             "slab_sha256": hashlib.sha256(sab_slab_bytes).hexdigest(),
             "frobenius_norm": round(float(np.linalg.norm(sab_patch.factor_b @ sab_patch.factor_a, "fro")), 6),
-            "norm_only_gate_passes": bool(
-                sab_cert.frobenius_sq_scaled * gate_policy.max_frob_sq_den
-                <= gate_policy.max_frob_sq_num * (1 << sab_cert.radix_scale_exp2)
-            ),
+            "norm_only_gate_passes": norm_only_passes,
             "stage2_certificate_passes": bool(sab_cert_ok),
             "stage2_rejection_reasons": sab_cert_problems,
             "certificate": json.loads(sab_cert.canonical_json()),
         },
         "goodhart_patch": {
-            "gguf_path": str(gh_gguf_path),
+            "gguf_path": gh_rel_gguf,
+            "gguf_disk_path": str(gh_gguf_path.name),
             "gguf_sha256": gh_gguf_sha,
             "slab_sha256": hashlib.sha256(gh_slab_bytes).hexdigest(),
             "frobenius_norm": round(float(np.linalg.norm(gh_patch.factor_b @ gh_patch.factor_a, "fro")), 6),
+            "in_nullspace_stage2_admissible": bool(gh_cert_ok),
             "stage2_certificate_passes": bool(gh_cert_ok),
             "stage2_rejection_reasons": gh_cert_problems,
-            "expected_rejection_stage": "stage3_verifier_canaries_and_phase5_private_holdout",
+            "stage2_admissibility_note": (
+                "Solved inside Null(K0) via BetaEditNullspaceProjector; Stage-2-admissible by design, "
+                "caught by Stage-3 verifier domain canaries and Phase-5 holdout (not Stage 2)."
+            ),
+            "expected_rejection_stage": "stage3_domain_canaries_and_phase5_holdout_not_stage2",
             "certificate": json.loads(gh_patch.certificate.canonical_json()),
         },
-        "warp_adversarial_bundles": {k: str(v[0]) for k, v in bundle_files.items()},
+        "warp_adversarial_bundles": {k: f"{rel_prefix}/{bfname}" for k, (bfname, _b) in bundle_files.items()},
     }

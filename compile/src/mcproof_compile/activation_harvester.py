@@ -1,13 +1,24 @@
 """Real hidden-activation and closed-form analytical target-residual harvester on Qwen3.5-4B.
 
-Extracts real Layer-31 `mlp.up_proj` input activations (`d_in = 2560`) and exact
+Determinism boundary:
+- Stage A (Activation Harvest, this module): Runs `Qwen3.5-4B` forward passes in
+  `torch.bfloat16` on the host accelerator (`mps`, `cuda`, or `cpu`). Because BF16
+  kernel reductions vary across GPU/MPS/CPU backends, activation harvesting is
+  platform-specific and its output is pinned by `harvested_activations.npz`
+  (`npz_sha256` verified via `hmac.compare_digest` against `.meta.json`).
+- Stage B (Weight Compilation, `compiler_suite.py` and `rederive.py`): Pure CPU
+  `float64` solve and post-quantization integer certification that is bit-exact
+  (`0`-byte diff across all `9/9` `P2-B` files) from the pinned `(Safetensors,
+  harvested_activations.npz, harvested_activations.meta.json, Plane 1 lineage)` inputs.
+
+Extracts Layer-31 `mlp.up_proj` input activations (`d_in = 2560`) and exact
 SwiGLU (`gate_act * (W_down^T r_ffn)`) + zero-centered RMSNorm (`1.0 + norm.weight`)
 + unembedding natural-gradient target residuals (`d_out = 9216`) strictly from public
 Phase 1 datasets:
 - `compile.jsonl` (96 paired formal-verification prompts across Families A, B, C, D)
 - `hybrid_k0.jsonl` (2048 seeded random-vocab noise sequences + 24 y=0 preservation anchors)
 
-Also captures 256 real `ffn_down` (`d_in = 9216`) `Hybrid K0` activations for the
+Also captures 280 real `ffn_down` (`d_in = 9216`) `Hybrid K0` activations for the
 `siliquant` PR #12 32-layer `ffn_down` loud-column ablation.
 
 Never touches the sealed holdout vault (`<workspace>/mcproof-vault/`).
@@ -16,14 +27,44 @@ Never touches the sealed holdout vault (`<workspace>/mcproof-vault/`).
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import platform
 from pathlib import Path
 from typing import Any, Sequence
 
 import numpy as np
 
-from .hardware_probe import PINNED_TARGET_LAYER
+from .hardware_probe import PINNED_TARGET_LAYER, sha256_file_stream
 from .safetensors_io import load_safetensors_tensor_f64
+
+
+def verify_cached_activations_npz(
+    npz_path: Path,
+    meta_path: Path | None = None,
+) -> dict[str, Any]:
+    """Verify `sha256(npz_path) == meta['npz_sha256']` via `hmac.compare_digest` before reuse."""
+    npz_file = Path(npz_path)
+    if not npz_file.is_file():
+        raise FileNotFoundError(f"Cached activations NPZ not found: {npz_file}")
+    sidecar = Path(meta_path) if meta_path is not None else npz_file.with_suffix(".meta.json")
+    if not sidecar.is_file():
+        raise FileNotFoundError(f"Activations metadata sidecar not found: {sidecar}")
+
+    meta = json.loads(sidecar.read_text(encoding="utf-8"))
+    if not isinstance(meta, dict):
+        raise ValueError(f"Invalid activations metadata JSON in {sidecar.name}")
+    expected_sha = meta.get("npz_sha256")
+    if not isinstance(expected_sha, str) or len(expected_sha) != 64:
+        raise ValueError(f"Missing or invalid 64-hex npz_sha256 in {sidecar.name}")
+
+    actual_sha = sha256_file_stream(npz_file)
+    if not hmac.compare_digest(actual_sha, expected_sha.lower()):
+        raise RuntimeError(
+            f"Cached activations NPZ SHA-256 mismatch for {npz_file.name}: "
+            f"actual {actual_sha} != meta {expected_sha}"
+        )
+    return meta
 
 POSITIVE_KEYS = (
     "positive_completion",
@@ -583,6 +624,13 @@ def harvest_all_activations(
         "n_compile_decision_states": int(compile_keys.shape[1]),
         "residual_rel_scale": residual_rel_scale,
         "npz_sha256": npz_sha256,
+        "harvest_runtime": {
+            "torch_version": str(torch.__version__),
+            "device": str(device),
+            "forward_dtype": "bfloat16",
+            "platform": platform.platform(),
+            "determinism_boundary": "platform_specific_bf16_harvest__cpu_float64_compile_deterministic_from_pinned_npz",
+        },
         "step_metadata": compile_step_meta,
     }
     meta_path.write_text(json.dumps(meta, indent=2, sort_keys=True) + "\n", encoding="utf-8")

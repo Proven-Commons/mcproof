@@ -18,6 +18,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import shutil
 import socket
 import subprocess
 import sys
@@ -35,19 +36,24 @@ COMPILE_DIR = Path(os.environ.get("MCPROOF_COMPILE_DIR") or (REPO_ROOT / "compil
 WEFT_SRC = Path(os.environ.get("WEFT_SRC") or (_SC_ROOT / "weft" / "src"))
 EXO_SRC = Path(os.environ.get("EXO_SRC") or (_SC_ROOT / "exo" / "src"))
 ZONE_MANIFEST_PATH = REPO_ROOT / "schemas" / "zone-manifest.v0.1.json"
-BASE_GGUF = COMPILE_DIR / "checkpoints" / "Qwen3.5-4B-GGUF" / "Qwen3.5-4B-Q8_0.gguf"
-LLAMA_BIN = Path(os.environ.get("LLAMA_SERVER_BIN") or "/opt/homebrew/bin/llama-server")
+BASE_GGUF = (
+    (COMPILE_DIR / "checkpoints" / "Qwen3.5-4B-GGUF" / "Qwen3.5-4B-Q8_0.gguf")
+    if (COMPILE_DIR / "checkpoints" / "Qwen3.5-4B-GGUF" / "Qwen3.5-4B-Q8_0.gguf").is_file()
+    else (REPO_ROOT.parent / "compile" / "checkpoints" / "Qwen3.5-4B-GGUF" / "Qwen3.5-4B-Q8_0.gguf")
+)
+LLAMA_BIN = Path(os.environ.get("LLAMA_SERVER_BIN") or shutil.which("llama-server") or "llama-server")
 
-for p in (str(VAULT_ROOT / "harnesses"), str(WEFT_SRC), str(EXO_SRC)):
+for p in (str(VERIF_DIR / "graders"), str(VERIF_DIR), str(WEFT_SRC), str(EXO_SRC)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
 import exo.policy as exo_policy  # noqa: E402
 import exo.router as exo_router  # noqa: E402
-import grade_canaries  # type: ignore[import-not-found]  # noqa: E402
-import grade_holdout  # type: ignore[import-not-found]  # noqa: E402
-import grade_mixed  # type: ignore[import-not-found]  # noqa: E402
-import grade_retention  # type: ignore[import-not-found]  # noqa: E402
+import grade_canaries  # noqa: E402
+import grade_holdout  # noqa: E402
+import grade_mixed  # noqa: E402
+import grade_retention  # noqa: E402
+from leak_audit import verify_zero_vault_leak_text  # noqa: E402
 from weft.gguf_lora import build_llama_server_lora_flags  # noqa: E402
 
 STOP_TOKENS = ["<|im_end|>", "<|endoftext|>"]
@@ -373,11 +379,8 @@ def summarize_canaries_sanitized(
 
 
 def verify_zero_vault_leak(serialized_json: str, all_vault_rows: Sequence[Mapping[str, Any]]) -> None:
-    for row in all_vault_rows:
-        prompt_s = str(row.get("prompt", "")).strip()
-        probe = prompt_s[:48]
-        if len(probe) >= 24 and probe in serialized_json:
-            raise RuntimeError(f"SECURITY VIOLATION: vault prompt substring leaked for {row.get('id')}")
+    prompts = [str(row.get("prompt", "")).strip() for row in all_vault_rows if row.get("prompt")]
+    verify_zero_vault_leak_text(serialized_json, prompts, label="vault_arms_adapters.json")
 
 
 def main() -> int:

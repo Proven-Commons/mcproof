@@ -19,3 +19,6 @@ code = [
 results = "tests/TEST-RESULTS.md"
 command = "python3 tests/run_tests.py"
 files = ["tests/run_tests.py"]
+
+[ci]
+required_check = "ci / bar"

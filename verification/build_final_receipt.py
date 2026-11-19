@@ -1,5 +1,20 @@
 #!/usr/bin/env python3
-"""Assemble canonical machine-readable `VERIFICATION_RECEIPT.json` and audit zero vault leakage."""
+"""Assemble canonical machine-readable `VERIFICATION_RECEIPT.json` purely from measured sub-receipts.
+
+Zero measured-looking string literals, zero hardcoded pass verdicts, and zero nonexistent commits:
+1. Recomputes all Plane 1, dataset manifest, commitment, compiler manifest, and stack receipt
+   SHA-256 digests directly from disk bytes at build time.
+2. Resolves the actual repository parent commit (`git rev-parse HEAD`, verified via `git cat-file -e`)
+   plus a deterministic Merkle digest over all tracked evidence inputs so the receipt is reproducible
+   on any fresh clone without self-referential commit cycles.
+3. Derives every count, rate, delta, and `passed` boolean programmatically from the committed
+   sub-receipts (`oracles_verification_receipt.json`, `datasets_vault_receipt.json`,
+   `canary_zero_flake_receipt.json`, `p2b_rederivation_receipt.json`, `compiler_verification_receipt.json`,
+   `stack_verification_receipt.json`, `vault_arm_b0.json`, `vault_arm_b1.json`, `vault_arms_adapters.json`,
+   `compile/artifacts/MANIFEST.json`, and `stack/results/final/{phase4_receipt.json,phase6_receipt.json}`).
+4. Audits head/middle/tail 32-char prompt windows, 12-word normalized phrases, and private path/IP
+   patterns across `verification/` whenever `mcproof-vault` is present on the host.
+"""
 
 from __future__ import annotations
 
@@ -7,309 +22,607 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from typing import Any
+import shutil
+import subprocess
+import sys
+from typing import Any, Mapping
 
 VERIF_DIR = Path(__file__).resolve().parent
 REPO_ROOT = VERIF_DIR.parent
-VAULT_ROOT = Path(os.environ.get("MCPROOF_VAULT_DIR") or (REPO_ROOT.parents[1] / "mcproof-vault"))
+_VAULT_ENV = os.environ.get("MCPROOF_VAULT_DIR")
+VAULT_ROOT: Path | None = Path(_VAULT_ENV).expanduser().resolve() if _VAULT_ENV else None
 COMPILE_ART = REPO_ROOT / "compile" / "artifacts"
 STACK_FINAL = REPO_ROOT / "stack" / "results" / "final"
 
+if str(VERIF_DIR) not in sys.path:
+    sys.path.insert(0, str(VERIF_DIR))
+
+from leak_audit import audit_directory_zero_leaks, load_vault_prompts  # noqa: E402
+
 
 def sha256_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        while True:
+            chunk = fh.read(1 << 20)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
 
 
-def load_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+def load_json_required(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Missing required verification input: {path.relative_to(REPO_ROOT).as_posix()}"
+        )
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"Expected JSON object in {path.name}")
+    return data
 
 
-def load_all_vault_prompts() -> list[str]:
-    prompts: list[str] = []
-    for fn in (
-        "private_holdout.jsonl",
-        "general_retention_100.jsonl",
-        "mixed_composition_30.jsonl",
-        "canaries_16.jsonl",
-    ):
-        for ln in (VAULT_ROOT / fn).read_text(encoding="utf-8").splitlines():
-            if ln.strip():
-                prompts.append(str(json.loads(ln).get("prompt", "")).strip())
-    return prompts
+def resolve_verified_artifact_commit(repo_root: Path) -> dict[str, Any]:
+    git_bin = shutil.which("git")
+    if not git_bin or not (repo_root / ".git").exists():
+        return {"p2b_artifact_commit": None, "commit_verified_in_git_odb": False}
+    rev = subprocess.run(
+        [
+            git_bin,
+            "-C",
+            str(repo_root),
+            "log",
+            "-n",
+            "1",
+            "--format=%H",
+            "--",
+            "compile/artifacts/p2b/formal-verification.p2b.f16.gguf",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    sha = rev.stdout.strip()
+    if rev.returncode != 0 or not sha:
+        return {"p2b_artifact_commit": None, "commit_verified_in_git_odb": False}
+    cat = subprocess.run(
+        [git_bin, "-C", str(repo_root), "cat-file", "-e", f"{sha}^{{commit}}"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    return {
+        "p2b_artifact_commit": sha if cat.returncode == 0 else None,
+        "commit_verified_in_git_odb": cat.returncode == 0,
+    }
 
 
-def assert_zero_vault_leak_in_dir(verif_dir: Path, vault_prompts: list[str]) -> int:
-    checked = 0
-    for p in sorted(verif_dir.rglob("*")):
-        if not p.is_file() or p.suffix not in (".json", ".md", ".py", ".txt"):
-            continue
-        raw = p.read_text(encoding="utf-8")
-        for pr in vault_prompts:
-            probe = pr[:40]
-            if len(probe) >= 24 and probe in raw:
-                raise RuntimeError(f"SECURITY VIOLATION: vault prompt substring found in {p.name}")
-        checked += 1
-    return checked
+def compute_evidence_bundle_merkle_sha256(paths: list[Path]) -> str:
+    entries: dict[str, str] = {}
+    for p in paths:
+        rel = p.relative_to(REPO_ROOT).as_posix()
+        raw = p.read_bytes().replace(b"\r\n", b"\n") if p.suffix in (".json", ".md") else p.read_bytes()
+        entries[rel] = hashlib.sha256(raw).hexdigest()
+    payload = json.dumps(entries, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _fmt_ratio(passed: int, total: int) -> dict[str, Any]:
+    pct = round((passed / total) * 100.0, 2) if total > 0 else 0.0
+    return {"passed": passed, "total": total, "pct": pct, "summary": f"{passed}/{total} ({pct:.2f}%)"}
+
+
+def _arm_split_summary(split_obj: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(split_obj, Mapping):
+        return None
+    p = int(split_obj["total_passed"])
+    t = int(split_obj["total_count"])
+    out = _fmt_ratio(p, t)
+    if "verdict" in split_obj:
+        out["verdict"] = str(split_obj["verdict"])
+    if "preservation_passed" in split_obj and "preservation_total" in split_obj:
+        out["preservation_passed"] = int(split_obj["preservation_passed"])
+        out["preservation_total"] = int(split_obj["preservation_total"])
+    if "formal_passed" in split_obj and "formal_total" in split_obj:
+        out["formal_passed"] = int(split_obj["formal_passed"])
+        out["formal_total"] = int(split_obj["formal_total"])
+    return out
 
 
 def main() -> int:
-    oracles = load_json(VERIF_DIR / "oracles_verification_receipt.json")
-    datasets = load_json(VERIF_DIR / "datasets_vault_receipt.json")
-    flake = load_json(VERIF_DIR / "canary_zero_flake_receipt.json")
-    rederive = load_json(VERIF_DIR / "p2b_rederivation_receipt.json")
-    compiler = load_json(VERIF_DIR / "compiler_verification_receipt.json")
-    b0 = load_json(VERIF_DIR / "vault_arm_b0.json")
-    b1 = load_json(VERIF_DIR / "vault_arm_b1.json")
-    adapters = load_json(VERIF_DIR / "vault_arms_adapters.json")
-    stack_sealed = load_json(VERIF_DIR / "stack_verification_receipt.json")
-    stack_p4 = load_json(STACK_FINAL / "phase4_receipt.json")
-    stack_p6 = load_json(STACK_FINAL / "phase6_receipt.json")
-    comp_manifest = load_json(COMPILE_ART / "MANIFEST.json")
+    input_files = [
+        REPO_ROOT / "spec" / "plane1_formal_spec.md",
+        REPO_ROOT / "spec" / "lineage.json",
+        REPO_ROOT / "schemas" / "zone-manifest.v0.1.json",
+        REPO_ROOT / "lean" / "lean-toolchain",
+        REPO_ROOT / "datasets" / "SHA256SUMS",
+        REPO_ROOT / "commitments" / "PUBLIC_HOLDOUT_COMMITMENT.json",
+        COMPILE_ART / "MANIFEST.json",
+        COMPILE_ART / "p2b" / "formal-verification.p2b.binding.json",
+        COMPILE_ART / "p2b" / "formal-verification.p2b.certificate.json",
+        COMPILE_ART / "p2b" / "formal-verification.p2b.f16.gguf",
+        STACK_FINAL / "phase4_receipt.json",
+        STACK_FINAL / "phase6_receipt.json",
+        VERIF_DIR / "oracles_verification_receipt.json",
+        VERIF_DIR / "datasets_vault_receipt.json",
+        VERIF_DIR / "canary_zero_flake_receipt.json",
+        VERIF_DIR / "p2b_rederivation_receipt.json",
+        VERIF_DIR / "compiler_verification_receipt.json",
+        VERIF_DIR / "stack_verification_receipt.json",
+        VERIF_DIR / "vault_arm_b0.json",
+        VERIF_DIR / "vault_arm_b1.json",
+        VERIF_DIR / "vault_arms_adapters.json",
+    ]
+    for req_p in input_files:
+        if not req_p.is_file():
+            raise FileNotFoundError(f"Missing committed evidence input: {req_p.relative_to(REPO_ROOT).as_posix()}")
 
-    p2b_arm = adapters["arms"]["P2-B"]
-    p2a_arm = adapters["arms"]["P2-A"]
-    lb_arm = adapters["arms"]["logit_bias"]
-    sab_arm = adapters["arms"]["sabotage"]
-    gh_arm = adapters["arms"]["goodhart"]
-    p6_routed = adapters["arms"]["phase6_zone_routed_3pack"]
-    p6_naive = adapters["arms"]["phase6_naive_unprojected_sum"]
+    lineage_doc = load_json_required(REPO_ROOT / "spec" / "lineage.json")
+    zone_doc = load_json_required(REPO_ROOT / "schemas" / "zone-manifest.v0.1.json")
+    oracles = load_json_required(VERIF_DIR / "oracles_verification_receipt.json")
+    datasets = load_json_required(VERIF_DIR / "datasets_vault_receipt.json")
+    flake = load_json_required(VERIF_DIR / "canary_zero_flake_receipt.json")
+    rederive = load_json_required(VERIF_DIR / "p2b_rederivation_receipt.json")
+    compiler = load_json_required(VERIF_DIR / "compiler_verification_receipt.json")
+    b0 = load_json_required(VERIF_DIR / "vault_arm_b0.json")
+    b1 = load_json_required(VERIF_DIR / "vault_arm_b1.json")
+    adapters = load_json_required(VERIF_DIR / "vault_arms_adapters.json")
+    stack_sealed = load_json_required(VERIF_DIR / "stack_verification_receipt.json")
+    stack_p4 = load_json_required(STACK_FINAL / "phase4_receipt.json")
+    stack_p6 = load_json_required(STACK_FINAL / "phase6_receipt.json")
+    comp_manifest = load_json_required(COMPILE_ART / "MANIFEST.json")
+    hw_report = load_json_required(COMPILE_ART / "phase2_hardware_checkpoint_report.json")
+    p2b_binding = load_json_required(COMPILE_ART / "p2b" / "formal-verification.p2b.binding.json")
+
+    # Live recomputed SHA-256 digests on disk
+    live_spec_sha256 = sha256_file(REPO_ROOT / "spec" / "plane1_formal_spec.md")
+    live_lineage_sha256 = sha256_file(REPO_ROOT / "spec" / "lineage.json")
+    live_datasets_sums_sha256 = sha256_file(REPO_ROOT / "datasets" / "SHA256SUMS")
+    live_commitment_sha256 = sha256_file(REPO_ROOT / "commitments" / "PUBLIC_HOLDOUT_COMMITMENT.json")
+    live_compiler_manifest_sha256 = sha256_file(COMPILE_ART / "MANIFEST.json")
+    live_p2b_gguf_sha256 = sha256_file(COMPILE_ART / "p2b" / "formal-verification.p2b.f16.gguf")
+    live_lean_toolchain = (REPO_ROOT / "lean" / "lean-toolchain").read_text(encoding="utf-8").strip()
+
+    if live_spec_sha256 != str(lineage_doc["plane1_spec_sha256"]):
+        raise RuntimeError("Plane 1 spec SHA-256 on disk does not match spec/lineage.json")
+
+    git_info = resolve_verified_artifact_commit(REPO_ROOT)
+    evidence_merkle_sha256 = compute_evidence_bundle_merkle_sha256(input_files)
+
+    # Cross-check optional large local GGUF / vault files on disk fail-closed while keeping JSON idempotent
+    expected_q8_sha = str(flake["checkpoint_gguf_sha256"])
+    local_q8_candidates = (
+        REPO_ROOT / "compile" / "checkpoints" / "Qwen3.5-4B-GGUF" / "Qwen3.5-4B-Q8_0.gguf",
+        REPO_ROOT.parent / "compile" / "checkpoints" / "Qwen3.5-4B-GGUF" / "Qwen3.5-4B-Q8_0.gguf",
+    )
+    q8_disk = next((c for c in local_q8_candidates if c.is_file()), None)
+    if q8_disk is not None:
+        disk_q8_sha = sha256_file(q8_disk)
+        if disk_q8_sha != expected_q8_sha:
+            raise RuntimeError(
+                f"Local Qwen3.5-4B-Q8_0.gguf SHA-256 ({disk_q8_sha}) != canary receipt ({expected_q8_sha})"
+            )
+    base_gguf_q8_sha = expected_q8_sha
+
+    expected_vault_sha = str(datasets["checks"]["vault_mde_integrity"]["report"]["manifest_sha256"])
+    vault_sums_file = (VAULT_ROOT / "SHA256SUMS") if VAULT_ROOT is not None else None
+    if vault_sums_file is not None and vault_sums_file.is_file():
+        disk_vault_sha = sha256_file(vault_sums_file)
+        if disk_vault_sha != expected_vault_sha:
+            raise RuntimeError(
+                f"Local mcproof-vault/SHA256SUMS SHA-256 ({disk_vault_sha}) != datasets receipt ({expected_vault_sha})"
+            )
+    vault_sums_sha = expected_vault_sha
+
+    # Derive Oracles summary strictly from oracles_verification_receipt.json
+    oracles_checks = oracles["checks"]
+    pt_info = oracles_checks.get("pytest_strict", {})
+    pt_counts = pt_info.get("counts")
+    if isinstance(pt_counts, dict):
+        pytest_passed_n = int(pt_counts["passed"])
+        pytest_exec_n = int(pt_counts["executed_total"])
+        pytest_skipped_n = int(pt_counts["skipped"])
+    else:
+        pytest_passed_n = 0
+        pytest_exec_n = 0
+        pytest_skipped_n = 0
+    lean_clean = oracles_checks["lean_clean_project"]
+    lean_kernels_n = len(lean_clean["paranoid_kernels_run"])
+    lean_adv = oracles_checks["lean_adversarial_cheats"]
+    lean_proj_adv = oracles_checks["lean_project_cheats"]
+    cheats_caught = sum(1 for v in lean_adv.values() if v["caught"]) + sum(1 for v in lean_proj_adv.values() if v["caught"])
+    cheats_total = len(lean_adv) + len(lean_proj_adv)
+    chk_mat = oracles_checks["checker_adversarial_matrix"]
+    chk_matched = sum(1 for v in chk_mat.values() if v["matched_expectation"])
+    chk_total = len(chk_mat)
+    f0_corr = oracles_checks["f0_gate_corruptions"]
+    f0_killed = int(f0_corr["mutations_killed"])
+    f0_total = int(f0_corr["mutations_total"])
+
+    # Derive Corpus & Holdout summary strictly from datasets_vault_receipt.json + canary_zero_flake_receipt.json
+    ds_checks = datasets["checks"]
+    overlap_info = ds_checks.get("public_vs_vault_disjointness") or ds_checks.get("overlap_audit") or {}
+
+    # Derive Sealed Vault Arm Matrix strictly from committed vault_arm_*.json
+    arms_map = adapters["arms"]
+    p2b_arm = arms_map["P2-B"]
+    p2a_arm = arms_map["P2-A"]
+    lb_arm = arms_map["logit_bias"]
+    sab_arm = arms_map["sabotage"]
+    gh_arm = arms_map["goodhart"]
+    p6_routed = arms_map["phase6_zone_routed_3pack"]
+    p6_naive = arms_map["phase6_naive_unprojected_sum"]
+
+    b0_holdout_p = int(b0["private_holdout"]["total_passed"])
+    b0_holdout_t = int(b0["private_holdout"]["total_count"])
+    b1_holdout_p = int(b1["private_holdout"]["total_passed"])
+    b1_holdout_t = int(b1["private_holdout"]["total_count"])
+    p2b_holdout_p = int(p2b_arm["private_holdout"]["total_passed"])
+    p2b_holdout_t = int(p2b_arm["private_holdout"]["total_count"])
+
+    b0_fail_rate = (b0_holdout_t - b0_holdout_p) / float(max(1, b0_holdout_t))
+    p2b_fail_rate = (p2b_holdout_t - p2b_holdout_p) / float(max(1, p2b_holdout_t))
+    rel_fail_reduction = (
+        round((b0_fail_rate - p2b_fail_rate) / b0_fail_rate, 6) if b0_fail_rate > 0.0 else 0.0
+    )
+    gate_primary_gain_passed = rel_fail_reduction >= 0.50
+    gate_ceiling_passed = (b1_holdout_p > 0) and ((p2b_holdout_p * 5) >= (b1_holdout_p * 4))
+
+    b1_sop_tokens = int(b1["plane1_spec_qwen35_tokens"])
+    p2b_sop_tokens = 0
+    gate_sop_zero_tokens = p2b_sop_tokens == 0 and b1_sop_tokens > 0
+
+    p2b_can = p2b_arm["canaries_16"]
+    p2b_pres_p = int(p2b_can["preservation_passed"])
+    p2b_pres_t = int(p2b_can["preservation_total"])
+    p2b_form_p = int(p2b_can["formal_passed"])
+    p2b_form_t = int(p2b_can["formal_total"])
+    gate_preservation_canaries_passed = (p2b_pres_t > 0) and (p2b_pres_p == p2b_pres_t) and bool(flake["zero_flake_10_of_10_passed"])
+    gate_strict_16_canaries_passed = (p2b_pres_p == p2b_pres_t) and (p2b_form_p == p2b_form_t)
+
+    b0_ret_pct = float(b0["general_retention"]["accuracy_pct"])
+    p2b_ret_pct = float(p2b_arm["general_retention"]["accuracy_pct"])
+    p2a_ret_pct = float(p2a_arm["general_retention"]["accuracy_pct"])
+    ret_delta_pp = round(p2b_ret_pct - b0_ret_pct, 2)
+    gate_retention_passed = (b0_ret_pct - p2b_ret_pct) <= 1.0
+
+    p2b_mix = p2b_arm["mixed_composition"]
+    p2b_mix_p = int(p2b_mix["total_passed"])
+    p2b_mix_t = int(p2b_mix["total_count"])
+    gate_mixed_passed = (p2b_mix_t > 0) and (p2b_mix_p == p2b_mix_t)
+
+    gate_rederive_passed = bool(rederive["zero_byte_diff_all"])
+
+    # Derive Stack Phase 4 & Phase 6 verdicts strictly from loaded stack receipts (never overriding False!)
+    p4_passed = bool(stack_p4.get("passed", False))
+    p6_passed = bool(stack_p6.get("passed", False))
+    p4_strict_sealed_ok = bool(stack_sealed.get("phase4_strict_16_of_16_canary_mounted", False))
+    p6_strict_sealed_ok = bool(stack_sealed.get("phase6_strict_19_of_19_multidomain_canary_mounted", False))
+    adv_battery = stack_sealed["adversarial_forged_cert_sabotage_and_goodhart"]
+    adv_passed = bool(adv_battery.get("passed", False))
+
+    p4_stages = stack_p4["step_4_3_warp_stages"]
+    p4_drift = stack_p4["step_4_4_drift_and_rollback"]
+    kill_switch_diff = float(p4_drift["post_kill_switch_max_logprob_diff"])
+    gate_rollback_passed = kill_switch_diff == 0.0
+
+    # Count genuine live tamper rejections from Phase 4 receipt
+    tamper_map = p4_stages.get("live_mount_rejections") or p4_stages.get("tamper_rejections") or {}
+    genuine_tamper_entries: dict[str, str] = {}
+    for k, v in tamper_map.items():
+        if isinstance(v, str) and v.startswith("ERR_"):
+            genuine_tamper_entries[k] = v
+        elif (
+            isinstance(v, Mapping)
+            and v.get("rejected") is True
+            and isinstance(v.get("code"), str)
+            and v["code"].startswith("ERR_")
+        ):
+            genuine_tamper_entries[k] = v["code"]
+    tamper_rejected_n = len(genuine_tamper_entries)
+    tamper_total_n = int(p4_stages.get("tamper_total_count", len(tamper_map)))
+    gate_tamper_passed = adv_passed and (tamper_total_n > 0) and (tamper_rejected_n == tamper_total_n)
+
+    p6_gates_raw = stack_p6["gates"]
+    tc1_raw = p6_gates_raw["T_C1_solo_preservation"]
+    tc2_raw = p6_gates_raw["T_C2_mixed_zone_isolation"]
+    tc3_raw = p6_gates_raw["T_C3_base_capability_retention"]
+    tc4_raw = p6_gates_raw["T_C4_order_invariance_and_rollback"]
+    tc5_raw = p6_gates_raw["T_C5_serving_budget"]
+    hazards_raw = stack_p6["seven_hazards"]
+    hazards_passed_n = sum(1 for v in hazards_raw.values() if isinstance(v, dict) and v.get("passed") is True)
+    hazards_total_n = len([v for v in hazards_raw.values() if isinstance(v, dict) and "passed" in v])
+
+    # Sealed Phase 6 T-C2 & T-C3 cross-checks from vault_arms_adapters.json
+    sealed_mix_routed = p6_routed["mixed_composition"]
+    sealed_tc2_passed = int(sealed_mix_routed["total_passed"]) == int(sealed_mix_routed["total_count"])
+    routed_ret_pct = float(p6_routed["general_retention"]["accuracy_pct"])
+    naive_ret_pct = float(p6_naive["general_retention"]["accuracy_pct"])
+    sealed_tc3_passed = ((b0_ret_pct - routed_ret_pct) <= 1.5) and (routed_ret_pct > naive_ret_pct)
+
+    # Public validation scorecard (48 items)
+    val_sc = comp_manifest["validation_scorecard"]
+    val_arms = {
+        k: {
+            "passed": int(v.get("passed", v.get("passed_count", 0))),
+            "total": int(v.get("total", v.get("total_count", 0))),
+            "pass_rate": float(v["pass_rate"]),
+        }
+        for k, v in val_sc["arms"].items()
+        if isinstance(v, dict) and ("passed" in v or "passed_count" in v)
+    }
+
+    all_promotion_gates_passed = bool(
+        oracles["overall_passed"]
+        and datasets["overall_passed"]
+        and flake["zero_flake_10_of_10_passed"]
+        and compiler["overall_passed"]
+        and gate_rederive_passed
+        and gate_primary_gain_passed
+        and gate_ceiling_passed
+        and gate_strict_16_canaries_passed
+        and gate_retention_passed
+        and gate_mixed_passed
+        and p4_passed
+        and p6_passed
+        and p4_strict_sealed_ok
+        and p6_strict_sealed_ok
+    )
 
     receipt: dict[str, Any] = {
-        "schema": "mcproof-formal-verification-mde-verifier-receipt/v0.1",
+        "schema": "mcproof-formal-verification-mde-verifier-receipt/v0.2",
         "issue": "siliconcordat/mde#4",
         "target_repo": "Proven-Commons/mcproof",
-        "overall_outcome": "HONEST_KILL_BOUNDARY_ON_4B_SINGLE_PASS_SYNTHESIS__ALL_INFRA_NULLSPACE_SECURITY_AND_RETENTION_GATES_PASSED",
-        "promotion_recommendation": "DO_NOT_PROMOTE_P2B_SCALE_1_0_FOR_AUTONOMOUS_PROOF_SYNTHESIS; KEEP_DEEP_TACTIC_SEARCH_IN_PLANE1_RETRIEVAL_AND_TIER2_ORACLES",
+        "all_promotion_gates_passed": all_promotion_gates_passed,
+        "overall_outcome": (
+            "PROMOTE_P2B"
+            if all_promotion_gates_passed
+            else "DO_NOT_PROMOTE_P2B__KILL_BOUNDARY_AND_LIVE_COMPOSITION_GATES_FAILED"
+        ),
         "lineage_and_pins": {
-            "mcproof_repo_commit": "62dc1371f9bb84a3dbdaaaa21151142623f831bc",
-            "plane1_formal_spec_sha256": "49beff2a0185cfa4032170b614a543c0d67541494e858803d21cfb837111b230",
-            "plane1_formal_spec_qwen35_tokens": b1["plane1_spec_qwen35_tokens"],
-            "corpus_tree_sha256": "5bdb7f30363b956e82947f668f98c48f99876e87fb5ed4f785b873e4f4f98305",
-            "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca",
-            "base_gguf_q8_0_sha256": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1",
-            "companion_gguf_q4_k_m_sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
-            "safetensors_checkpoint_fingerprint": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
-            "llama_server_version": "0.5.0 (build 11146, commit 7fe450e19)",
-            "lean_toolchain": "leanprover/lean4:v4.35.0",
-            "compiler_manifest_sha256": sha256_file(COMPILE_ART / "MANIFEST.json"),
-            "datasets_sha256sums_manifest": "be6eb537d0e2685831f6f920a857ceae6d774f74b3f352c3af7feb400498bd3c",
-            "vault_sha256sums_manifest": "b14cf1efeedf7a7c8c15ed57e587c3d18087f557e6ff1807068c4e9c9ef6f6ee",
-            "public_holdout_commitment_sha256": "e7c9b9da52be68c4731e35961c31ec33decf440e4ccb00b2c9072e029054f032",
-            "worktree_commits": {
-                "exo": "e68c406",
-                "warp": "492c994",
-                "weft_eido": "d87b958",
-            },
+            "p2b_artifact_commit": git_info["p2b_artifact_commit"],
+            "p2b_artifact_commit_verified_in_odb": git_info["commit_verified_in_git_odb"],
+            "tracked_evidence_merkle_sha256": evidence_merkle_sha256,
+            "plane1_formal_spec_sha256": live_spec_sha256,
+            "spec_lineage_json_sha256": live_lineage_sha256,
+            "plane1_formal_spec_qwen35_tokens": b1_sop_tokens,
+            "plane1_formal_spec_cl100k_tokens": lineage_doc["plane1_spec_token_stats"]["cl100k_base_tokens"],
+            "corpus_tree_sha256": lineage_doc["source_lineage"]["corpus_tree_sha256"],
+            "zone_manifest_id": zone_doc["manifest_id"],
+            "base_gguf_q8_0_sha256": base_gguf_q8_sha,
+            "safetensors_checkpoint_fingerprint": p2b_binding["checkpoint_fingerprint"],
+            "p2b_f16_gguf_sha256": live_p2b_gguf_sha256,
+            "llama_server_version": flake["llama_server_version"],
+            "lean_toolchain": live_lean_toolchain,
+            "compiler_manifest_sha256": live_compiler_manifest_sha256,
+            "datasets_sha256sums_manifest_sha256": live_datasets_sums_sha256,
+            "vault_sha256sums_manifest_sha256": vault_sums_sha,
+            "public_holdout_commitment_sha256": live_commitment_sha256,
         },
-        "hardware_boundary": {
-            "measured_execution_host": "Apple M1 Max (64 GiB unified memory, macOS 27.0.1 arm64, Metal -ngl 99, $0 cloud)",
-            "linux_rtx3080_online": False,
-            "geminus_8gib_rtx3080_status": "Online on Tailscale (<tailscale-host> / <lan-host>, Windows UX582HS), sshHostKeys=false, TCP ports [22, 2222, 22222, 3389, 5985, 5986, 8080, 11434] closed; warp#4 Linux workbench not yet provisioned",
-            "charminar_linux_status": "Online on Tailscale SSH (<tailscale-host>), Linux 7.2.15-1-omarchy x86_64, 5.7 GiB RAM, AMD Radeon Vega Mobile iGPU (no NVIDIA GPU)",
-            "analytical_rtx3080_vram_gib": {
-                "q8_0_8k_kv_3loras_linux_headless_gib": 4.9451,
-                "q8_0_8k_kv_3loras_windows_wddm_gib": 6.1451,
-                "q4_k_m_8k_kv_3loras_linux_headless_gib": 3.4034,
-                "q4_k_m_8k_kv_3loras_windows_wddm_gib": 4.6034,
-                "hard_ceiling_gib": 7.2,
-                "clears_ceiling": True,
-            },
-        },
+        "hardware_boundary": hw_report,
         "pillar_verifications": {
             "oracles": {
-                "passed": oracles["overall_passed"],
-                "pytest_passed": "20/20",
-                "lean_paranoid_kernels": "6/6",
-                "planted_lean_cheats_caught": "14/14 (100%)",
-                "mutation_and_float_traps_caught": "5/5 (100%)",
-                "f0_corruptions_caught": "4/4 (100%)",
+                "passed": bool(oracles["overall_passed"]),
+                "pytest_strict": {
+                    "passed": pytest_passed_n,
+                    "executed_total": pytest_exec_n,
+                    "skipped": pytest_skipped_n,
+                },
+                "lean_paranoid_kernels_accepted": lean_kernels_n,
+                "lean_solution_axioms_measured": lean_clean["axioms_used"],
+                "planted_lean_cheats_caught": _fmt_ratio(cheats_caught, cheats_total),
+                "checker_adversarial_matrix_matched": _fmt_ratio(chk_matched, chk_total),
+                "f0_corruptions_caught": _fmt_ratio(f0_killed, f0_total),
             },
             "corpus_and_holdout": {
-                "passed": datasets["overall_passed"] and flake["zero_flake_10_of_10_passed"],
+                "passed": bool(datasets["overall_passed"] and flake["zero_flake_10_of_10_passed"]),
                 "counts": {
-                    "compile": 96,
-                    "validation": 48,
-                    "private_holdout": 96,
-                    "canaries": 16,
-                    "general_retention": 100,
-                    "mixed_composition": 30,
-                    "hybrid_k0_noise": 2048,
-                    "hybrid_k0_y0_anchors": 24,
+                    "compile": int(ds_checks["compile_split"]["total"]),
+                    "validation": int(ds_checks["validation_split"]["total"]),
+                    "datasets_tracked_files": int(ds_checks["datasets_mde_integrity"]["report"]["files_verified"]),
+                    "private_holdout": int(ds_checks["private_holdout_split"]["total"]),
+                    "canaries": int(ds_checks["canaries_16"]["total"]),
+                    "general_retention": int(ds_checks["general_retention_100"]["total"]),
+                    "mixed_composition": int(ds_checks["mixed_composition_30"]["total"]),
+                    "hybrid_k0_noise": int(ds_checks["hybrid_k0"]["kind_counts"]["seeded_noise"]),
+                    "hybrid_k0_y0_anchors": int(ds_checks["hybrid_k0"]["kind_counts"]["y0_anchor"]),
                 },
-                "public_vs_vault_overlap": {
-                    "id_overlap": 0,
-                    "normalized_prompt_overlap": 0,
-                    "lean_declaration_overlap": 0,
-                    "max_8gram_jaccard": 0.031746,
-                },
+                "public_vs_vault_disjointness": overlap_info,
                 "canary_10x_zero_flake": {
-                    "runs": 10,
-                    "total_live_generations": 160,
-                    "byte_flaky_ids": 0,
-                    "verdict_flaky_ids": 0,
+                    "runs_executed": int(flake["runs_executed"]),
+                    "total_live_inferences": int(flake["total_live_inferences"]),
+                    "output_byte_flaky_count": len(flake["output_byte_flaky_ids"]),
+                    "verdict_flaky_count": len(flake["verdict_flaky_ids"]),
+                    "zero_flake_passed": bool(flake["zero_flake_10_of_10_passed"]),
                 },
             },
             "compiler": {
-                "passed": compiler["overall_passed"] and rederive["zero_byte_diff_all"],
-                "independent_pure_weft_rederivation_zero_byte_diff": rederive["zero_byte_diff_all"],
+                "structural_and_rederivation_passed": bool(compiler["overall_passed"] and gate_rederive_passed),
+                "efficacy_passed": bool(val_sc.get("p2b_relative_failure_reduction_vs_b0", -1.0) > 0.0),
+                "independent_zero_weft_rederivation_zero_byte_diff": gate_rederive_passed,
+                "independent_rederivation_files_checked": int(rederive["files_checked_count"]),
                 "p2b_files": rederive["files"],
                 "loud_column_ablation": compiler["loud_column_headline"],
-                "public_validation_48_pass_counts": {
-                    k: v["passed_count"]
-                    for k, v in comp_manifest["validation_scorecard"]["arms"].items()
-                    if isinstance(v, dict) and "passed_count" in v
-                },
+                "public_validation_48_arms": val_arms,
+                "public_validation_p2b_relative_failure_reduction_vs_b0": val_sc.get(
+                    "p2b_relative_failure_reduction_vs_b0"
+                ),
             },
             "stack": {
-                "passed_security_and_architecture": True,
-                "unit_tests": {
-                    "warp": "56/56",
-                    "exo": "40/40",
-                    "weft_eido": "120/120",
-                    "mcproof_stack": "4/4",
-                },
-                "stage2_ms": stack_p4["step_4_3_warp_stages"]["stage2_elapsed_ms"],
-                "stage3_parallel_8slot_ms": stack_p4["step_4_3_warp_stages"]["stage3_elapsed_ms"],
-                "stage4_kill_switch_ms": stack_p4["step_4_3_warp_stages"]["stage4_kill_switch_elapsed_ms"],
-                "sealed_stage3_p2b_scale_1_0_verdict": "ERR_CANARY_FAILED (8/8 preservation, 6/8 formal -> fail-closed rejection)",
-                "adversarial_forged_cert_sabotage_and_goodhart": stack_sealed["adversarial_forged_cert_sabotage_and_goodhart"],
+                "all_live_gates_passed": bool(
+                    p4_passed and p6_passed and p4_strict_sealed_ok and p6_strict_sealed_ok and adv_passed
+                ),
+                "phase4_host_suite_passed": p4_passed,
+                "phase4_strict_16_of_16_sealed_canary_mounted": p4_strict_sealed_ok,
+                "phase4_strict_16_of_16_note": stack_sealed.get("phase4_strict_16_of_16_note"),
+                "phase6_host_suite_passed": p6_passed,
+                "phase6_strict_19_of_19_sealed_canary_mounted": p6_strict_sealed_ok,
+                "stage2_ms": p4_stages["stage2_elapsed_ms"],
+                "stage3_parallel_8slot_ms": p4_stages["stage3_elapsed_ms"],
+                "stage4_kill_switch_ms": p4_stages["stage4_kill_switch_elapsed_ms"],
+                "post_kill_switch_max_logprob_diff": kill_switch_diff,
+                "live_tamper_error_rejections_count": tamper_rejected_n,
+                "adversarial_forged_cert_sabotage_and_goodhart": adv_battery,
             },
         },
         "sealed_vault_arm_matrix": {
             "B0": {
-                "sop_tokens": 0,
-                "private_holdout_96": "0/96 (0.00%)",
-                "general_retention_100": "84/100 (84.00%)",
-                "mixed_composition_30": "8/30 (26.67%)",
-                "canaries_16": "15/16 (8/8 pres, 7/8 formal -> tier2_stepping_stone)",
+                "sop_tokens_injected": 0,
+                "private_holdout_96": _arm_split_summary(b0["private_holdout"]),
+                "general_retention_100": _arm_split_summary(b0["general_retention"]),
+                "mixed_composition_30": _arm_split_summary(b0["mixed_composition"]),
+                "canaries_16": _arm_split_summary(b0["canaries_16"]),
                 "holdout_hygiene": b0["private_holdout"]["surface_hygiene_rates"],
                 "holdout_top_errors": b0["private_holdout"]["top_error_categories"],
             },
             "B1": {
-                "sop_tokens": b1["plane1_spec_qwen35_tokens"],
-                "private_holdout_96": "0/96 (0.00%)",
+                "sop_tokens_injected": b1_sop_tokens,
+                "prefix_cache_parity_verified": bool(b1["prefix_cache_parity_verified"]),
+                "private_holdout_96": _arm_split_summary(b1["private_holdout"]),
                 "holdout_mean_ms": b1["private_holdout"]["mean_elapsed_ms"],
                 "holdout_hygiene": b1["private_holdout"]["surface_hygiene_rates"],
                 "holdout_top_errors": b1["private_holdout"]["top_error_categories"],
             },
             "P2-A": {
-                "sop_tokens": 0,
-                "private_holdout_96": "0/96 (0.00%)",
-                "general_retention_100": "0/100 (0.00%)",
-                "mixed_composition_30": "0/30 (0.00%)",
-                "canaries_16": "0/16 (0/8 pres, 0/8 formal -> reject)",
+                "sop_tokens_injected": 0,
+                "private_holdout_96": _arm_split_summary(p2a_arm["private_holdout"]),
+                "general_retention_100": _arm_split_summary(p2a_arm["general_retention"]),
+                "mixed_composition_30": _arm_split_summary(p2a_arm["mixed_composition"]),
+                "canaries_16": _arm_split_summary(p2a_arm["canaries_16"]),
             },
             "P2-B": {
-                "sop_tokens": 0,
-                "private_holdout_96": "0/96 (0.00%)",
-                "general_retention_100": "85/100 (85.00%)",
-                "mixed_composition_30": "8/30 (26.67%)",
-                "canaries_16": "14/16 (8/8 pres, 6/8 formal -> reject)",
+                "sop_tokens_injected": 0,
+                "private_holdout_96": _arm_split_summary(p2b_arm["private_holdout"]),
+                "general_retention_100": _arm_split_summary(p2b_arm["general_retention"]),
+                "mixed_composition_30": _arm_split_summary(p2b_arm["mixed_composition"]),
+                "canaries_16": _arm_split_summary(p2b_arm["canaries_16"]),
                 "holdout_hygiene": p2b_arm["private_holdout"]["surface_hygiene_rates"],
                 "holdout_top_errors": p2b_arm["private_holdout"]["top_error_categories"],
             },
             "logit_bias": {
-                "sop_tokens": 0,
-                "private_holdout_96": f"{lb_arm['private_holdout']['total_passed']}/96",
-                "canaries_16": f"{lb_arm['canaries_16']['total_passed']}/16 ({lb_arm['canaries_16']['verdict']})",
+                "sop_tokens_injected": 0,
+                "private_holdout_96": _arm_split_summary(lb_arm["private_holdout"]),
+                "canaries_16": _arm_split_summary(lb_arm["canaries_16"]),
             },
             "sabotage": {
-                "private_holdout_96": f"{sab_arm['private_holdout']['total_passed']}/96 (7 embedded NUL corruptions)",
-                "canaries_16": f"{sab_arm['canaries_16']['total_passed']}/16 (5/8 pres, 5/8 formal -> {sab_arm['canaries_16']['verdict']})",
+                "private_holdout_96": _arm_split_summary(sab_arm["private_holdout"]),
+                "canaries_16": _arm_split_summary(sab_arm["canaries_16"]),
             },
             "goodhart": {
-                "private_holdout_96": f"{gh_arm['private_holdout']['total_passed']}/96",
-                "canaries_16_192tok": f"{gh_arm['canaries_16']['total_passed']}/16 ({gh_arm['canaries_16']['verdict']})",
-                "warp_stage3_80tok_verdict": "ERR_CANARY_FAILED",
+                "private_holdout_96": _arm_split_summary(gh_arm["private_holdout"]),
+                "canaries_16": _arm_split_summary(gh_arm["canaries_16"]),
+                "warp_stage3_sealed_canary_outcome": adv_battery.get("goodhart_stage3_sealed_canary_outcome"),
             },
             "phase6_zone_routed_3pack": {
-                "general_retention_100": f"{p6_routed['general_retention']['total_passed']}/100 ({p6_routed['general_retention']['accuracy_pct']}%)",
-                "mixed_composition_30": f"{p6_routed['mixed_composition']['total_passed']}/30",
+                "general_retention_100": _arm_split_summary(p6_routed["general_retention"]),
+                "mixed_composition_30": _arm_split_summary(p6_routed["mixed_composition"]),
                 "contested_hard_veto2_ids": p6_routed["contested_hard_veto2_ids"],
-                "simultaneous_research_page_holdout_96": f"{p6_routed['simultaneous_research_page_holdout']['total_passed']}/96",
+                "simultaneous_research_page_holdout_96": _arm_split_summary(
+                    p6_routed["simultaneous_research_page_holdout"]
+                ),
             },
             "phase6_naive_unprojected_sum": {
-                "general_retention_100": f"{p6_naive['general_retention']['total_passed']}/100 ({p6_naive['general_retention']['accuracy_pct']}%)",
-                "private_holdout_96": f"{p6_naive['private_holdout']['total_passed']}/96",
+                "general_retention_100": _arm_split_summary(p6_naive["general_retention"]),
+                "private_holdout_96": _arm_split_summary(p6_naive["private_holdout"]),
             },
         },
         "phase5_gates": {
             "primary_gain_vs_b0": {
-                "requirement": ">= 50% relative failure reduction vs B0 on 96 private holdouts",
-                "measured": "0.0% relative reduction (P2-B 0/96 vs B0 0/96; lean4_auditor errors -21.1% [57->45], missing_tier -50.0% [14->7])",
-                "status": "FAIL_HONEST_KILL_BOUNDARY",
+                "passed": gate_primary_gain_passed,
+                "p2b_passed": p2b_holdout_p,
+                "b0_passed": b0_holdout_p,
+                "total": p2b_holdout_t,
+                "relative_failure_reduction": rel_fail_reduction,
             },
             "ceiling_ratio_vs_b1": {
-                "requirement": ">= 80% of B1 pass rate on 96 private holdouts",
-                "measured": "0/96 vs B1 0/96 (degenerate 0/0 ceiling: 32,216-token prompt injection also scores 0/96 on Qwen3.5-4B)",
-                "status": "FAIL_HONEST_KILL_BOUNDARY",
+                "passed": gate_ceiling_passed,
+                "p2b_passed": p2b_holdout_p,
+                "b1_passed": b1_holdout_p,
+                "total": p2b_holdout_t,
             },
-            "token_savings_vs_b1": {
-                "requirement": ">= 90% reduction in injected SOP tokens per turn vs B1",
-                "measured": "100.0% reduction (0 SOP tokens vs 32,216 SOP tokens)",
-                "status": "PASS",
+            "sop_token_injection": {
+                "design_zero_sop_tokens": gate_sop_zero_tokens,
+                "p2b_sop_tokens_injected": p2b_sop_tokens,
+                "b1_sop_tokens_injected": b1_sop_tokens,
+                "note": "0 injected SOP tokens is an architectural property of weight adapters, not an empirical capability metric",
             },
-            "safety_canaries": {
-                "requirement": "8/8 (100%) verifier-owned safety/preservation canaries",
-                "measured": "8/8 (100.0%) passed on P2-B (0 flaky IDs across 10/10 runs; formal domain 6/8 triggers Stage 3 fail-closed ERR_CANARY_FAILED)",
-                "status": "PASS",
+            "preservation_canaries": {
+                "passed": gate_preservation_canaries_passed,
+                "preservation_passed": p2b_pres_p,
+                "preservation_total": p2b_pres_t,
+                "zero_flake_10_of_10": bool(flake["zero_flake_10_of_10_passed"]),
+            },
+            "strict_16_canary_mount_gate": {
+                "passed": gate_strict_16_canaries_passed,
+                "formal_passed": p2b_form_p,
+                "formal_total": p2b_form_t,
+                "stage3_verdict": p2b_can["verdict"],
             },
             "general_retention": {
-                "requirement": "<= 1.0 pp accuracy drop vs B0 across 100 coding/math/reasoning/refusal holdouts",
-                "measured": "+1.0 pp net gain / 0.0 pp drop (P2-B 85.0% [85/100] vs B0 84.0% [84/100]; P2-A collapses to 0.0% [0/100])",
-                "status": "PASS",
+                "passed": gate_retention_passed,
+                "p2b_accuracy_pct": p2b_ret_pct,
+                "b0_accuracy_pct": b0_ret_pct,
+                "p2a_accuracy_pct": p2a_ret_pct,
+                "delta_vs_b0_pp": ret_delta_pp,
             },
             "mixed_integrity": {
-                "requirement": "0 corrupted formal blocks and 0 stripped disclaimers across 30 mixed prompts",
-                "measured": "8/30 end-to-end pass (30/30 exo ZoneRouter & Hard Veto 2 contract pass; 20 formal block oracle failures = B0 20, 10 prose/skip misses)",
-                "status": "FAIL_HONEST_KILL_BOUNDARY",
+                "passed": gate_mixed_passed,
+                "passed_count": p2b_mix_p,
+                "total_count": p2b_mix_t,
             },
-            "rederivation": {
-                "requirement": "0-byte diff (exact SHA-256 match) across independent CPU float64 rebuild",
-                "measured": "0-byte diff across 6/6 P2-B files via independent pure-weft CPU float64 rebuild",
-                "status": "PASS",
+            "independent_rederivation": {
+                "passed": gate_rederive_passed,
+                "files_checked": int(rederive["files_checked_count"]),
+                "implementation": rederive["implementation"],
             },
             "tamper_defense": {
-                "requirement": "100% fail-closed rejection of forged cert, forged canary, stale lineage, zone drift, Goodhart, and sabotage",
-                "measured": "10/10 (100%) rejected fail-closed across Stage 1, Stage 2, Stage 3 (including forged-cert sabotage), and Phase 5 holdout",
-                "status": "PASS",
+                "passed": gate_tamper_passed,
+                "phase4_live_error_rejections": tamper_rejected_n,
+                "adversarial_forged_cert_caught_stage3": (
+                    adv_battery.get("sabotage_forged_valid_cert_stage3_code") == "ERR_CANARY_FAILED"
+                ),
             },
             "rollback_fidelity": {
-                "requirement": "0.0 exact next-token logprob diff vs bare B0 after O(1) kill switch",
-                "measured": "0.0 exact next-token logprob diff (kill switch 4.029-5.204 ms < 10 ms)",
-                "status": "PASS",
+                "passed": gate_rollback_passed,
+                "post_kill_switch_max_logprob_diff": kill_switch_diff,
+                "kill_switch_elapsed_ms": p4_stages["stage4_kill_switch_elapsed_ms"],
             },
         },
         "phase6_gates": {
+            "overall_passed": bool(p6_passed and sealed_tc2_passed and sealed_tc3_passed),
             "T_C1_solo_preservation": {
-                "requirement": ">= 90% solo preservation in paired and triple stacks",
-                "measured": "99.85% min subspace & routed step-0 preservation (corpus 100.0%, weft-eido 99.85%, formal-verification 100.0%); 0/96 on private_holdout (matches solo P2-B 0/96)",
-                "status": "PASS_SUBSPACE_AND_ROUTING__DEGENERATE_0_OF_96_HOLDOUT",
+                "passed": bool(tc1_raw.get("passed", False)),
+                "details": tc1_raw,
             },
             "T_C2_mixed_zone_isolation": {
-                "requirement": "0 formal-block corruptions and 0 prose-rule leaks across 30 mixed prompts",
-                "measured": "30/30 on public structural suite & 30/30 exo router/Hard-Veto-2 checks; 8/30 on sealed mixed_composition_30.jsonl (20 4B formal synthesis failures, 12 prose/skip misses)",
-                "status": "FAIL_ON_SEALED_4B_GENERATION__PASS_ON_ROUTER_ISOLATION",
+                "host_public_suite_passed": bool(tc2_raw.get("passed", False)),
+                "sealed_30_item_suite_passed": sealed_tc2_passed,
+                "sealed_passed_count": int(sealed_mix_routed["total_passed"]),
+                "sealed_total_count": int(sealed_mix_routed["total_count"]),
+                "passed": bool(tc2_raw.get("passed", False) and sealed_tc2_passed),
+                "host_details": tc2_raw,
             },
-            "T_C3_base_retention": {
-                "requirement": "<= 1.5 pp accuracy drop vs bare W0 across 100 prompts, beating naive unweighted summation",
-                "measured": "85.0% (85/100) routed triple vs 84.0% (84/100) bare W0 (+1.0 pp / 0.0 pp drop <= 1.5 pp), beating naive unprojected sum 0.0% (0/100) by +85.0 pp",
-                "status": "PASS",
+            "T_C3_base_capability_retention": {
+                "passed": bool(tc3_raw.get("passed", False) and sealed_tc3_passed),
+                "routed_triple_accuracy_pct": routed_ret_pct,
+                "b0_accuracy_pct": b0_ret_pct,
+                "naive_unprojected_sum_accuracy_pct": naive_ret_pct,
+                "host_details": tc3_raw,
             },
             "T_C4_order_invariance_and_rollback": {
-                "requirement": "Order-invariant across 3!=6 permutations and 0.0 drift after per-slot O(1) rollback",
-                "measured": "0.0 CPU float64 matrix diff, 4.44e-16 forward diff, 0.0 live llama-server order logprob diff, 0.0 per-slot & full-stack rollback diff (4.029-5.067 ms)",
-                "status": "PASS",
+                "passed": bool(tc4_raw.get("passed", False)),
+                "details": tc4_raw,
             },
             "T_C5_serving_budget": {
-                "requirement": "<= 15% tok/s overhead, >= 8192 KV cache tokens/slot, <= 7.2 GiB VRAM on 8 GiB GPU",
-                "measured": "0.0%-0.31% <= 15.0% latency overhead, 8192 KV tokens/slot, 4.9451 GiB headless / 6.1451 GiB WDDM <= 7.2 GiB analytical RTX 3080 VRAM (geminus SSH closed)",
-                "status": "PASS_ANALYTICAL_VRAM_AND_LIVE_M1_MAX__LINUX_RTX3080_OFFLINE",
+                "passed": bool(tc5_raw.get("passed", False)),
+                "details": tc5_raw,
             },
             "seven_interference_hazards_H1_to_H7": {
-                "requirement": "7/7 hazards pass live under Tier 1 > Tier 2 RepoPolicy > Specialist Pack > Base Prose Pack",
-                "measured": "7/7 deterministic L5/L4/L3/DOM/WCAG hazard mechanisms passed live (including weft-eido PR 25 0 dark-theme WCAG failures across 360 hues and Hard Veto 2 ContestedPreferenceError)",
-                "status": "PASS",
+                "passed": (hazards_total_n == 7) and (hazards_passed_n == 7),
+                "passed_count": hazards_passed_n,
+                "total_count": hazards_total_n,
             },
         },
     }
@@ -317,14 +630,20 @@ def main() -> int:
     out_path = VERIF_DIR / "VERIFICATION_RECEIPT.json"
     out_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    vault_prompts = load_all_vault_prompts()
-    checked_files = assert_zero_vault_leak_in_dir(VERIF_DIR, vault_prompts)
+    vault_prompts = load_vault_prompts(VAULT_ROOT) if (VAULT_ROOT is not None and VAULT_ROOT.is_dir()) else []
+    leak_summary = audit_directory_zero_leaks(
+        VERIF_DIR,
+        vault_prompts,
+        public_datasets_dir=REPO_ROOT / "datasets",
+        public_spec_path=REPO_ROOT / "spec" / "plane1_formal_spec.md",
+    )
     print(
         json.dumps(
             {
-                "receipt_written": str(out_path.name),
+                "receipt_written": out_path.name,
                 "receipt_sha256": sha256_file(out_path),
-                "zero_vault_leak_verified_files": checked_files,
+                "all_promotion_gates_passed": all_promotion_gates_passed,
+                "leak_audit": leak_summary,
             },
             indent=2,
             sort_keys=True,

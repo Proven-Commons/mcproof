@@ -1,7 +1,7 @@
 From 4b3343d2d59bdb06e3e5ecfa4b3d9711070d7922 Mon Sep 17 00:00:00 2001
 From: ahraz <38987266+ahrazzle@users.noreply.github.com>
 Date: Thu, 19 Nov 2026 05:29:40 -0600
-Subject: [PATCH 1/7] warp: add top_p=1.0, n_probs, stage3 timing, and
+Subject: [PATCH 1/8] warp: add top_p=1.0, n_probs, stage3 timing, and
  jsonl/opaque canary gates
 
 ---
@@ -535,7 +535,7 @@ index a652585..688b0b9 100644
 From dbd6db96b31cec57042e4c644786d7fa2fb0654b Mon Sep 17 00:00:00 2001
 From: ahraz <38987266+ahrazzle@users.noreply.github.com>
 Date: Thu, 19 Nov 2026 05:49:46 -0600
-Subject: [PATCH 2/7] warp: support optional per-canary max_tokens ceiling in
+Subject: [PATCH 2/8] warp: support optional per-canary max_tokens ceiling in
  CanarySpec
 
 ---
@@ -586,7 +586,7 @@ index cf4a9de..c4888d4 100644
 From f5fb52f4400d1d3b75537b130202de16c045404b Mon Sep 17 00:00:00 2001
 From: ahraz <38987266+ahrazzle@users.noreply.github.com>
 Date: Thu, 19 Nov 2026 06:06:55 -0600
-Subject: [PATCH 3/7] feat(canary): support {server_url}/{lora_json}
+Subject: [PATCH 3/8] feat(canary): support {server_url}/{lora_json}
  placeholders in ExternalCommandCanaryRunner
 
 ---
@@ -725,7 +725,7 @@ index c4888d4..8e8d039 100644
 From 5d4c8d5af2bdd1930f997ca38390a388e4e2bf1f Mon Sep 17 00:00:00 2001
 From: ahraz <38987266+ahrazzle@users.noreply.github.com>
 Date: Thu, 19 Nov 2026 06:21:50 -0600
-Subject: [PATCH 4/7] perf(canary): batch Stage 3 shadow canaries across
+Subject: [PATCH 4/8] perf(canary): batch Stage 3 shadow canaries across
  parallel llama-server slots
 
 ---
@@ -902,7 +902,7 @@ index 8e8d039..40ebed3 100644
 From fb1ebf95eadf17b2460c4450c7785c728d0e558c Mon Sep 17 00:00:00 2001
 From: ahraz <38987266+ahrazzle@users.noreply.github.com>
 Date: Thu, 19 Nov 2026 06:43:05 -0600
-Subject: [PATCH 5/7] fix(canary): erase slot before every canary inside
+Subject: [PATCH 5/8] fix(canary): erase slot before every canary inside
  parallel slot buckets
 
 ---
@@ -992,7 +992,7 @@ index 688b0b9..89ef3b8 100644
 From 54b3a397d88cf42db3d005729e65cc8010ec0c3e Mon Sep 17 00:00:00 2001
 From: ahraz <38987266+ahrazzle@users.noreply.github.com>
 Date: Thu, 19 Nov 2026 06:45:49 -0600
-Subject: [PATCH 6/7] perf(verifier): parallelize multi-slot erase in Stage 4
+Subject: [PATCH 6/8] perf(verifier): parallelize multi-slot erase in Stage 4
  kill switch
 
 ---
@@ -1035,7 +1035,7 @@ index 85a60dd..a85aa8a 100644
 From 492c9944d75602817b03928757fea58943fdd7a9 Mon Sep 17 00:00:00 2001
 From: ahraz <38987266+ahrazzle@users.noreply.github.com>
 Date: Thu, 19 Nov 2026 07:58:05 -0600
-Subject: [PATCH 7/7] perf(canary): LPT slot load-balancing and parallel
+Subject: [PATCH 7/8] perf(canary): LPT slot load-balancing and parallel
  cleanup in Stage 3
 
 ---
@@ -1099,6 +1099,315 @@ index 5473747..b52a364 100644
              slot_flushed = all_flushed
  
          elapsed_ms = (time.perf_counter() - t0) * 1000.0
+-- 
+2.54.0 (Apple Git-157)
+
+
+From 390176c5af79cbdf8b14fff94c147db9f0898114 Mon Sep 17 00:00:00 2001
+From: ahraz <38987266+ahrazzle@users.noreply.github.com>
+Date: Thu, 19 Nov 2026 13:19:12 -0600
+Subject: [PATCH 8/8] fix(canary): reject aggregate-only opaque output and
+ enforce preservation floor
+
+---
+ src/warp_modeld/canary.py   | 112 ++++++++++++++++++++++-----------
+ tests/test_stage3_canary.py | 122 ++++++++++++++++++++++++++++++++++--
+ 2 files changed, 193 insertions(+), 41 deletions(-)
+
+diff --git a/src/warp_modeld/canary.py b/src/warp_modeld/canary.py
+index b52a364..89372cc 100644
+--- a/src/warp_modeld/canary.py
++++ b/src/warp_modeld/canary.py
+@@ -576,14 +576,18 @@ class ExternalCommandCanaryRunner:
+         suite_sha256_hint: str | None = None,
+         canary_slot_id: int = 0,
+         timeout_seconds: float = 30.0,
++        min_preservation: int = 4,
+     ) -> None:
+         if not command:
+             raise CanaryConfigError("external canary command must be non-empty")
++        if min_preservation < 1:
++            raise CanaryConfigError("min_preservation must be >= 1")
+         self.llama_client = llama_client
+         self.command = tuple(str(c) for c in command)
+         self.suite_sha256 = suite_sha256_hint or hashlib.sha256(" ".join(self.command).encode("utf-8")).hexdigest()
+         self.canary_slot_id = canary_slot_id
+         self.timeout_seconds = float(timeout_seconds)
++        self.min_preservation = int(min_preservation)
+ 
+     def run(
+         self,
+@@ -688,49 +692,87 @@ class ExternalCommandCanaryRunner:
+ 
+         suite_sha = str(parsed.get("suite_sha256") or parsed.get("canaries_sha256") or self.suite_sha256)
+         raw_outcomes = parsed.get("outcomes")
+-        if not isinstance(raw_outcomes, list):
+-            raw_outcomes = parsed.get("results") or parsed.get("canaries") or []
++        if raw_outcomes is None:
++            raw_outcomes = parsed.get("results")
++        if raw_outcomes is None:
++            raw_outcomes = parsed.get("canaries")
++
++        if not isinstance(raw_outcomes, list) or len(raw_outcomes) == 0:
++            raise CanaryFailedError(
++                "opaque verifier canary command must return a non-empty per-canary 'outcomes' list; "
++                "aggregate-only reports are rejected"
++            )
++
++        parsed_outcomes: list[CanaryCheckOutcome] = []
++        seen_ids: set[str] = set()
++        for idx, item in enumerate(raw_outcomes):
++            if not isinstance(item, dict) or not isinstance(item.get("passed"), bool):
++                raise CanaryFailedError(
++                    f"opaque verifier canary outcome #{idx} must be an object with boolean 'passed'"
++                )
++            raw_id = item.get("canary_id") if item.get("canary_id") is not None else item.get("id")
++            cid = str(raw_id or "").strip()
++            if not cid:
++                raise CanaryFailedError(f"opaque verifier canary outcome #{idx} is missing a non-empty 'canary_id'")
++            if cid in seen_ids:
++                raise CanaryFailedError(f"duplicate canary_id in opaque verifier outcomes: {cid!r}")
++            seen_ids.add(cid)
++
++            raw_cat = str(item.get("category") or "").strip().lower()
++            if raw_cat == "preservation":
++                cat = "preservation"
++            elif raw_cat in ("domain", "formal"):
++                cat = "domain"
++            elif raw_cat == "cross_adapter":
++                cat = "cross_adapter"
++            else:
++                raise CanaryFailedError(
++                    f"invalid category {item.get('category')!r} for canary {cid!r}; "
++                    f"expected preservation, domain, or cross_adapter"
++                )
+ 
+-        if isinstance(raw_outcomes, list) and raw_outcomes:
+-            outcomes = tuple(
++            raw_failures = item.get("failures")
++            if not isinstance(raw_failures, list):
++                raw_failures = item.get("failure_codes", ())
++            parsed_outcomes.append(
+                 CanaryCheckOutcome(
+-                    canary_id=str(o.get("canary_id") or o.get("id") or f"canary-{idx}"),
+-                    category=str(o.get("category", "domain")),
+-                    passed=bool(o["passed"]),
+-                    failures=tuple(str(f) for f in o.get("failures", ())),
++                    canary_id=cid,
++                    category=cat,
++                    passed=bool(item["passed"]),
++                    failures=tuple(str(f) for f in raw_failures),
+                 )
+-                for idx, o in enumerate(raw_outcomes, start=1)
+-                if isinstance(o, dict) and "passed" in o
+             )
+-            pres_items = [o for o in outcomes if o.category == "preservation"]
+-            pres_total = int(parsed.get("preservation_total") or len(pres_items) or len(outcomes))
+-            pres_passed = int(
+-                parsed.get("preservation_passed")
+-                if parsed.get("preservation_passed") is not None
+-                else (sum(1 for o in pres_items if o.passed) if pres_items else sum(1 for o in outcomes if o.passed))
++
++        outcomes = tuple(parsed_outcomes)
++        pres_items = [o for o in outcomes if o.category == "preservation"]
++        pres_total = len(pres_items)
++        pres_passed = sum(1 for o in pres_items if o.passed)
++
++        if parsed.get("preservation_total") is not None and int(parsed["preservation_total"]) != pres_total:
++            raise CanaryFailedError(
++                f"opaque verifier preservation_total ({parsed['preservation_total']}) disagrees with "
++                f"outcomes count ({pres_total})"
+             )
+-        else:
+-            overall_ok = bool(parsed.get("passed", parsed.get("all_passed", False)))
+-            total_n = int(parsed.get("total", parsed.get("canary_count", 16)))
+-            passed_n = int(parsed.get("passed_count", total_n if overall_ok else 0))
+-            if not overall_ok or total_n <= 0 or passed_n != total_n:
+-                raise CanaryFailedError("opaque verifier canary command reported failure or empty suite")
+-            pres_total = int(parsed.get("preservation_total", max(1, total_n // 2)))
+-            pres_passed = int(parsed.get("preservation_passed", pres_total))
+-            outcomes = tuple(
+-                CanaryCheckOutcome(
+-                    canary_id=f"opaque-{i:02d}",
+-                    category="preservation" if i <= pres_total else "domain",
+-                    passed=True,
+-                    failures=(),
+-                )
+-                for i in range(1, total_n + 1)
++        if parsed.get("preservation_passed") is not None and int(parsed["preservation_passed"]) != pres_passed:
++            raise CanaryFailedError(
++                f"opaque verifier preservation_passed ({parsed['preservation_passed']}) disagrees with "
++                f"outcomes count ({pres_passed})"
++            )
++        if pres_total < self.min_preservation:
++            raise CanaryFailedError(
++                f"opaque verifier canary gate requires at least {self.min_preservation} preservation canaries "
++                f"(found {pres_total})"
+             )
+ 
+-        if not outcomes or pres_total <= 0:
+-            raise CanaryFailedError("opaque verifier canary command returned empty outcomes or zero preservation_total")
+         failed = [o for o in outcomes if not o.passed]
+-        if pres_passed != pres_total or failed or parsed.get("passed") is False or parsed.get("all_passed") is False:
++        verdict_str = str(parsed.get("verdict") or "").strip().lower()
++        if (
++            pres_passed != pres_total
++            or failed
++            or parsed.get("passed") is False
++            or parsed.get("all_passed") is False
++            or verdict_str in ("reject", "fail", "failed")
++        ):
+             raise CanaryFailedError(
+                 f"opaque verifier canary gate failed (preservation {pres_passed}/{pres_total}, failed={len(failed)})"
+             )
+diff --git a/tests/test_stage3_canary.py b/tests/test_stage3_canary.py
+index 89ef3b8..b389b13 100644
+--- a/tests/test_stage3_canary.py
++++ b/tests/test_stage3_canary.py
+@@ -201,11 +201,18 @@ class TestStage3Canary(unittest.TestCase):
+                 # Opaque command runner test (zero direct vault read by caller)
+                 runner_script = tmp / "opaque_runner.py"
+                 runner_script.write_text(
+-                    "import json, sys\n"
+-                    "print(json.dumps({"
+-                    "'suite_sha256': 'a'*64, "
+-                    "'preservation_passed': 8, 'preservation_total': 8, "
+-                    "'outcomes': [{'canary_id': 'c1', 'category': 'preservation', 'passed': True, 'failures': []}]"
++                    "import json\n"
++                    "outcomes = [\n"
++                    "    {'canary_id': f'pres-{i}', 'category': 'preservation', 'passed': True, 'failures': []}\n"
++                    "    for i in range(1, 5)\n"
++                    "] + [\n"
++                    "    {'canary_id': 'dom-1', 'category': 'domain', 'passed': True, 'failures': []}\n"
++                    "]\n"
++                    "print(json.dumps({\n"
++                    "    'suite_sha256': 'a'*64,\n"
++                    "    'preservation_passed': 4,\n"
++                    "    'preservation_total': 4,\n"
++                    "    'outcomes': outcomes,\n"
+                     "}))\n",
+                     encoding="utf-8",
+                 )
+@@ -221,8 +228,70 @@ class TestStage3Canary(unittest.TestCase):
+                     )
+                 )
+                 res = ext.run([bundle])
+-                self.assertEqual(res.preservation_passed, 8)
++                self.assertEqual(res.preservation_passed, 4)
++                self.assertEqual(res.preservation_total, 4)
++                self.assertEqual(len(res.outcomes), 5)
+                 self.assertTrue(res.canary_slot_flushed)
++
++                # Fail-closed check 1: bare aggregate {"passed": true} without per-canary outcomes MUST fail!
++                agg_only_script = tmp / "opaque_agg_only.py"
++                agg_only_script.write_text(
++                    "import json\nprint(json.dumps({'passed': True}))\n",
++                    encoding="utf-8",
++                )
++                ext_agg = ExternalCommandCanaryRunner(
++                    LlamaServerClient(url),
++                    [sys.executable, str(agg_only_script)],
++                )
++                with self.assertRaises(CanaryFailedError) as agg_ctx:
++                    ext_agg.run([bundle])
++                self.assertIn("aggregate-only reports are rejected", str(agg_ctx.exception))
++
++                # Fail-closed check 2: fewer than min_preservation (4) preservation canaries MUST fail!
++                low_pres_script = tmp / "opaque_low_pres.py"
++                low_pres_script.write_text(
++                    "import json\n"
++                    "print(json.dumps({\n"
++                    "    'suite_sha256': 'b'*64,\n"
++                    "    'preservation_passed': 2,\n"
++                    "    'preservation_total': 2,\n"
++                    "    'outcomes': [\n"
++                    "        {'canary_id': 'p1', 'category': 'preservation', 'passed': True, 'failures': []},\n"
++                    "        {'canary_id': 'p2', 'category': 'preservation', 'passed': True, 'failures': []},\n"
++                    "        {'canary_id': 'd1', 'category': 'domain', 'passed': True, 'failures': []},\n"
++                    "    ],\n"
++                    "}))\n",
++                    encoding="utf-8",
++                )
++                ext_low = ExternalCommandCanaryRunner(
++                    LlamaServerClient(url),
++                    [sys.executable, str(low_pres_script)],
++                )
++                with self.assertRaises(CanaryFailedError) as low_ctx:
++                    ext_low.run([bundle])
++                self.assertIn("requires at least 4 preservation canaries", str(low_ctx.exception))
++
++                # Fail-closed check 3: mismatched preservation_total header spoofing MUST fail!
++                spoof_hdr_script = tmp / "opaque_spoof_hdr.py"
++                spoof_hdr_script.write_text(
++                    "import json\n"
++                    "print(json.dumps({\n"
++                    "    'suite_sha256': 'c'*64,\n"
++                    "    'preservation_passed': 8,\n"
++                    "    'preservation_total': 8,\n"
++                    "    'outcomes': [\n"
++                    "        {'canary_id': 'p1', 'category': 'preservation', 'passed': True, 'failures': []}\n"
++                    "    ],\n"
++                    "}))\n",
++                    encoding="utf-8",
++                )
++                ext_spoof = ExternalCommandCanaryRunner(
++                    LlamaServerClient(url),
++                    [sys.executable, str(spoof_hdr_script)],
++                )
++                with self.assertRaises(CanaryFailedError) as spoof_ctx:
++                    ext_spoof.run([bundle])
++                self.assertIn("disagrees with outcomes count", str(spoof_ctx.exception))
+         finally:
+             mock.stop()
+ 
+@@ -275,6 +344,47 @@ class TestStage3Canary(unittest.TestCase):
+             # 10 pre-canary erases across buckets + 4 final cleanup erases = 14 total erase_slot calls
+             self.assertEqual(len(erase_calls), 14)
+ 
++    def test_external_command_canary_runner_rejects_malformed_outcomes_and_duplicates(self) -> None:
++        from warp_modeld.canary import ExternalCommandCanaryRunner
++        from warp_modeld.llama_client import LlamaServerClient
++        from warp_modeld.fingerprint import AdapterBundle
++        import sys
++
++        mock = MockLlamaServer()
++        url = mock.start()
++        try:
++            with tempfile.TemporaryDirectory() as td:
++                tmp = Path(td)
++                bundle = AdapterBundle.from_dict(
++                    make_adapter_bundle_dict(
++                        adapter_id="mde:formal-verification",
++                        domain="formal-verification",
++                        llama_adapter_id=2,
++                    )
++                )
++                dup_script = tmp / "dup_outcomes.py"
++                dup_script.write_text(
++                    "import json\n"
++                    "print(json.dumps({\n"
++                    "    'outcomes': [\n"
++                    "        {'canary_id': 'p1', 'category': 'preservation', 'passed': True},\n"
++                    "        {'canary_id': 'p1', 'category': 'preservation', 'passed': True},\n"
++                    "        {'canary_id': 'p3', 'category': 'preservation', 'passed': True},\n"
++                    "        {'canary_id': 'p4', 'category': 'preservation', 'passed': True},\n"
++                    "    ]\n"
++                    "}))\n",
++                    encoding="utf-8",
++                )
++                ext_dup = ExternalCommandCanaryRunner(LlamaServerClient(url), [sys.executable, str(dup_script)])
++                with self.assertRaises(CanaryFailedError) as dup_ctx:
++                    ext_dup.run([bundle])
++                self.assertIn("duplicate canary_id", str(dup_ctx.exception))
++
++                with self.assertRaises(CanaryConfigError):
++                    ExternalCommandCanaryRunner(LlamaServerClient(url), [sys.executable], min_preservation=0)
++        finally:
++            mock.stop()
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
 -- 
 2.54.0 (Apple Git-157)
 

@@ -2,20 +2,18 @@
 """Independent live end-to-end verification of `stack/` (`mde -> exo -> warp-modeld -> llama-server`).
 
 Executes against `compile/artifacts/MANIFEST.json` and sealed `<workspace>/mcproof-vault/`:
-1. Full Phase 4 live 4-stage gate (`run_phase4_live_mount`) with sealed `warp_canaries_16.json`
-   (and fallback opaque Tier-2 `grade_canaries.py --opaque-stage3` probe if strict 16/16 flags `CAN-FORM-C1`).
-2. Independent adversarial battery against live `WarpModeld` + `WarpUnixRpcServer` + sealed `warp_canaries_16.json`:
+1. Independent adversarial battery against live `WarpModeld` + `WarpUnixRpcServer` + sealed `warp_canaries_16.json`:
    - Honest-cert low-norm `formal-verification.sabotage.f16.gguf` -> Stage 2 `ERR_CERT_INVALID`.
    - Forged-cert (recomputed valid `cert_sha256` with `leakage_energy_scaled=0`, `max_safety_dot_sq_scaled=0`)
      on `formal-verification.sabotage.f16.gguf` -> passes Stage 2, caught at Stage 3 by sealed canaries (`ERR_CANARY_FAILED`).
-   - Real `Qwen3.5-4B` in-nullspace `formal-verification.goodhart.f16.gguf` -> passes Stage 2, probed at Stage 3
-     and cross-referenced with Phase 5 `private_holdout.jsonl` rejection.
+   - Real `Qwen3.5-4B` in-nullspace `formal-verification.goodhart.f16.gguf` -> passes Stage 2, probed live at Stage 3
+     and cross-checked against measured `vault_arms_adapters.json` (`0/96` on `private_holdout.jsonl`).
+2. Full Phase 4 live 4-stage gate (`run_phase4_live_mount`) with sealed `warp_canaries_16.json`
+   (recording strict 16/16 and Tier-2 15/16 verdicts honestly without masking failures).
 3. Full Phase 6 multi-MDE composition (`run_phase6_composition`) with sealed `warp_canaries_multidomain.json`
-   and sealed `mixed_composition_30.jsonl` + `grade_mixed.py`, verifying `T-C1`..`T-C5` and `H1`..`H7`.
+   and sealed `mixed_composition_30.jsonl` + committed `verification/graders/grade_mixed.py`.
 
-SECURITY INVARIANT:
-- All raw stack outputs sit inside an ephemeral `0o700` `TemporaryDirectory` that is wiped on exit.
-- Verifies zero 24+ char vault prompt leakage before writing `stack_verification_receipt.json`.
+Exits non-zero (`1`) unless the adversarial battery AND strict sealed Phase 4 AND Phase 6 gates all pass.
 """
 
 from __future__ import annotations
@@ -26,16 +24,21 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 VERIF_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = VERIF_DIR.parent
 STACK_ROOT = Path(os.environ.get("MCPROOF_STACK_DIR") or (_REPO_ROOT / "stack"))
 VAULT_ROOT = Path(os.environ.get("MCPROOF_VAULT_DIR") or (_REPO_ROOT.parents[1] / "mcproof-vault"))
-COMPILE_MANIFEST = Path(os.environ.get("MCPROOF_COMPILE_MANIFEST") or (_REPO_ROOT / "compile" / "artifacts" / "MANIFEST.json"))
+COMPILE_MANIFEST = Path(
+    os.environ.get("MCPROOF_COMPILE_MANIFEST") or (_REPO_ROOT / "compile" / "artifacts" / "MANIFEST.json")
+)
 
-sys.path.insert(0, str(STACK_ROOT / "src"))
+for _p in (str(VERIF_DIR), str(STACK_ROOT / "src")):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
+from leak_audit import load_vault_prompts, verify_zero_vault_leak_text  # noqa: E402
 from mcproof_stack.phase4_mount import run_phase4_live_mount  # noqa: E402
 from mcproof_stack.phase6_composition import run_phase6_composition  # noqa: E402
 from mcproof_stack.runtime import (  # noqa: E402
@@ -46,25 +49,8 @@ from mcproof_stack.runtime import (  # noqa: E402
 )
 
 
-def load_vault_prompts() -> list[str]:
-    prompts: list[str] = []
-    for jname in ("private_holdout.jsonl", "general_retention_100.jsonl", "mixed_composition_30.jsonl", "canaries_16.jsonl"):
-        p = VAULT_ROOT / jname
-        for ln in p.read_text(encoding="utf-8").splitlines():
-            if ln.strip():
-                prompts.append(str(json.loads(ln).get("prompt", "")).strip())
-    return prompts
-
-
-def verify_zero_vault_leak(serialized_json: str, vault_prompts: Sequence[str]) -> None:
-    for pr in vault_prompts:
-        probe = pr[:40]
-        if len(probe) >= 24 and probe in serialized_json:
-            raise RuntimeError("SECURITY VIOLATION: vault prompt substring detected in stack receipt!")
-
-
 def scrub_failing_items(obj: Any) -> Any:
-    """Strip any text fields inside failing_items while preserving IDs and issue category codes."""
+    """Strip any text or local host path fields while preserving IDs and sanitized category codes."""
     if isinstance(obj, Mapping):
         cleaned: dict[str, Any] = {}
         for k, v in obj.items():
@@ -74,7 +60,26 @@ def scrub_failing_items(obj: Any) -> Any:
         return cleaned
     if isinstance(obj, list):
         return [scrub_failing_items(x) for x in obj]
+    if isinstance(obj, str) and (("/" + "Users/") in obj or ("/" + "home/") in obj):
+        return Path(obj).name
     return obj
+
+
+def _load_goodhart_phase5_cross_check() -> dict[str, Any] | None:
+    adapters_file = VERIF_DIR / "vault_arms_adapters.json"
+    if not adapters_file.is_file():
+        return None
+    doc = json.loads(adapters_file.read_text(encoding="utf-8"))
+    gh = doc.get("arms", {}).get("goodhart", {})
+    ph = gh.get("private_holdout")
+    if not isinstance(ph, dict):
+        return None
+    return {
+        "source_receipt": "verification/vault_arms_adapters.json",
+        "private_holdout_total_passed": int(ph["total_passed"]),
+        "private_holdout_total_count": int(ph["total_count"]),
+        "rejected_by_phase5_holdout": int(ph["total_passed"]) == 0,
+    }
 
 
 def run_forged_cert_sabotage_and_goodhart_probe(
@@ -155,8 +160,12 @@ def run_forged_cert_sabotage_and_goodhart_probe(
         runtime_flags_sha256=warp_flags.canonical_digest(),
     )
     template_bundle = base_bundles[0]
+    if ckpt.has_ssm_recurrent:
+        template_bundle["checkpoint"]["has_ssm_recurrent"] = True
+        template_bundle["checkpoint"]["has_horizontal_lattice"] = False
+        template_bundle["checkpoint"]["lattice_layers"] = 0
+        template_bundle["checkpoint"]["lattice_width"] = 0
 
-    # Load [0=p2b, 1=sabotage, 2=goodhart] into live llama-server at initial scale 0.0
     with LiveLlamaProcess(
         llama_bin=paths.llama_server_bin,
         base_gguf=paths.default_base_gguf,
@@ -189,7 +198,6 @@ def run_forged_cert_sabotage_and_goodhart_probe(
         try:
             bridge = WarpUnixBridge(sock_path, ledger=exo_ledger, timeout_sec=60.0)
 
-            # A. Honest-cert sabotage -> Stage 2 ERR_CERT_INVALID
             sab_honest_cert = FixedRadixCertificate.from_weft_dict(
                 sab_info["weft_certificate_dict"],
                 adapter_id="mde:formal-verification",
@@ -208,8 +216,6 @@ def run_forged_cert_sabotage_and_goodhart_probe(
             except WarpLoadError as exc:
                 honest_sab_code = str(exc.code)
 
-            # B. Forged-cert sabotage (recomputed valid cert_sha256 claiming 0 leakage & 0 safety overlap!)
-            # Passes Stage 2 integer bounds; MUST be caught at Stage 3 by sealed warp_canaries_16.json!
             sab_forged_valid_cert = FixedRadixCertificate.create(
                 adapter_id="mde:formal-verification",
                 adapter_sha256=str(sab_info["gguf_sha256"]),
@@ -234,7 +240,6 @@ def run_forged_cert_sabotage_and_goodhart_probe(
 
             scales_after_sab = {a.id: a.scale for a in llama_client.list_lora_adapters()}
 
-            # C. Real Qwen3.5-4B in-nullspace Goodhart patch (passes Stage 2 cert!)
             gh_warp_cert = FixedRadixCertificate.from_weft_dict(
                 gh_info["weft_certificate_dict"],
                 adapter_id="mde:formal-verification",
@@ -248,7 +253,7 @@ def run_forged_cert_sabotage_and_goodhart_probe(
             b_gh["adapter_sha256"] = str(gh_info["gguf_sha256"])
             b_gh["adapter_path"] = str(gh_gguf)
             b_gh["certificate"] = gh_warp_cert.to_dict()
-            gh_stage3_outcome = "MOUNTED_STAGE3_REJECTED_AT_PHASE5_HOLDOUT"
+            gh_stage3_outcome = "MOUNTED_AT_STAGE3_THEN_UNMOUNTED"
             try:
                 bridge.mount_stack([b_gh], zone_manifest_id=zm_id)
                 bridge.unmount(reason="unmount_goodhart_probe")
@@ -266,34 +271,38 @@ def run_forged_cert_sabotage_and_goodhart_probe(
     if any(abs(v) > 0.0 for v in scales_after_sab.values()):
         raise RuntimeError(f"Non-zero active LoRA scale after sabotage rejection: {scales_after_sab}")
 
+    gh_holdout_check = _load_goodhart_phase5_cross_check()
+    gh_caught = (gh_stage3_outcome == "ERR_CANARY_FAILED") or bool(
+        gh_holdout_check and gh_holdout_check.get("rejected_by_phase5_holdout")
+    )
+
     return {
-        "passed": True,
+        "passed": gh_caught,
         "sabotage_honest_cert_stage2_code": honest_sab_code,
         "sabotage_forged_valid_cert_stage3_code": forged_sab_code,
         "scales_after_sabotage_rejection": scales_after_sab,
         "goodhart_stage2_bounds_passed": True,
         "goodhart_stage3_sealed_canary_outcome": gh_stage3_outcome,
+        "goodhart_phase5_holdout_cross_check": gh_holdout_check,
         "scales_after_goodhart_unmount": scales_final,
     }
 
 
 def main() -> int:
-    vault_prompts = load_vault_prompts()
+    vault_prompts = load_vault_prompts(VAULT_ROOT)
     paths = StackPaths.discover()
 
     with tempfile.TemporaryDirectory(prefix="verifier_stack_sealed_") as td_str:
         td = Path(td_str)
         td.chmod(0o700)
 
-        # 1. Independent adversarial battery (honest-cert sabotage, forged-cert sabotage, real Goodhart)
         adv_probe = run_forged_cert_sabotage_and_goodhart_probe(paths, td / "adv")
 
-        # 2. Full Phase 4 live mount: test strict 16/16 sealed canaries, opaque Tier-2 15/16 sealed canaries,
-        # and full Stages 1-4 + drift/rollback verification.
         phase4_strict_16_ok = False
         phase4_strict_err: str | None = None
         phase4_tier2_15_ok = False
         phase4_tier2_err: str | None = None
+        phase4_degraded_unsealed = False
         phase4_receipt: dict[str, Any]
         try:
             phase4_receipt = run_phase4_live_mount(
@@ -310,7 +319,7 @@ def main() -> int:
             phase4_strict_err = f"{type(exc).__name__}:{str(exc)[:220]}"
             opaque_cmd = [
                 sys.executable,
-                str(VAULT_ROOT / "harnesses" / "grade_canaries.py"),
+                str(VERIF_DIR / "graders" / "grade_canaries.py"),
                 "--opaque-stage3",
                 "--server-url",
                 "{server_url}",
@@ -333,23 +342,24 @@ def main() -> int:
                 phase4_tier2_15_ok = True
             except Exception as exc2:  # noqa: BLE001
                 phase4_tier2_err = f"{type(exc2).__name__}:{str(exc2)[:220]}"
+                phase4_degraded_unsealed = True
                 phase4_receipt = run_phase4_live_mount(
                     paths,
-                    output_dir=td / "phase4_host",
+                    output_dir=td / "phase4_diagnostic_unsealed",
                     compiler_manifest_path=COMPILE_MANIFEST,
                     ctx_size=4096,
                     parallel_slots=8,
                 )
 
-        # 3. Full Phase 6 composition with sealed warp_canaries_multidomain.json + sealed mixed_composition_30.jsonl
         mixed_grader_cmd = [
             sys.executable,
-            str(VAULT_ROOT / "harnesses" / "grade_mixed.py"),
+            str(VERIF_DIR / "graders" / "grade_mixed.py"),
             "--responses",
             "{responses_jsonl}",
         ]
         phase6_strict_19_ok = False
         phase6_strict_err: str | None = None
+        phase6_degraded_unsealed = False
         phase6_receipt: dict[str, Any]
         try:
             phase6_receipt = run_phase6_composition(
@@ -359,48 +369,62 @@ def main() -> int:
                 canary_jsonl_path=VAULT_ROOT / "warp_canaries_multidomain.json",
                 mixed_jsonl_path=VAULT_ROOT / "mixed_composition_30.jsonl",
                 mixed_grader_cmd=mixed_grader_cmd,
-                ctx_size=4096,
+                ctx_size=8192,
                 parallel_slots=8,
             )
             phase6_strict_19_ok = True
         except Exception as exc:  # noqa: BLE001
             phase6_strict_err = f"{type(exc).__name__}:{str(exc)[:160]}"
+            phase6_degraded_unsealed = True
             phase6_receipt = run_phase6_composition(
                 paths,
-                output_dir=td / "phase6_tier2",
+                output_dir=td / "phase6_diagnostic_unsealed",
                 compiler_manifest_path=COMPILE_MANIFEST,
                 mixed_jsonl_path=VAULT_ROOT / "mixed_composition_30.jsonl",
                 mixed_grader_cmd=mixed_grader_cmd,
-                ctx_size=4096,
+                ctx_size=8192,
                 parallel_slots=8,
             )
 
+    strict_sealed_all_passed = bool(
+        adv_probe["passed"]
+        and phase4_strict_16_ok
+        and (not phase4_degraded_unsealed)
+        and bool(phase4_receipt.get("passed"))
+        and phase6_strict_19_ok
+        and (not phase6_degraded_unsealed)
+        and bool(phase6_receipt.get("passed"))
+    )
+
     sanitized_out = scrub_failing_items(
         {
-            "schema": "verifier-stack-sealed-receipt/v0.1",
-            "compiler_manifest_path": str(COMPILE_MANIFEST),
+            "schema": "verifier-stack-sealed-receipt/v0.2",
+            "strict_sealed_all_passed": strict_sealed_all_passed,
+            "compiler_manifest_path": "compile/artifacts/MANIFEST.json",
             "adversarial_forged_cert_sabotage_and_goodhart": adv_probe,
             "phase4_strict_16_of_16_canary_mounted": phase4_strict_16_ok,
             "phase4_strict_16_of_16_note": phase4_strict_err,
             "phase4_tier2_15_of_16_canary_mounted": phase4_tier2_15_ok,
             "phase4_tier2_15_of_16_note": phase4_tier2_err,
+            "phase4_degraded_to_unsealed_diagnostic": phase4_degraded_unsealed,
             "phase4": phase4_receipt,
             "phase6_strict_19_of_19_multidomain_canary_mounted": phase6_strict_19_ok,
             "phase6_strict_19_of_19_note": phase6_strict_err,
+            "phase6_degraded_to_unsealed_diagnostic": phase6_degraded_unsealed,
             "phase6": phase6_receipt,
         }
     )
     serialized = json.dumps(sanitized_out, indent=2, sort_keys=True) + "\n"
-    verify_zero_vault_leak(serialized, vault_prompts)
+    verify_zero_vault_leak_text(serialized, vault_prompts, label="stack_verification_receipt.json")
     out_path = VERIF_DIR / "stack_verification_receipt.json"
     out_path.write_text(serialized, encoding="utf-8")
 
     print(
         json.dumps(
             {
+                "strict_sealed_all_passed": strict_sealed_all_passed,
                 "adversarial_passed": adv_probe["passed"],
                 "phase4_strict_16_mounted": phase4_strict_16_ok,
-                "phase4_tier2_15_mounted": phase4_tier2_15_ok,
                 "phase4_passed": phase4_receipt.get("passed"),
                 "phase6_strict_19_mounted": phase6_strict_19_ok,
                 "phase6_passed": phase6_receipt.get("passed"),
@@ -409,7 +433,7 @@ def main() -> int:
             sort_keys=True,
         )
     )
-    return 0
+    return 0 if strict_sealed_all_passed else 1
 
 
 if __name__ == "__main__":
