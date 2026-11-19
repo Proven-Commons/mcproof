@@ -497,15 +497,15 @@ def compile_p2b_deterministic(
 
     cert_path = output_dir / cert_name
     cert_path.write_text(
-        json.dumps(asdict(p2b_f16.certificate), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(asdict(p2b_f16.certificate), indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
     )
     bind_path = output_dir / bind_name
     bind_path.write_text(
-        json.dumps(asdict(binding_manifest), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(asdict(binding_manifest), indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
     )
     gate_policy_path = output_dir / gate_policy_name
     gate_policy_path.write_text(
-        json.dumps(asdict(gate_policy), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(asdict(gate_policy), indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
     )
 
     warp_flags = WarpRuntimeFlags(
@@ -539,7 +539,7 @@ def compile_p2b_deterministic(
     warp_bundle["zone_manifest_id"] = zone_manifest_id
     warp_bundle_path = output_dir / warp_bundle_name
     warp_bundle_path.write_text(
-        json.dumps(warp_bundle, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(warp_bundle, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
     )
 
     # Hard Veto 4 vendor-namespaced W-MCP Profile B metadata (`_meta["gg.siliconcordat/mde"]`)
@@ -559,7 +559,9 @@ def compile_p2b_deterministic(
         }
     }
     wmcp_meta_path = output_dir / wmcp_meta_name
-    wmcp_meta_path.write_text(json.dumps(wmcp_meta, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    wmcp_meta_path.write_text(
+        json.dumps(wmcp_meta, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
+    )
 
     return {
         "projector": proj,

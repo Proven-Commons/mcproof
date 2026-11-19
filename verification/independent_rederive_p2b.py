@@ -674,13 +674,13 @@ def main() -> int:
         (OUT_DIR / fname).write_bytes(wfsl_bytes)
 
     (OUT_DIR / "formal-verification.p2b.certificate.json").write_text(
-        json.dumps(f16_form["cert"], indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(f16_form["cert"], indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
     )
     (OUT_DIR / "formal-verification.p2b.binding.json").write_text(
-        json.dumps(binding_dict, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(binding_dict, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
     )
     (OUT_DIR / "formal-verification.p2b.gate_policy.json").write_text(
-        json.dumps(PRE_REGISTERED_GATE_POLICY_DICT, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(PRE_REGISTERED_GATE_POLICY_DICT, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
     )
 
     # 8. Independent Warp AdapterBundle + W-MCP vendor _meta (completing 9/9 P2-B outputs)
@@ -766,7 +766,7 @@ def main() -> int:
         "zone_manifest_id": zone_manifest_id,
     }
     (OUT_DIR / "formal-verification.p2b.warp_bundle.json").write_text(
-        json.dumps(warp_bundle, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(warp_bundle, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
     )
 
     wmcp_meta = {
@@ -783,7 +783,7 @@ def main() -> int:
         }
     }
     (OUT_DIR / "formal-verification.p2b.wmcp_meta.json").write_text(
-        json.dumps(wmcp_meta, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(wmcp_meta, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
     )
 
     checked_files = (
@@ -838,7 +838,7 @@ def main() -> int:
         "zero_byte_diff_all": all_ok,
         "files": comparisons,
     }
-    RECEIPT_JSON.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    RECEIPT_JSON.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps(receipt, indent=2, sort_keys=True))
     return 0 if all_ok else 1
 

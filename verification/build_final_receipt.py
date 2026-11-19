@@ -628,7 +628,7 @@ def main() -> int:
     }
 
     out_path = VERIF_DIR / "VERIFICATION_RECEIPT.json"
-    out_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    out_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
 
     vault_prompts = load_vault_prompts(VAULT_ROOT) if (VAULT_ROOT is not None and VAULT_ROOT.is_dir()) else []
     leak_summary = audit_directory_zero_leaks(
