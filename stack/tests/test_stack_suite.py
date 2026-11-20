@@ -12,6 +12,7 @@ import sys
 import tempfile
 from typing import Any
 import unittest
+import unittest.mock
 
 _STACK_SRC = Path(__file__).resolve().parents[1] / "src"
 if str(_STACK_SRC) not in sys.path:
@@ -40,6 +41,7 @@ from mcproof_stack.runtime import (  # noqa: E402
     GGUF_MAGIC,
     GGUF_VERSION,
     StackPaths,
+    resolve_siliconcordat_root,
     build_canary_command,
     build_checkpoint_and_weft_suite,
     compute_mcproof_plane1_tree_sha256,
@@ -110,6 +112,40 @@ class _FakeFlags:
     ctx_size: int
     kv_cache_type: str
     lora_init_without_apply: bool
+
+
+class TestSiliconcordatRootResolution(unittest.TestCase):
+    """Flat-clone and mcproof-lab layouts must resolve `siliconcordat` without `SILICONCORDAT_ROOT`."""
+
+    def test_flat_clone_resolves_sibling_under_lab_root(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="mcproof_flat_") as td:
+            lab = Path(td) / "workspace"
+            lab.mkdir()
+            (lab / "siliconcordat").mkdir()
+            with unittest.mock.patch.dict(os.environ, {}, clear=True):
+                resolved = resolve_siliconcordat_root(lab)
+            self.assertEqual(resolved, (lab / "siliconcordat").resolve())
+
+    def test_mcproof_lab_layout_resolves_parent_sibling(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="mcproof_lab_") as td:
+            work = Path(td) / "work"
+            lab = work / "mcproof-lab"
+            lab.mkdir(parents=True)
+            (work / "siliconcordat").mkdir()
+            with unittest.mock.patch.dict(os.environ, {}, clear=True):
+                resolved = resolve_siliconcordat_root(lab)
+            self.assertEqual(resolved, (work / "siliconcordat").resolve())
+
+    def test_env_override_wins(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="mcproof_env_sc_") as td:
+            custom = Path(td) / "custom-siliconcordat"
+            custom.mkdir()
+            lab = Path(td) / "lab"
+            lab.mkdir()
+            (lab / "siliconcordat").mkdir()
+            with unittest.mock.patch.dict(os.environ, {"SILICONCORDAT_ROOT": str(custom)}, clear=True):
+                resolved = resolve_siliconcordat_root(lab)
+            self.assertEqual(resolved, custom.resolve())
 
 
 class TestPureStackHelpers(unittest.TestCase):

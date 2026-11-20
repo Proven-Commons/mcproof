@@ -33,7 +33,7 @@ On public `validation.jsonl` (`48` items), `P2-B` regressed below bare `B0` and 
 | --- | --- | --- | --- |
 | Primary holdout & validation gain | `>= 50%` failure drop vs `B0` | Sealed `0/96` vs `B0` `0/96`, public `validation.jsonl` `2/48` (`4.17%`) vs `B0` `4/48` (`8.33%`, `-4.55%` rel. drop) | **FAIL (Honest Kill Boundary)** |
 | Plane 1 ceiling ratio | `>= 80%` of `B1` pass rate | Sealed `0/96` vs `B1` `0/96`, public `validation.jsonl` `2/48` vs `B1` `8/48` (`25.0%` ceiling ratio) | **FAIL (Honest Kill Boundary)** |
-| Injected SOP prompt tokens | Eliminate `B1` prompt overhead (`>= 90%` drop) | `0` injected SOP tokens on `P2-B` vs `32,216` `Qwen3.5` tokens on `B1` (`b1_prefix_cache_parity_verified: true`) | **PASS** |
+| Injected SOP prompt tokens | Eliminate `B1` prompt overhead (`>= 90%` drop) | `0` injected SOP tokens on `P2-B` vs `32,216` `Qwen3.5` tokens on `B1`. Committed `validation_scorecard.json` records `b1_prefix_cache_parity_verified` on a **3-item live prefix probe** (prefix containment, not full-string identity). | **PASS (architectural zero-token SOP on P2-B, not a capability gain)** |
 | Safety canaries | `8/8` (`100%`) mandatory, `0` flakes | `8/8` (`100.0%`), `0` flaky IDs across `10/10` live runs (`160` generations) | **PASS** |
 | General retention | `<= 1.0 pp` drop vs `B0` on `100` holdouts | `0.0 pp` drop (`P2-B` `85.0%` vs `B0` `84.0%`, unprojected `P2-A` `0.0%`) | **PASS** |
 | Mixed-zone synthesis | `0` corruptions/leaks across `30` mixed prompts | `30/30` `exo` router + public suite, `8/30` sealed `4B` oracle synthesis | **FAIL on `4B` / PASS on Router** |
@@ -68,7 +68,7 @@ Tests that require optional external binaries (`lean`, `lake`, `mde`, `llama-ser
 
 ### 2. Full Tier 2 Oracle and Stack Bootstrap
 
-Clone all `10` SHA-pinned Plane 1 upstream repositories plus the `4` `siliconcordat/*` sibling stacks, build `mde`, and install Lean `v4.35.0`:
+Clone all `10` SHA-pinned Plane 1 upstream repositories plus the `4` `siliconcordat/*` sibling stacks, build `mde`, and install Lean `v4.35.0`. Building `siliconcordat/mde` requires **Rust `>= 1.90`** because pinned crates such as `tree-sitter-language` need 1.90. The repo does not commit a `Cargo.lock`, so resolver floors drift with the registry. Use a recent `rustup toolchain install stable` or `cargo +nightly build` if needed.
 
 ```sh
 ./bin/bootstrap-deps --with-siliconcordat
