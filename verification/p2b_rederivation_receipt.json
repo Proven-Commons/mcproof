@@ -4,8 +4,8 @@
     "formal-verification.p2b.binding.json": {
       "byte_diff_count": 0,
       "bytes": 3429,
-      "expected_sha256": "9ea059c61a6dc21fe9328795c4cb639c6c19050d1fbb6459750a2e68f6175c4d",
-      "rederived_sha256": "9ea059c61a6dc21fe9328795c4cb639c6c19050d1fbb6459750a2e68f6175c4d",
+      "expected_sha256": "93c8accd871093c896ba08f511c14ac0d71c6505ef447733bd4db72456d23d5d",
+      "rederived_sha256": "93c8accd871093c896ba08f511c14ac0d71c6505ef447733bd4db72456d23d5d",
       "zero_byte_diff": true
     },
     "formal-verification.p2b.certificate.json": {
@@ -18,8 +18,8 @@
     "formal-verification.p2b.f16.gguf": {
       "byte_diff_count": 0,
       "bytes": 189408,
-      "expected_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
-      "rederived_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+      "expected_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
+      "rederived_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
       "zero_byte_diff": true
     },
     "formal-verification.p2b.f16.wfsl": {
@@ -53,20 +53,20 @@
     "formal-verification.p2b.warp_bundle.json": {
       "byte_diff_count": 0,
       "bytes": 2104,
-      "expected_sha256": "c8995729247d9d81690f75dc224127d2bd77a2237e7e7e056fb78e9ad25e70f2",
-      "rederived_sha256": "c8995729247d9d81690f75dc224127d2bd77a2237e7e7e056fb78e9ad25e70f2",
+      "expected_sha256": "1653a78658531be3950c3a6533fa97364736ccade86e163e9e4664d219bb1c2d",
+      "rederived_sha256": "1653a78658531be3950c3a6533fa97364736ccade86e163e9e4664d219bb1c2d",
       "zero_byte_diff": true
     },
     "formal-verification.p2b.wmcp_meta.json": {
       "byte_diff_count": 0,
       "bytes": 1583,
-      "expected_sha256": "6b31545190f4631fd982c4a7443e173ac11a84980efe13d89e7a6162fba826d4",
-      "rederived_sha256": "6b31545190f4631fd982c4a7443e173ac11a84980efe13d89e7a6162fba826d4",
+      "expected_sha256": "475ad6151b3e039050b4deedf2586150f7f220103fe2469c3fc896642a854bca",
+      "rederived_sha256": "475ad6151b3e039050b4deedf2586150f7f220103fe2469c3fc896642a854bca",
       "zero_byte_diff": true
     }
   },
   "files_checked_count": 9,
-  "harvested_activations_meta_sha256": "36df5b5734b1c0b2f538f2393bf9a02f2823634f8d776d6d62c1d312a1602933",
+  "harvested_activations_meta_sha256": "12031b25dd24555f03d9bc5e3cb9d76e6525e135238d5c2f324bc2d54c35a6ad",
   "harvested_activations_npz_sha256": "413a112304d3f80c27e76d16558900f82c16692151275ac488206d202aea72be",
   "hyperparameter_source": "pinned_constants_and_spec_lineage_json__never_read_from_expected_artifact",
   "implementation": "pure_numpy_and_python_stdlib__zero_weft_or_mcproof_compile_imports",

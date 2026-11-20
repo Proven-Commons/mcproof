@@ -1,6 +1,14 @@
 {
   "d_in": 2560,
   "d_out": 9216,
+  "harvest_runtime": {
+    "determinism_boundary": "platform_specific_bf16_harvest__cpu_float64_compile_deterministic_from_pinned_npz",
+    "device": "mps",
+    "forward_dtype": "bfloat16",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "provenance": "reconstructed_from_phase2_hardware_report_local_host_not_reharvested",
+    "torch_version": "unrecorded"
+  },
   "n_compile_decision_states": 332,
   "n_compile_prompts": 96,
   "n_ffn_down_k0_samples": 280,

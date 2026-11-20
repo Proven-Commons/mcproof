@@ -8,8 +8,8 @@
       "byte_len": 3429,
       "crlf_only_mismatch": false,
       "diagnostic": "exact_match",
-      "expected_sha256": "9ea059c61a6dc21fe9328795c4cb639c6c19050d1fbb6459750a2e68f6175c4d",
-      "rederived_sha256": "9ea059c61a6dc21fe9328795c4cb639c6c19050d1fbb6459750a2e68f6175c4d",
+      "expected_sha256": "93c8accd871093c896ba08f511c14ac0d71c6505ef447733bd4db72456d23d5d",
+      "rederived_sha256": "93c8accd871093c896ba08f511c14ac0d71c6505ef447733bd4db72456d23d5d",
       "zero_byte_diff": true
     },
     "formal-verification.p2b.certificate.json": {
@@ -26,8 +26,8 @@
       "byte_len": 189408,
       "crlf_only_mismatch": false,
       "diagnostic": "exact_match",
-      "expected_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
-      "rederived_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+      "expected_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
+      "rederived_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
       "zero_byte_diff": true
     },
     "formal-verification.p2b.f16.wfsl": {
@@ -71,8 +71,8 @@
       "byte_len": 2104,
       "crlf_only_mismatch": false,
       "diagnostic": "exact_match",
-      "expected_sha256": "c8995729247d9d81690f75dc224127d2bd77a2237e7e7e056fb78e9ad25e70f2",
-      "rederived_sha256": "c8995729247d9d81690f75dc224127d2bd77a2237e7e7e056fb78e9ad25e70f2",
+      "expected_sha256": "1653a78658531be3950c3a6533fa97364736ccade86e163e9e4664d219bb1c2d",
+      "rederived_sha256": "1653a78658531be3950c3a6533fa97364736ccade86e163e9e4664d219bb1c2d",
       "zero_byte_diff": true
     },
     "formal-verification.p2b.wmcp_meta.json": {
@@ -80,8 +80,8 @@
       "byte_len": 1583,
       "crlf_only_mismatch": false,
       "diagnostic": "exact_match",
-      "expected_sha256": "6b31545190f4631fd982c4a7443e173ac11a84980efe13d89e7a6162fba826d4",
-      "rederived_sha256": "6b31545190f4631fd982c4a7443e173ac11a84980efe13d89e7a6162fba826d4",
+      "expected_sha256": "475ad6151b3e039050b4deedf2586150f7f220103fe2469c3fc896642a854bca",
+      "rederived_sha256": "475ad6151b3e039050b4deedf2586150f7f220103fe2469c3fc896642a854bca",
       "zero_byte_diff": true
     }
   },

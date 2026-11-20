@@ -56,7 +56,7 @@
       "adapter_id": "mde:formal-verification",
       "certificate_sha256": "56820652f47de5866a57fd39bbb092ea2c14c658f2671dbcbcafcc2fa5180b76",
       "gguf_bytes": 189408,
-      "gguf_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+      "gguf_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
       "rederived_zero_byte_ok": true,
       "slab_int4_f16_bytes": 78803,
       "slab_int4_int8_bytes": 58357,
@@ -258,7 +258,7 @@
         "adapter_id": "mde:formal-verification",
         "certificate_sha256": "56820652f47de5866a57fd39bbb092ea2c14c658f2671dbcbcafcc2fa5180b76",
         "gguf_bytes": 189408,
-        "gguf_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+        "gguf_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
         "llama_adapter_id": 2,
         "source_kind": "compiler_handoff"
       },

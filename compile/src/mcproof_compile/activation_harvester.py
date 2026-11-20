@@ -57,6 +57,15 @@ def verify_cached_activations_npz(
     expected_sha = meta.get("npz_sha256")
     if not isinstance(expected_sha, str) or len(expected_sha) != 64:
         raise ValueError(f"Missing or invalid 64-hex npz_sha256 in {sidecar.name}")
+    runtime = meta.get("harvest_runtime")
+    if not isinstance(runtime, dict):
+        raise ValueError(f"Activations sidecar {sidecar.name} is missing harvest_runtime provenance")
+    for key in ("torch_version", "device", "platform"):
+        value = runtime.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(
+                f"Activations sidecar {sidecar.name} harvest_runtime.{key} must be a non-empty string"
+            )
 
     actual_sha = sha256_file_stream(npz_file)
     if not hmac.compare_digest(actual_sha, expected_sha.lower()):

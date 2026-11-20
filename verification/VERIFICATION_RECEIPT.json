@@ -589,21 +589,21 @@
   "issue": "siliconcordat/mde#4",
   "lineage_and_pins": {
     "base_gguf_q8_0_sha256": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1",
-    "compiler_manifest_sha256": "feb435b67d3f065539cef8a5c02ab9f189a20314ca1388b845f268538f89935b",
+    "compiler_manifest_sha256": "fcec69eace974d2cb8629935864ced711a8859b07e7a396e530cf373f2606fac",
     "corpus_tree_sha256": "93624aae09eea99c3d35ebfa2e9acde1f9ac9c675167461652486850f206b642",
     "datasets_sha256sums_manifest_sha256": "312953bc99bb42e6cbef1d1a3c240975f2baf3c60506df6c9eef06a678d45d56",
     "lean_toolchain": "leanprover/lean4:v4.35.0",
     "llama_server_version": "0.5.0 (build 11146, commit 7fe450e19)",
-    "p2b_artifact_commit": "f4c74a1e609c9d197b813a7141344c6e2cd72b08",
+    "p2b_artifact_commit": "6c40a4c3dea2380101dd1392ec6a344b1ff96dee",
     "p2b_artifact_commit_verified_in_odb": true,
-    "p2b_f16_gguf_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+    "p2b_f16_gguf_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
     "plane1_formal_spec_cl100k_tokens": 30873,
     "plane1_formal_spec_qwen35_tokens": 32216,
     "plane1_formal_spec_sha256": "49beff2a0185cfa4032170b614a543c0d67541494e858803d21cfb837111b230",
     "public_holdout_commitment_sha256": "e7c9b9da52be68c4731e35961c31ec33decf440e4ccb00b2c9072e029054f032",
     "safetensors_checkpoint_fingerprint": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
     "spec_lineage_json_sha256": "344f5506e702dc8dc0ee7374d30af788e3d4c2c370fcdbc877435e133da26a76",
-    "tracked_evidence_merkle_sha256": "218957d629427afcf5a967b09d0abc49598f55924a8307a8edb5ca6d4448f76c",
+    "tracked_evidence_merkle_sha256": "96467eb7b707561b8bc2e60045dcb6f99ce7be2aac36e293fbff7e03fe1c1f37",
     "vault_sha256sums_manifest_sha256": "b14cf1efeedf7a7c8c15ed57e587c3d18087f557e6ff1807068c4e9c9ef6f6ee",
     "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
   },
@@ -943,8 +943,8 @@
         "formal-verification.p2b.binding.json": {
           "byte_diff_count": 0,
           "bytes": 3429,
-          "expected_sha256": "9ea059c61a6dc21fe9328795c4cb639c6c19050d1fbb6459750a2e68f6175c4d",
-          "rederived_sha256": "9ea059c61a6dc21fe9328795c4cb639c6c19050d1fbb6459750a2e68f6175c4d",
+          "expected_sha256": "93c8accd871093c896ba08f511c14ac0d71c6505ef447733bd4db72456d23d5d",
+          "rederived_sha256": "93c8accd871093c896ba08f511c14ac0d71c6505ef447733bd4db72456d23d5d",
           "zero_byte_diff": true
         },
         "formal-verification.p2b.certificate.json": {
@@ -957,8 +957,8 @@
         "formal-verification.p2b.f16.gguf": {
           "byte_diff_count": 0,
           "bytes": 189408,
-          "expected_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
-          "rederived_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+          "expected_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
+          "rederived_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
           "zero_byte_diff": true
         },
         "formal-verification.p2b.f16.wfsl": {
@@ -992,15 +992,15 @@
         "formal-verification.p2b.warp_bundle.json": {
           "byte_diff_count": 0,
           "bytes": 2104,
-          "expected_sha256": "c8995729247d9d81690f75dc224127d2bd77a2237e7e7e056fb78e9ad25e70f2",
-          "rederived_sha256": "c8995729247d9d81690f75dc224127d2bd77a2237e7e7e056fb78e9ad25e70f2",
+          "expected_sha256": "1653a78658531be3950c3a6533fa97364736ccade86e163e9e4664d219bb1c2d",
+          "rederived_sha256": "1653a78658531be3950c3a6533fa97364736ccade86e163e9e4664d219bb1c2d",
           "zero_byte_diff": true
         },
         "formal-verification.p2b.wmcp_meta.json": {
           "byte_diff_count": 0,
           "bytes": 1583,
-          "expected_sha256": "6b31545190f4631fd982c4a7443e173ac11a84980efe13d89e7a6162fba826d4",
-          "rederived_sha256": "6b31545190f4631fd982c4a7443e173ac11a84980efe13d89e7a6162fba826d4",
+          "expected_sha256": "475ad6151b3e039050b4deedf2586150f7f220103fe2469c3fc896642a854bca",
+          "rederived_sha256": "475ad6151b3e039050b4deedf2586150f7f220103fe2469c3fc896642a854bca",
           "zero_byte_diff": true
         }
       },
@@ -1036,7 +1036,7 @@
           "total": 48
         }
       },
-      "public_validation_p2b_relative_failure_reduction_vs_b0": null,
+      "public_validation_p2b_relative_failure_reduction_vs_b0": -0.045455,
       "structural_and_rederivation_passed": true
     },
     "corpus_and_holdout": {

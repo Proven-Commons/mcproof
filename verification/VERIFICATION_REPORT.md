@@ -32,7 +32,7 @@ Read-only Tailscale TCP probes across `9` workbench ports (`22`, `445`, `2222`, 
 | Primary `Qwen3.5-4B-Q8_0.gguf` | `4,482,403,488` B (`has_ssm_recurrent = true`) | `10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1` |
 | Companion `Qwen3.5-4B-Q4_K_M.gguf` | `2,740,937,888` B (`3.3534 GiB` Linux / `4.5534 GiB` WDDM analytical) | `00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4` |
 | `Qwen/Qwen3.5-4B` BF16 Safetensors | `738` tensors, `blk.31.ffn_up.weight` `[9216, 2560]` | `1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64` |
-| `compile/artifacts/MANIFEST.json` | Identical to `compiler_manifest.json` | `feb435b67d3f065539cef8a5c02ab9f189a20314ca1388b845f268538f89935b` |
+| `compile/artifacts/MANIFEST.json` | Identical to `compiler_manifest.json` | `fcec69eace974d2cb8629935864ced711a8859b07e7a396e530cf373f2606fac` |
 | Companion stack patches (`exo`, `warp`, `weft-eido`) | `40/40`, `57/57`, `120/120` unit tests passing | `e68c406`, `390176c`, `d87b958` |
 
 ## Pillar 1: Deterministic Oracles (`oracles_verification_receipt.json`)
@@ -67,15 +67,15 @@ Prompt-free vault graders (`verification/graders/{common,grade_canaries,grade_ho
 
 | `P2-B` Artifact | Size (Bytes) | Expected & Re-Derived SHA-256 | Byte Diff |
 | --- | --- | --- | --- |
-| `formal-verification.p2b.f16.gguf` | `189,408` | `728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5` | `0` |
+| `formal-verification.p2b.f16.gguf` | `189,408` | `01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa` | `0` |
 | `formal-verification.p2b.f16.wfsl` | `189,357` | `7f68b13bac77427e1734d32bf6e5593d61975313abfd62fe1041f878f7b15164` | `0` |
 | `formal-verification.p2b.int4_int8.wfsl` | `58,357` | `a1b8566c5a4ef4337c55e56673fe9fe6d6bcc6fb90288c9d6ad650787f343d16` | `0` |
 | `formal-verification.p2b.int4_f16.wfsl` | `78,803` | `cafadd5de9a114655c8a9f2d04bea51de1e292773a81e691fd538ff8c1e70449` | `0` |
 | `formal-verification.p2b.certificate.json` | `312` | `e0c6b9a7bbd0f7f3da2ad09def08521a07cb62564bef8ca905c0744a5181d4f5` | `0` |
-| `formal-verification.p2b.binding.json` | `3,429` | `9ea059c61a6dc21fe9328795c4cb639c6c19050d1fbb6459750a2e68f6175c4d` | `0` |
+| `formal-verification.p2b.binding.json` | `3,429` | `93c8accd871093c896ba08f511c14ac0d71c6505ef447733bd4db72456d23d5d` | `0` |
 | `formal-verification.p2b.gate_policy.json` | `236` | `a6445d66592528c2e68020c9b9df8d89573e5fe319cefaca17d816872ff6dc97` | `0` |
-| `formal-verification.p2b.warp_bundle.json` | `2,104` | `c8995729247d9d81690f75dc224127d2bd77a2237e7e7e056fb78e9ad25e70f2` | `0` |
-| `formal-verification.p2b.wmcp_meta.json` | `1,583` | `6b31545190f4631fd982c4a7443e173ac11a84980efe13d89e7a6162fba826d4` | `0` |
+| `formal-verification.p2b.warp_bundle.json` | `2,104` | `1653a78658531be3950c3a6533fa97364736ccade86e163e9e4664d219bb1c2d` | `0` |
+| `formal-verification.p2b.wmcp_meta.json` | `1,583` | `475ad6151b3e039050b4deedf2586150f7f220103fe2469c3fc896642a854bca` | `0` |
 
 - **Loud-column outlier profile ([Moissanite-Labs/siliquant PR 12](https://github.com/Moissanite-Labs/siliquant/pull/12)):** Across all `32` `Qwen3.5-4B` `ffn_down` (`2560 x 9216`) matrices, `max/mean` column L2 norm peaked at `1.7832x` on Layer 30 (`1.7750x` on Layer 31, compared against the cited `1.21x`-`1.41x` `TinyStories-1M` literature baseline). On base `ffn_down` INT4 weights, top-10 activation-weighted imatrix column protection reduced `K0` output drift `10.27%` (`193.70` vs `215.88`), whereas static weight-norm top-10 shifted drift `-0.01%`.
 - **Asymmetric `int4/int8` leakage on compiled `P2-B` vs seeded `ffn_down` probe:** On compiled `P2-B` `ffn_up` (`9216 x 2560`), `int4/int8` (`58,357` B, `69.2%` smaller than F16) cut `K0` Frobenius leakage **`2.295x`** (`5.268x` scaled leakage energy) vs `int4/int4`, with top-10 column protection ratio `0.9998x`. On the seeded Gaussian null-space probe on `ffn_down` (`2560 x 9216`, `seed = 20261119`), `int4/int8` cut `K0` Frobenius leakage **`20.766x`** (`7.6756` vs `159.3915`), and top-10 imatrix protection reduced leakage an additional `12.03%` (`6.7523`, ratio `0.8797x`).
