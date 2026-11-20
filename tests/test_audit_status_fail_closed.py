@@ -160,6 +160,24 @@ def test_known_proof_digest_and_tcb_pins_are_not_a_citation() -> None:
     expect_false("CERT_A7_ILLEGAL_TIER_SWAP" in _rules(cert), _rules(cert))
 
 
+def test_known_invisible_citation_text_is_rejected() -> None:
+    """Invisible source or reference text is missing.
+
+    Disabling the visible-character check lets these certificates pass.
+    """
+    _expect_citation_rejected(_cited_known(source="\u200b"), "CERT_KNOWN_CITATION_MISSING")
+    _expect_citation_rejected(_cited_known(reference="\ufeff "), "CERT_KNOWN_CITATION_MISSING")
+    _expect_citation_rejected(_cited_known(source="\u00a0\u2060"), "CERT_KNOWN_CITATION_MISSING")
+
+
+def test_known_all_zero_artifact_digest_is_rejected() -> None:
+    """Sixty-four zeros match the hex pattern and are still malformed."""
+    _expect_citation_rejected(
+        _cited_known(artifact_sha256="0" * 64),
+        "CERT_KNOWN_CITATION_MALFORMED",
+    )
+
+
 def test_known_with_citation_keeps_known() -> None:
     """A source, a reference, and a lowercase artifact digest stay KNOWN."""
     cert = _cited_known()
