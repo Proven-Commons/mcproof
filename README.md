@@ -93,7 +93,7 @@ Run the full Tier 2 oracle gates and Family `A` to `D` graders. On Linux, `lake 
 ## What is not proved
 
 - Passing Tier 2 oracles proves only the machine-checked properties enforced by each checker. Whether a theorem statement matches human intent remains a Tier 1 human specification judgment.
-- `datasets/scripts/grade_item.py` grades Family C items by deterministic structural claim-tier and `meta["bar_status"]` replay rather than re-running Lean compilation on prose-only reports.
+- `datasets/scripts/grade_item.py` grades Family C items by deterministic structural claim-tier and `meta["bar_status"]` replay. The `bar_check` replay pins `spec_meta.statements` and does not emit an identity scaffold. It does not re-run Lean compilation. `verdict_audit` items, including `PUB-C-V02`, check a verdict JSON block and do not use the Family C Lean repair path.
 - Live `8` GiB RTX 3080 `T-C5` telemetry (`stack/results/final/ux582hs_rtx3080_tc5_live_receipt.json`) measured Windows 11 NVIDIA Optimus (`driver 566.07`, `0 MiB` idle WDDM VRAM), while bare-metal Linux kernel execution on `UX582HS` remains tracked separately.
 
 ## What you must trust

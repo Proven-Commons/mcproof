@@ -34,6 +34,7 @@ import urllib.request
 
 from .lean_harness import (
     THEOREM_DECL_RE,
+    _lean_env,
     strip_lean_comments_and_strings,
     verify_lean4_against_challenge,
     verify_lean4_project_comparator,
@@ -53,7 +54,7 @@ from .oracles import (
     run_verdicts_oracle,
     sanitize_verdict_id,
 )
-from .paths import dep_repo, repo_root
+from .paths import dep_repo, find_lean_tool, repo_root
 
 MAX_RETRIEVAL_TOKENS_HARD_CAP = 1500
 QWEN35_STOP_TOKENS: tuple[str, ...] = ("<|im_end|>", "<|endoftext|>")
@@ -841,25 +842,96 @@ def _family_c_candidate_statements(candidate_lean: str) -> dict[str, str]:
     return stmts
 
 
-def _family_c_expected_statements(pkg: str, theorem_names: Sequence[str]) -> dict[str, str]:
-    """Map each challenge theorem name to the sha256 of the statement the Spec module declares."""
+def _family_c_statement_headers(
+    meta: Mapping[str, Any], theorem_names: Sequence[str]
+) -> dict[str, str] | None:
+    """Return the pinned header of every challenge theorem, or None if any pin is missing.
+
+    A header is the text after the fully-qualified theorem name, the same span
+    `THEOREM_DECL_RE` captures. Callers hash that text. Nothing here invents `op x = x`.
+    """
+    raw = meta.get("statements")
+    if not isinstance(raw, Mapping):
+        return None
+    headers: dict[str, str] = {}
+    for name in theorem_names:
+        full = str(name)
+        header = raw.get(full)
+        if not isinstance(header, str) or not header.strip():
+            return None
+        headers[full] = header.strip()
+    return headers
+
+
+def _family_c_expected_statements(headers: Mapping[str, str]) -> dict[str, str]:
+    """Map each fully-qualified name to the sha256 of its pinned, whitespace-normalized statement."""
     expected: dict[str, str] = {}
-    for tfull in theorem_names:
-        full = str(tfull)
-        stmt = _normalize_family_c_statement(f"{full} (x : Nat) : {pkg}.op x = x")
-        expected[full] = hashlib.sha256(stmt.encode("utf-8")).hexdigest()
+    for full, header in headers.items():
+        stmt = _normalize_family_c_statement(f"{full} {header}")
+        expected[str(full)] = hashlib.sha256(stmt.encode("utf-8")).hexdigest()
     return expected
 
 
+def _family_c_root_source(pkg: str, meta: Mapping[str, Any]) -> str:
+    """Library module for the generated project. Uses caller-supplied defs, never an identity `op`."""
+    defs = meta.get("definitions")
+    if isinstance(defs, str) and defs.strip():
+        return defs.strip() + "\n"
+    return f"namespace {pkg}\nend {pkg}\n"
+
+
+def _family_c_spec_source(pkg: str, headers: Mapping[str, str]) -> str:
+    """Challenge module: each pinned header, proved with `sorry` so the solution file is what `lake` checks."""
+    lines = [f"import {pkg}", f"namespace {pkg}.Spec"]
+    for full, header in headers.items():
+        short = str(full).split(".")[-1]
+        lines.append(f"theorem {short} {header} := by sorry")
+    lines.append(f"end {pkg}.Spec")
+    return "\n".join(lines) + "\n"
+
+
+def _family_c_lakefile(pkg: str) -> str:
+    """Build the library, the challenge, and the candidate proofs. `["{pkg}"]` alone skips the proofs."""
+    return (
+        f'name = "{pkg.lower()}"\nversion = "0.1.0"\n'
+        f'defaultTargets = ["{pkg}", "{pkg}.Spec", "{pkg}.Proofs"]\n\n'
+        f'[[lean_lib]]\nname = "{pkg}"\n\n[[lean_lib]]\nname = "{pkg}.Spec"\n\n'
+        f'[[lean_lib]]\nname = "{pkg}.Proofs"\n\n[[lean_exe]]\nname = "{pkg.lower()}"\nroot = "Main"\n'
+    )
+
+
+def _family_c_code_under_proof(pkg: str, meta: Mapping[str, Any]) -> list[str]:
+    raw = meta.get("code_under_proof")
+    if isinstance(raw, list) and raw and all(isinstance(item, str) and item.strip() for item in raw):
+        return [str(item) for item in raw]
+    return [pkg]
+
+
+def _family_c_toolchain_pin() -> str:
+    return (repo_root() / "lean" / "lean-toolchain").read_text(encoding="utf-8").strip() + "\n"
+
+
 def _check_family_c_statement_match(
-    pkg: str,
+    meta: Mapping[str, Any],
     theorem_names: Sequence[str],
     candidate_lean: str,
 ) -> list[dict[str, Any]]:
-    """Statement-match guard: names plus statement hashes must equal challenge meta."""
+    """Statement-match guard: names plus hashes of the pinned target statements."""
     findings: list[dict[str, Any]] = []
+    headers = _family_c_statement_headers(meta, theorem_names)
+    if headers is None:
+        findings.append(
+            {
+                "rule": "FAMILY_C_TARGET_STATEMENT_ABSENT",
+                "message": (
+                    "spec_meta.statements must pin the header of every theorem_names entry. "
+                    "The turn does not invent an identity statement."
+                ),
+            }
+        )
+        return findings
     cand = _family_c_candidate_statements(candidate_lean)
-    exp = _family_c_expected_statements(pkg, theorem_names)
+    exp = _family_c_expected_statements(headers)
     if set(cand) != set(exp):
         findings.append(
             {
@@ -885,13 +957,65 @@ def _check_family_c_statement_match(
     return findings
 
 
-def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: str) -> list[dict[str, Any]]:
-    """Real-Lean Family C turn: meta-only bar status, candidate-built project, Lean-enabled comparator.
+def _family_c_lake_failure_message(stdout: str, stderr: str) -> str:
+    """Keep the compiler `file:line:column` lines, then the short lake tail."""
+    lines = [line.strip() for line in f"{stdout}\n{stderr}".splitlines() if line.strip()]
+    located = [line for line in lines if re.search(r"\.lean:\d+:\d+", line)]
+    tail = lines[-6:]
+    kept: list[str] = []
+    for line in located + tail:
+        if line not in kept:
+            kept.append(line)
+    return " | ".join(kept[-8:])
 
-    The checked project is built from the candidate's ```lean blocks (never the
-    identity scaffold), and `lake comparator --paranoid` runs Lean-enabled with
-    raw `file:line:column` tails kept in the findings so `format_diagnostics`
-    can pipe them into the turn `t+1` prompt.
+
+def _family_c_direct_lake_build(root: Path) -> list[dict[str, Any]]:
+    """Run `lake build` when the comparator's auditor checkout is absent.
+
+    A missing `soko` tree must not hide a Lean error. A missing `lean`/`lake` still fails closed.
+    """
+    try:
+        lake_bin = find_lean_tool("lake")
+        env = _lean_env()
+    except (OSError, RuntimeError) as exc:
+        return [
+            {
+                "rule": "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE",
+                "message": f"Lean toolchain unavailable; turn fails closed: {exc}",
+            }
+        ]
+    build_res = subprocess.run(
+        [lake_bin, "build"],
+        cwd=root,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=300,
+        check=False,
+    )
+    if build_res.returncode != 0:
+        return [
+            {
+                "rule": "LAKE_BUILD_FAILED",
+                "message": f"`lake build` failed: {_family_c_lake_failure_message(build_res.stdout or '', build_res.stderr or '')}",
+            }
+        ]
+    return []
+
+
+def _lean_exception_is_missing_toolchain(exc: BaseException) -> bool:
+    message = str(exc)
+    return "Lean tool" in message or "elan bin" in message
+
+
+def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: str) -> list[dict[str, Any]]:
+    """Real-Lean Family C turn for `oracle_type: bar_check` only.
+
+    `bar_status` comes from harness meta. The challenge statements come from
+    `spec_meta.statements`. The solution file is the candidate's fenced lean.
+    `verdict_audit` items never enter this function. `lake build` still runs when
+    the mission template or the soko auditor checkout is absent. It does not run
+    when `lean` and `lake` themselves are absent.
     """
     meta = harness.get("spec_meta") or {}
     pkg = str(meta.get("pkg", "")).strip()
@@ -938,44 +1062,70 @@ def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: st
                 "message": "solution module uses 'sorry' or 'admit'; the turn fails.",
             }
         )
-    findings.extend(_check_family_c_statement_match(pkg, thms, candidate_lean))
+    findings.extend(_check_family_c_statement_match(meta, thms, candidate_lean))
     if findings:
         return findings
-    bar_tpl = dep_repo("mission") / "bar" / "template"
-    bar_chk = dep_repo("mission") / "bar" / "check.py"
+    headers = _family_c_statement_headers(meta, thms)
+    if headers is None:
+        return [
+            {
+                "rule": "FAMILY_C_TARGET_STATEMENT_ABSENT",
+                "message": (
+                    "spec_meta.statements must pin the header of every theorem_names entry. "
+                    "The turn does not invent an identity statement."
+                ),
+            }
+        ]
+    mission_bar: tuple[Path, Path] | None = None
+    try:
+        mission = dep_repo("mission")
+    except FileNotFoundError as exc:
+        findings.append(
+            {
+                "rule": "FAMILY_C_MISSION_BAR_UNAVAILABLE",
+                "message": (
+                    "mission bar template is unavailable, so the structural bar replay was not run. "
+                    f"{exc}"
+                ),
+            }
+        )
+    else:
+        bar_tpl = mission / "bar" / "template"
+        bar_chk = mission / "bar" / "check.py"
+        if bar_tpl.is_dir() and bar_chk.is_file():
+            mission_bar = (bar_tpl, bar_chk)
+        else:
+            findings.append(
+                {
+                    "rule": "FAMILY_C_MISSION_BAR_UNAVAILABLE",
+                    "message": f"mission checkout at {mission} has no bar/template or bar/check.py.",
+                }
+            )
+    code_toml = ", ".join(json.dumps(name) for name in _family_c_code_under_proof(pkg, meta))
+    test_cmd = str(meta.get("test_cmd") or "python3 tests/run_tests.py")
     with tempfile.TemporaryDirectory(prefix="mcproof_rep_bar_") as td:
         root = Path(td)
-        shutil.copytree(bar_tpl, root, dirs_exist_ok=True)
-        (root / "Clamp.lean").unlink(missing_ok=True)
-        shutil.rmtree(root / "Clamp", ignore_errors=True)
-        (root / "lake-manifest.json").unlink(missing_ok=True)
-        (root / f"{pkg}.lean").write_text(
-            f"namespace {pkg}\ndef op (x : Nat) : Nat := x\nend {pkg}\n",
-            encoding="utf-8",
-        )
+        if mission_bar is not None:
+            shutil.copytree(mission_bar[0], root, dirs_exist_ok=True)
+            (root / "Clamp.lean").unlink(missing_ok=True)
+            shutil.rmtree(root / "Clamp", ignore_errors=True)
+            (root / "lake-manifest.json").unlink(missing_ok=True)
+        else:
+            (root / "lean-toolchain").write_text(_family_c_toolchain_pin(), encoding="utf-8")
+        (root / f"{pkg}.lean").write_text(_family_c_root_source(pkg, meta), encoding="utf-8")
         (root / pkg).mkdir(exist_ok=True)
-        spec_lines = [f"import {pkg}", f"namespace {pkg}.Spec"]
-        for tfull in thms:
-            tshort = str(tfull).split(".")[-1]
-            spec_lines.append(f"theorem {tshort} (x : Nat) : {pkg}.op x = x := by sorry")
-        spec_lines.append(f"end {pkg}.Spec\n")
-        (root / pkg / "Spec.lean").write_text("\n".join(spec_lines), encoding="utf-8")
-        # Solution module is the candidate's lean blocks verbatim: theorems must be
-        # declared by fully-qualified challenge name (e.g. `theorem ModInv.Spec.modInv_correct ...`).
+        (root / pkg / "Spec.lean").write_text(_family_c_spec_source(pkg, headers), encoding="utf-8")
+        # Solution module is the candidate's lean blocks verbatim. Theorems must use
+        # the fully-qualified challenge name (for example `theorem CrtPair.Spec.crt_mod_left ...`).
         (root / pkg / "Proofs.lean").write_text(
             f"import {pkg}\n\n{candidate_lean}\n",
             encoding="utf-8",
         )
         (root / "Main.lean").write_text(
-            f'import {pkg}\ndef main : IO Unit := IO.println s!"{{{pkg}.op 1}}"\n',
+            f'import {pkg}\ndef main : IO Unit := IO.println "ok"\n',
             encoding="utf-8",
         )
-        (root / "lakefile.toml").write_text(
-            f'name = "{pkg.lower()}"\nversion = "0.1.0"\ndefaultTargets = ["{pkg}", "{pkg}.Spec", "{pkg}.Proofs"]\n\n'
-            f'[[lean_lib]]\nname = "{pkg}"\n\n[[lean_lib]]\nname = "{pkg}.Spec"\n\n'
-            f'[[lean_lib]]\nname = "{pkg}.Proofs"\n\n[[lean_exe]]\nname = "{pkg.lower()}"\nroot = "Main"\n',
-            encoding="utf-8",
-        )
+        (root / "lakefile.toml").write_text(_family_c_lakefile(pkg), encoding="utf-8")
         (root / "comparator.json").write_text(
             json.dumps(
                 {
@@ -989,34 +1139,66 @@ def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: st
             + "\n",
             encoding="utf-8",
         )
-        (root / "bar.toml").write_text(
-            f'[project]\nname = "{pkg.lower()}"\nstatus = "{bar_status}"\npage = "README.md"\n'
-            f'spec_authors = ["example-author"]\nentry_points = ["Main.lean"]\n\n'
-            f'[spec]\nfiles = ["SPEC.md", "{pkg}/Spec.lean"]\ncode = ["{pkg}.op"]\n\n'
-            f'[tests]\nresults = "tests/TEST-RESULTS.md"\ncommand = "{meta["test_cmd"]}"\nfiles = ["tests/run_tests.py"]\n',
-            encoding="utf-8",
-        )
-        (root / "README.md").write_text(readme_body, encoding="utf-8")
-        out_json = root / "bar_out.json"
-        proc = subprocess.run(
-            [sys.executable, "-O", "-B", "-W", "error", str(bar_chk), str(root), "--no-lean", "--offline", "--json", str(out_json)],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if proc.returncode != 0:
-            findings.append({"rule": "BAR_CHECK_FAILED", "message": "bar check failed"})
-        elif out_json.is_file():
-            rep = json.loads(out_json.read_text(encoding="utf-8"))
-            by_item = {r["item"]: r["status"] for r in rep.get("items", [])}
-            for req_i in (2, 4, 5, 6):
-                if by_item.get(req_i) != "PASS":
-                    findings.append({"rule": "BAR_CHECK_ITEM_FAIL", "message": f"bar item {req_i} did not pass"})
-        # Lean-enabled formal signal: build the candidate project and run the
-        # 6-kernel paranoid comparator. Raw `file:line:column` tails are kept in
-        # the messages so `format_diagnostics` pipes them into the next prompt.
+        if mission_bar is not None:
+            (root / "bar.toml").write_text(
+                f'[project]\nname = "{pkg.lower()}"\nstatus = "{bar_status}"\npage = "README.md"\n'
+                f'spec_authors = ["example-author"]\nentry_points = ["Main.lean"]\n\n'
+                f'[spec]\nfiles = ["SPEC.md", "{pkg}/Spec.lean"]\ncode = [{code_toml}]\n\n'
+                f'[tests]\nresults = "tests/TEST-RESULTS.md"\ncommand = "{test_cmd}"\nfiles = ["tests/run_tests.py"]\n',
+                encoding="utf-8",
+            )
+            (root / "README.md").write_text(readme_body, encoding="utf-8")
+            out_json = root / "bar_out.json"
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    "-O",
+                    "-B",
+                    "-W",
+                    "error",
+                    str(mission_bar[1]),
+                    str(root),
+                    "--no-lean",
+                    "--offline",
+                    "--json",
+                    str(out_json),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if proc.returncode != 0:
+                findings.append({"rule": "BAR_CHECK_FAILED", "message": "bar check failed"})
+            elif out_json.is_file():
+                rep = json.loads(out_json.read_text(encoding="utf-8"))
+                by_item = {r["item"]: r["status"] for r in rep.get("items", [])}
+                for req_i in (2, 4, 5, 6):
+                    if by_item.get(req_i) != "PASS":
+                        findings.append({"rule": "BAR_CHECK_ITEM_FAIL", "message": f"bar item {req_i} did not pass"})
+        # `lake build` is the formal signal. Its message keeps `.lean:line:column` lines.
+        # The comparator's own tail keeps only the last 6 lines, which can drop that error.
+        # Kernel checks run only after this build succeeds.
+        findings.extend(_family_c_direct_lake_build(root))
+        if any(f.get("rule") in {"LAKE_BUILD_FAILED", "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE"} for f in findings):
+            return findings
         try:
             lean_res = verify_lean4_project_comparator(root, allow_unsandboxed=True)
+        except FileNotFoundError as exc:
+            if _lean_exception_is_missing_toolchain(exc):
+                findings.append(
+                    {
+                        "rule": "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE",
+                        "message": f"Lean toolchain unavailable; turn fails closed: {exc}",
+                    }
+                )
+                return findings
+            findings.append(
+                {
+                    "rule": "FAMILY_C_LEAN_AUDIT_DEPS_UNAVAILABLE",
+                    "message": f"lake build passed, but the comparator auditor checkout is missing: {exc}",
+                }
+            )
+            return findings
         except (OSError, RuntimeError) as exc:
             findings.append(
                 {

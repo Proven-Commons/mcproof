@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import importlib.util
 import io
 import json
 from pathlib import Path
+import re
 import sys
 from typing import Any, Mapping, Sequence
+
+import pytest
 
 from mcproof.cli import main as cli_main
 from mcproof.domain_protocol import (
@@ -37,7 +41,7 @@ from mcproof.repair_loop import (
     sanitize_oracle_diagnostics,
 )
 
-from helpers import expect_eq, expect_false, expect_in, expect_true, requires_dep, requires_mde
+from helpers import expect_eq, expect_false, expect_in, expect_true, has_lean_toolchain, requires_dep, requires_mde
 
 
 def test_targeted_plane1_retrieval_stays_under_1500_tokens_across_validation_split() -> None:
@@ -460,6 +464,17 @@ def test_audit_transition_certificate_catches_f01_to_f08_and_a6_a7(tmp_path: Pat
     expect_true(lp_farkas_ok["passed"])
 
 
+# Coprime two-modulus residue claims. These are the target statements the guard hashes.
+# They are not `op x = x`.
+_CRT_LEFT = (
+    "(m1 m2 x y : Nat) (hcop : Nat.gcd m1 m2 = 1) "
+    "(h1 : Dvd.dvd m1 (x - y)) (h2 : Dvd.dvd m2 (x - y)) : Dvd.dvd (m1 * m2) (x - y)"
+)
+_CRT_RIGHT = (
+    "(m1 m2 x : Nat) (hcop : Nat.gcd m1 m2 = 1) (hx : Dvd.dvd (m1 * m2) x) : Dvd.dvd m1 x"
+)
+
+
 def _family_c_spoof_harness() -> dict[str, Any]:
     return {
         "oracle_type": "bar_check",
@@ -468,6 +483,10 @@ def _family_c_spoof_harness() -> dict[str, Any]:
             "bar_status": "in-progress",
             "test_cmd": "python3 tests/run_tests.py",
             "theorem_names": ["CrtPair.Spec.crt_mod_left", "CrtPair.Spec.crt_mod_right"],
+            "statements": {
+                "CrtPair.Spec.crt_mod_left": _CRT_LEFT,
+                "CrtPair.Spec.crt_mod_right": _CRT_RIGHT,
+            },
         },
     }
 
@@ -490,6 +509,7 @@ def test_family_c_identity_plus_rfl_scaffold_no_longer_passes() -> None:
 
 
 def test_family_c_lean_error_text_reaches_next_turn_prompt() -> None:
+    """Formats a hand-written diagnostic. This test does not run `lake`."""
     findings = [
         {
             "line": 1,
@@ -500,3 +520,90 @@ def test_family_c_lean_error_text_reaches_next_turn_prompt() -> None:
     text = format_diagnostics(findings, family="C")
     expect_in("LAKE_BUILD_FAILED", text)
     expect_in("Proofs.lean:2:59", text)
+
+
+def test_family_c_fully_qualified_identity_rfl_fails_statement_hash() -> None:
+    """Fully-qualified `rfl` of `op x = x` must fail the pinned-statement hash.
+
+    The names match the challenge, so a disabled hash compare
+    (`if False and cand[name] != exp[name]`) lets this candidate through the guard
+    and this test fails.
+    """
+    comp = (
+        "Status: in progress.\n\n"
+        "```lean\n"
+        "theorem CrtPair.Spec.crt_mod_left (x : Nat) : CrtPair.op x = x := rfl\n"
+        "theorem CrtPair.Spec.crt_mod_right (x : Nat) : CrtPair.op x = x := rfl\n"
+        "```\n"
+    )
+    findings = _run_family_c_real_lean_turn(_family_c_spoof_harness(), comp)
+    rules = {f["rule"] for f in findings}
+    expect_in("FAMILY_C_STATEMENT_MISMATCH", rules)
+    expect_false("LAKE_BUILD_FAILED" in rules, "a statement mismatch must return before lake")
+    expect_false("FAMILY_C_THEOREM_NAME_MISMATCH" in rules, rules)
+
+
+def test_family_c_missing_statement_pin_does_not_fall_back_to_identity() -> None:
+    harness = _family_c_spoof_harness()
+    del harness["spec_meta"]["statements"]
+    comp = (
+        "```lean\n"
+        "theorem CrtPair.Spec.crt_mod_left (x : Nat) : CrtPair.op x = x := rfl\n"
+        "theorem CrtPair.Spec.crt_mod_right (x : Nat) : CrtPair.op x = x := rfl\n"
+        "```\n"
+    )
+    findings = _run_family_c_real_lean_turn(harness, comp)
+    expect_in("FAMILY_C_TARGET_STATEMENT_ABSENT", {f["rule"] for f in findings})
+
+
+def test_family_c_known_bad_proof_reaches_lake_build() -> None:
+    """Run `lake build` on a statement-exact candidate whose proof does not elaborate.
+
+    Skips only when `lean` and `lake` are absent. The skip reason says the lake path was not exercised.
+    """
+    if not has_lean_toolchain():
+        pytest.skip(
+            "Lean 4.35.0 (`lean` and `lake`) is absent, so the Family C lake path was not exercised"
+        )
+    comp = (
+        "Status: in progress.\n\n"
+        "```lean\n"
+        f"theorem CrtPair.Spec.crt_mod_left {_CRT_LEFT} := by\n  exact Nat.noSuchLemma x\n"
+        f"theorem CrtPair.Spec.crt_mod_right {_CRT_RIGHT} := by\n  exact Nat.noSuchLemma x\n"
+        "```\n"
+    )
+    findings = _run_family_c_real_lean_turn(_family_c_spoof_harness(), comp)
+    rules = {f["rule"] for f in findings}
+    expect_in("LAKE_BUILD_FAILED", rules)
+    blob = "\n".join(str(f.get("message", "")) for f in findings)
+    expect_in("noSuchLemma", blob)
+    expect_true(bool(re.search(r"\.lean:\d+:\d+", blob)), blob)
+
+
+def test_grade_item_pins_statements_and_refuses_identity_scaffold() -> None:
+    script = repo_root() / "datasets" / "scripts" / "grade_item.py"
+    spec = importlib.util.spec_from_file_location("grade_item_under_test", script)
+    expect_true(spec is not None and spec.loader is not None, "grade_item.py failed to load")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    harness = _family_c_spoof_harness()
+    bare = json.loads(json.dumps(harness))
+    del bare["spec_meta"]["statements"]
+    ok, errs = mod._run_family_c_structural_replay(bare, "Status: in progress.\n")
+    expect_false(ok, errs)
+    expect_true(any("target_statements_absent" in err for err in errs), errs)
+    readme = (repo_root() / "datasets" / "targets" / "family_c" / "PUB-C-V01.md").read_text(encoding="utf-8")
+    ok_pinned, pinned_errs = mod._run_family_c_structural_replay(harness, readme)
+    mission_check = mod.DEPS_ROOT / "mission" / "bar" / "check.py"
+    if not mission_check.is_file():
+        expect_false(ok_pinned, pinned_errs)
+        expect_true(any("missing_mission_dep" in err for err in pinned_errs), pinned_errs)
+        return
+    expect_true(ok_pinned, pinned_errs)
+    spec_src = mod._family_c_spec_source("CrtPair", harness["spec_meta"]["statements"])
+    expect_in("Dvd.dvd (m1 * m2) (x - y)", spec_src)
+    expect_false("op x = x" in spec_src, spec_src)
+    lake = mod._family_c_lakefile("CrtPair")
+    expect_in('"CrtPair.Spec"', lake)
+    expect_in('"CrtPair.Proofs"', lake)
+    expect_false(lake.split("defaultTargets = ", 1)[1].startswith('["CrtPair"]\n'), lake)
