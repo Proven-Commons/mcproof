@@ -36,6 +36,7 @@ from .lean_harness import (
     THEOREM_DECL_RE,
     strip_lean_comments_and_strings,
     verify_lean4_against_challenge,
+    verify_lean4_project_comparator,
     verify_lean4_prompt_obligations,
     verify_pinned_lean_defs,
 )
@@ -819,90 +820,225 @@ def _extract_first_json_block(text: str) -> str | None:
     return blocks[0].strip() if blocks else None
 
 
+_FAMILY_C_STATUS_VERIFIED_RE = re.compile(r"(?im)^status\s*:\s*verified\b")
+_FAMILY_C_STATUS_NOT_VERIFIED_RE = re.compile(r"(?im)^status\s*:.*not verified")
+_FAMILY_C_SORRY_OR_ADMIT_RE = re.compile(r"\b(sorry|admit)\b")
+
+
+def _normalize_family_c_statement(text: str) -> str:
+    """Collapse whitespace so statement hashes are layout-insensitive."""
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _family_c_candidate_statements(candidate_lean: str) -> dict[str, str]:
+    """Map each fully-qualified theorem name to the sha256 of its normalized statement."""
+    cleaned = strip_lean_comments_and_strings(candidate_lean)
+    stmts: dict[str, str] = {}
+    for match in THEOREM_DECL_RE.finditer(cleaned):
+        full = str(match.group("name"))
+        stmt = _normalize_family_c_statement(f"{full} {match.group('header')}")
+        stmts[full] = hashlib.sha256(stmt.encode("utf-8")).hexdigest()
+    return stmts
+
+
+def _family_c_expected_statements(pkg: str, theorem_names: Sequence[str]) -> dict[str, str]:
+    """Map each challenge theorem name to the sha256 of the statement the Spec module declares."""
+    expected: dict[str, str] = {}
+    for tfull in theorem_names:
+        full = str(tfull)
+        stmt = _normalize_family_c_statement(f"{full} (x : Nat) : {pkg}.op x = x")
+        expected[full] = hashlib.sha256(stmt.encode("utf-8")).hexdigest()
+    return expected
+
+
+def _check_family_c_statement_match(
+    pkg: str,
+    theorem_names: Sequence[str],
+    candidate_lean: str,
+) -> list[dict[str, Any]]:
+    """Statement-match guard: names plus statement hashes must equal challenge meta."""
+    findings: list[dict[str, Any]] = []
+    cand = _family_c_candidate_statements(candidate_lean)
+    exp = _family_c_expected_statements(pkg, theorem_names)
+    if set(cand) != set(exp):
+        findings.append(
+            {
+                "rule": "FAMILY_C_THEOREM_NAME_MISMATCH",
+                "message": (
+                    "candidate theorem names do not equal challenge meta: "
+                    f"missing={sorted(set(exp) - set(cand))} extra={sorted(set(cand) - set(exp))}."
+                ),
+            }
+        )
+        return findings
+    for name in sorted(exp):
+        if cand[name] != exp[name]:
+            findings.append(
+                {
+                    "rule": "FAMILY_C_STATEMENT_MISMATCH",
+                    "message": (
+                        f"candidate statement hash for '{name}' does not equal challenge meta; "
+                        "statements must match exactly."
+                    ),
+                }
+            )
+    return findings
+
+
+def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: str) -> list[dict[str, Any]]:
+    """Real-Lean Family C turn: meta-only bar status, candidate-built project, Lean-enabled comparator.
+
+    The checked project is built from the candidate's ```lean blocks (never the
+    identity scaffold), and `lake comparator --paranoid` runs Lean-enabled with
+    raw `file:line:column` tails kept in the findings so `format_diagnostics`
+    can pipe them into the turn `t+1` prompt.
+    """
+    meta = harness.get("spec_meta") or {}
+    pkg = str(meta.get("pkg", "")).strip()
+    thms = [str(t) for t in (meta.get("theorem_names") or [])]
+    # Bar status comes from harness meta exclusively; candidate prose can never promote it.
+    bar_status = str(meta.get("bar_status", "")).strip()
+    if not pkg or not thms:
+        return [
+            {
+                "rule": "FAMILY_C_MALFORMED_HARNESS",
+                "message": "harness spec_meta must define pkg and theorem_names.",
+            }
+        ]
+    findings: list[dict[str, Any]] = []
+    readme_body = re.sub(r"(?im)^Claim-Tier:[^\n]*\n+", "", completion_text, count=1)
+    if (
+        _FAMILY_C_STATUS_VERIFIED_RE.search(readme_body)
+        and not _FAMILY_C_STATUS_NOT_VERIFIED_RE.search(readme_body)
+        and bar_status.lower() != "verified"
+    ):
+        findings.append(
+            {
+                "rule": "FAMILY_C_STATUS_SELF_ATTESTATION",
+                "message": (
+                    f"candidate declares 'Status: verified' but harness meta bar_status is {bar_status!r}; "
+                    "bar status comes from harness meta exclusively."
+                ),
+            }
+        )
+    lean_blocks = extract_fenced_blocks(completion_text, ("lean", "lean4"))
+    candidate_lean = "\n\n".join(block.strip() for block in lean_blocks if block.strip())
+    if not candidate_lean:
+        findings.append(
+            {
+                "rule": "FAMILY_C_MISSING_CANDIDATE_LEAN",
+                "message": "no ```lean code blocks found; the checked project is built from the candidate's lean blocks.",
+            }
+        )
+        return findings
+    if _FAMILY_C_SORRY_OR_ADMIT_RE.search(strip_lean_comments_and_strings(candidate_lean)):
+        findings.append(
+            {
+                "rule": "FAMILY_C_SOLUTION_USES_SORRY_OR_ADMIT",
+                "message": "solution module uses 'sorry' or 'admit'; the turn fails.",
+            }
+        )
+    findings.extend(_check_family_c_statement_match(pkg, thms, candidate_lean))
+    if findings:
+        return findings
+    bar_tpl = dep_repo("mission") / "bar" / "template"
+    bar_chk = dep_repo("mission") / "bar" / "check.py"
+    with tempfile.TemporaryDirectory(prefix="mcproof_rep_bar_") as td:
+        root = Path(td)
+        shutil.copytree(bar_tpl, root, dirs_exist_ok=True)
+        (root / "Clamp.lean").unlink(missing_ok=True)
+        shutil.rmtree(root / "Clamp", ignore_errors=True)
+        (root / "lake-manifest.json").unlink(missing_ok=True)
+        (root / f"{pkg}.lean").write_text(
+            f"namespace {pkg}\ndef op (x : Nat) : Nat := x\nend {pkg}\n",
+            encoding="utf-8",
+        )
+        (root / pkg).mkdir(exist_ok=True)
+        spec_lines = [f"import {pkg}", f"namespace {pkg}.Spec"]
+        for tfull in thms:
+            tshort = str(tfull).split(".")[-1]
+            spec_lines.append(f"theorem {tshort} (x : Nat) : {pkg}.op x = x := by sorry")
+        spec_lines.append(f"end {pkg}.Spec\n")
+        (root / pkg / "Spec.lean").write_text("\n".join(spec_lines), encoding="utf-8")
+        # Solution module is the candidate's lean blocks verbatim: theorems must be
+        # declared by fully-qualified challenge name (e.g. `theorem ModInv.Spec.modInv_correct ...`).
+        (root / pkg / "Proofs.lean").write_text(
+            f"import {pkg}\n\n{candidate_lean}\n",
+            encoding="utf-8",
+        )
+        (root / "Main.lean").write_text(
+            f'import {pkg}\ndef main : IO Unit := IO.println s!"{{{pkg}.op 1}}"\n',
+            encoding="utf-8",
+        )
+        (root / "lakefile.toml").write_text(
+            f'name = "{pkg.lower()}"\nversion = "0.1.0"\ndefaultTargets = ["{pkg}", "{pkg}.Spec", "{pkg}.Proofs"]\n\n'
+            f'[[lean_lib]]\nname = "{pkg}"\n\n[[lean_lib]]\nname = "{pkg}.Spec"\n\n'
+            f'[[lean_lib]]\nname = "{pkg}.Proofs"\n\n[[lean_exe]]\nname = "{pkg.lower()}"\nroot = "Main"\n',
+            encoding="utf-8",
+        )
+        (root / "comparator.json").write_text(
+            json.dumps(
+                {
+                    "challenge_module": f"{pkg}.Spec",
+                    "solution_module": f"{pkg}.Proofs",
+                    "theorem_names": thms,
+                    "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (root / "bar.toml").write_text(
+            f'[project]\nname = "{pkg.lower()}"\nstatus = "{bar_status}"\npage = "README.md"\n'
+            f'spec_authors = ["example-author"]\nentry_points = ["Main.lean"]\n\n'
+            f'[spec]\nfiles = ["SPEC.md", "{pkg}/Spec.lean"]\ncode = ["{pkg}.op"]\n\n'
+            f'[tests]\nresults = "tests/TEST-RESULTS.md"\ncommand = "{meta["test_cmd"]}"\nfiles = ["tests/run_tests.py"]\n',
+            encoding="utf-8",
+        )
+        (root / "README.md").write_text(readme_body, encoding="utf-8")
+        out_json = root / "bar_out.json"
+        proc = subprocess.run(
+            [sys.executable, "-O", "-B", "-W", "error", str(bar_chk), str(root), "--no-lean", "--offline", "--json", str(out_json)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            findings.append({"rule": "BAR_CHECK_FAILED", "message": "bar check failed"})
+        elif out_json.is_file():
+            rep = json.loads(out_json.read_text(encoding="utf-8"))
+            by_item = {r["item"]: r["status"] for r in rep.get("items", [])}
+            for req_i in (2, 4, 5, 6):
+                if by_item.get(req_i) != "PASS":
+                    findings.append({"rule": "BAR_CHECK_ITEM_FAIL", "message": f"bar item {req_i} did not pass"})
+        # Lean-enabled formal signal: build the candidate project and run the
+        # 6-kernel paranoid comparator. Raw `file:line:column` tails are kept in
+        # the messages so `format_diagnostics` pipes them into the next prompt.
+        try:
+            lean_res = verify_lean4_project_comparator(root, allow_unsandboxed=True)
+        except (OSError, RuntimeError) as exc:
+            findings.append(
+                {
+                    "rule": "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE",
+                    "message": f"Lean toolchain unavailable; turn fails closed: {exc}",
+                }
+            )
+            return findings
+        for finding in lean_res.findings:
+            findings.append(dict(finding))
+    return findings
+
+
 def _run_public_family_c_harness(harness: Mapping[str, Any], completion_text: str) -> list[dict[str, Any]]:
     """Post-hoc Family C ground-truth scorer matching `datasets/scripts/grade_item.py`."""
     otype = harness.get("oracle_type")
-    meta = harness.get("spec_meta") or {}
-    findings: list[dict[str, Any]] = []
 
     if otype == "bar_check":
-        bar_tpl = dep_repo("mission") / "bar" / "template"
-        bar_chk = dep_repo("mission") / "bar" / "check.py"
-        pkg = str(meta["pkg"])
-        thms = list(meta["theorem_names"])
-        readme_body = re.sub(r"(?im)^Claim-Tier:[^\n]*\n+", "", completion_text, count=1)
-        says_verified = bool(
-            re.search(r"(?im)^status\s*:\s*verified\b", readme_body)
-            and not re.search(r"(?im)^status\s*:.*not verified", readme_body)
-        )
-        bar_status = "verified" if says_verified else str(meta["bar_status"])
-        with tempfile.TemporaryDirectory(prefix="mcproof_rep_bar_") as td:
-            root = Path(td)
-            shutil.copytree(bar_tpl, root, dirs_exist_ok=True)
-            (root / "Clamp.lean").unlink(missing_ok=True)
-            shutil.rmtree(root / "Clamp", ignore_errors=True)
-            (root / f"{pkg}.lean").write_text(
-                f"namespace {pkg}\ndef op (x : Nat) : Nat := x\nend {pkg}\n",
-                encoding="utf-8",
-            )
-            (root / pkg).mkdir(exist_ok=True)
-            spec_lines = [f"import {pkg}", f"namespace {pkg}.Spec"]
-            proof_lines = [f"import {pkg}", f"namespace {pkg}.Spec"]
-            for tfull in thms:
-                tshort = str(tfull).split(".")[-1]
-                spec_lines.append(f"theorem {tshort} (x : Nat) : {pkg}.op x = x := by sorry")
-                proof_lines.append(f"theorem {tshort} (x : Nat) : {pkg}.op x = x := rfl")
-            spec_lines.append(f"end {pkg}.Spec\n")
-            proof_lines.append(f"end {pkg}.Spec\n")
-            (root / pkg / "Spec.lean").write_text("\n".join(spec_lines), encoding="utf-8")
-            (root / pkg / "Proofs.lean").write_text("\n".join(proof_lines), encoding="utf-8")
-            (root / "Main.lean").write_text(
-                f'import {pkg}\ndef main : IO Unit := IO.println s!"{{{pkg}.op 1}}"\n',
-                encoding="utf-8",
-            )
-            (root / "lakefile.toml").write_text(
-                f'name = "{pkg.lower()}"\nversion = "0.1.0"\ndefaultTargets = ["{pkg}"]\n\n'
-                f'[[lean_lib]]\nname = "{pkg}"\n\n[[lean_lib]]\nname = "{pkg}.Spec"\n\n'
-                f'[[lean_lib]]\nname = "{pkg}.Proofs"\n\n[[lean_exe]]\nname = "{pkg.lower()}"\nroot = "Main"\n',
-                encoding="utf-8",
-            )
-            (root / "comparator.json").write_text(
-                json.dumps(
-                    {
-                        "challenge_module": f"{pkg}.Spec",
-                        "solution_module": f"{pkg}.Proofs",
-                        "theorem_names": thms,
-                        "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
-                    },
-                    indent=2,
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            (root / "bar.toml").write_text(
-                f'[project]\nname = "{pkg.lower()}"\nstatus = "{bar_status}"\npage = "README.md"\n'
-                f'spec_authors = ["example-author"]\nentry_points = ["Main.lean"]\n\n'
-                f'[spec]\nfiles = ["SPEC.md", "{pkg}/Spec.lean"]\ncode = ["{pkg}.op"]\n\n'
-                f'[tests]\nresults = "tests/TEST-RESULTS.md"\ncommand = "{meta["test_cmd"]}"\nfiles = ["tests/run_tests.py"]\n',
-                encoding="utf-8",
-            )
-            (root / "README.md").write_text(readme_body, encoding="utf-8")
-            out_json = root / "bar_out.json"
-            proc = subprocess.run(
-                [sys.executable, "-O", "-B", "-W", "error", str(bar_chk), str(root), "--no-lean", "--offline", "--json", str(out_json)],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if proc.returncode != 0:
-                findings.append({"rule": "BAR_CHECK_FAILED", "message": "bar check failed"})
-            elif out_json.is_file():
-                rep = json.loads(out_json.read_text(encoding="utf-8"))
-                by_item = {r["item"]: r["status"] for r in rep.get("items", [])}
-                for req_i in (2, 4, 5, 6):
-                    if by_item.get(req_i) != "PASS":
-                        findings.append({"rule": "BAR_CHECK_ITEM_FAIL", "message": f"bar item {req_i} did not pass"})
-        return findings
+        return _run_family_c_real_lean_turn(harness, completion_text)
+
+    meta = harness.get("spec_meta") or {}
+    findings: list[dict[str, Any]] = []
 
     if otype == "verdict_audit":
         jb = _extract_first_json_block(completion_text)

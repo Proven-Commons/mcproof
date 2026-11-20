@@ -26,6 +26,7 @@ from mcproof.domain_protocol import (
 from mcproof.paths import repo_root
 from mcproof.repair_loop import (
     MAX_RETRIEVAL_TOKENS_HARD_CAP,
+    _run_family_c_real_lean_turn,
     compute_candidate_state_hash,
     compute_failure_signature,
     default_inference_oracle,
@@ -457,3 +458,45 @@ def test_audit_transition_certificate_catches_f01_to_f08_and_a6_a7(tmp_path: Pat
 
     lp_farkas_ok = verify_rational_lp_certificate({"mode": "infeasible", "A": [[-1, -1]], "b": [1], "y": [1]})
     expect_true(lp_farkas_ok["passed"])
+
+
+def _family_c_spoof_harness() -> dict[str, Any]:
+    return {
+        "oracle_type": "bar_check",
+        "spec_meta": {
+            "pkg": "CrtPair",
+            "bar_status": "in-progress",
+            "test_cmd": "python3 tests/run_tests.py",
+            "theorem_names": ["CrtPair.Spec.crt_mod_left", "CrtPair.Spec.crt_mod_right"],
+        },
+    }
+
+
+def test_family_c_real_lean_turn_rejects_says_verified_spoof() -> None:
+    comp = "Claim-Tier: PROVEN\n\nStatus: verified. All checks passed.\n"
+    findings = _run_family_c_real_lean_turn(_family_c_spoof_harness(), comp)
+    expect_true(bool(findings), "spoofed verified claim must fail the turn")
+    expect_in("FAMILY_C_STATUS_SELF_ATTESTATION", {f["rule"] for f in findings})
+
+
+def test_family_c_identity_plus_rfl_scaffold_no_longer_passes() -> None:
+    comp = (
+        "Claim-Tier: PROVEN\n\nStatus: verified.\n\n"
+        "```lean\ntheorem crt_mod_left (x : Nat) : CrtPair.op x = x := rfl\n```\n"
+    )
+    findings = _run_family_c_real_lean_turn(_family_c_spoof_harness(), comp)
+    expect_true(bool(findings), "identity scaffold with rfl must fail the turn")
+    expect_in("FAMILY_C_THEOREM_NAME_MISMATCH", {f["rule"] for f in findings})
+
+
+def test_family_c_lean_error_text_reaches_next_turn_prompt() -> None:
+    findings = [
+        {
+            "line": 1,
+            "rule": "LAKE_BUILD_FAILED",
+            "message": "`lake build` failed: error: CrtPair/Proofs.lean:2:59: Unknown constant `Nat.noSuchLemma` | error: build failed",
+        }
+    ]
+    text = format_diagnostics(findings, family="C")
+    expect_in("LAKE_BUILD_FAILED", text)
+    expect_in("Proofs.lean:2:59", text)

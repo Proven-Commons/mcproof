@@ -91,3 +91,11 @@ python3 verification/build_final_receipt.py
 
 1. **Multi-layer `blk.28..31` `TangentBetaEdit` live serving promotion:** Wire 4-layer `TangentBetaEdit` (`weft` `c33bbf4f`) into live `warp-modeld` Stage 1 to 4 admission and measure multi-turn `k = 1..4` pass curves with `blk.28..31` non-uniform depth allocation (`alpha_l*` proportional to `R_l^2 / (gamma_l^2 * rho_l)`).
 2. **Concrete graph-hypothesis coupling for `Mcproof.TransitionBounds`:** Mechanize finite-table checkers discharging projection and cut-capacity hypotheses directly inside Lean `v4.35.0` alongside Python `verify_dual_product_parity`.
+
+## D11 Family C real-Lean repair turn (2026-11-20)
+- **Defect closed in `src/mcproof/repair_loop.py`:** the public Family C scorer parsed `says_verified` from candidate prose and rebuilt the identity `rfl` scaffold while running the comparator `--no-lean`, so candidate Lean never compiled and prose could self-promote `bar_status`.
+- **`_run_family_c_real_lean_turn`:** `bar_status` comes strictly from harness `spec_meta`. A spoofed claim yields `FAMILY_C_STATUS_SELF_ATTESTATION`. The checked project is built from the candidate's fenced lean blocks. Pre-Lean fail-closeds cover missing blocks and `sorry`/`admit`. A theorem-name plus statement-hash guard pins the challenge statements.
+- **`defaultTargets` fix (verified load-bearing):** the generated project now targets `["{pkg}", "{pkg}.Spec", "{pkg}.Proofs"]`. With the old `["{pkg}"]`, `lake build` exits 0 on broken candidate proofs without compiling them. The new list fails with `error: Tpkg/Proofs.lean:2:59`.
+- **Fail-closed evidence:** a statement-exact candidate with `by exact Nat.noSuchLemma x` ends the turn with `BAR_CHECK_FAILED` + `LAKE_BUILD_FAILED`. It is never verified. Real line:column diagnostics reach the turn t+1 prompt through the inference path (`LEAN_COMPILE_ERROR` with `McproofCandidateCheck.lean:1:33`, `:1:59` preserved by `format_diagnostics`).
+- **Known wart:** `LAKE_BUILD_FAILED` keeps the last 6 build lines. The per-file error line can scroll out of the post-hoc message. Next-turn delivery is unaffected (inference path). Follow-up may rank `\.lean:\d+:\d+` lines first in the tail.
+- **Envelope:** total diff vs `71d1a58` stays under the 400-line cap. No vault, holdout, or live-run access in this lane.
