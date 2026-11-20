@@ -23,8 +23,11 @@ import pytest
 from helpers import expect_false, expect_in, expect_true, has_dep, has_lean_toolchain
 from mcproof.cli import main as cli_main
 from mcproof.lean_harness import (
+    _NOFOLLOW_OPEN_RULE,
     _SANDBOX_CPU_SEC,
+    UntrustedProjectPath,
     _address_space_cap_bytes,
+    _nofollow_dir_ops_available,
     _spawn_confined,
     linux_bwrap_functional,
     lint_lean4_source,
@@ -324,7 +327,11 @@ def test_malformed_comparator_json_is_a_finding(tmp_path: Path) -> None:
     (tmp_path / "comparator.json").write_text("{", encoding="utf-8")
     res = verify_lean4_project_comparator(tmp_path)
     expect_false(res.passed)
-    expect_in("COMPARATOR_JSON_MALFORMED", {f["rule"] for f in res.findings})
+    rules = {f["rule"] for f in res.findings}
+    if _nofollow_dir_ops_available():
+        expect_in("COMPARATOR_JSON_MALFORMED", rules)
+    else:
+        expect_in(_NOFOLLOW_OPEN_RULE, rules)
 
 
 _ORIGINAL_PROOFS = "import Probe\ntheorem Probe.Proofs.goal : True := trivial\n"
@@ -692,7 +699,11 @@ def test_lake_symlink_is_a_finding(tmp_path: Path) -> None:
     lake = root / ".lake"
     lake.symlink_to(precious, target_is_directory=True)
     res = verify_lean4_project_comparator(root, allow_unsandboxed=True)
-    expect_in("LAKE_CACHE_SYMLINK", {f["rule"] for f in res.findings})
+    rules = {f["rule"] for f in res.findings}
+    if _nofollow_dir_ops_available():
+        expect_in("LAKE_CACHE_SYMLINK", rules)
+    else:
+        expect_in(_NOFOLLOW_OPEN_RULE, rules)
     expect_true((precious / "KEEP").read_text(encoding="utf-8") == "KEEP\n")
     expect_true(lake.is_symlink())
 
@@ -719,7 +730,11 @@ def test_family_c_lake_symlink_is_a_finding(monkeypatch: pytest.MonkeyPatch, tmp
     repair_build = repair._family_c_direct_lake_build
     monkeypatch.setattr(repair, "_family_c_direct_lake_build", _wrap)
     findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), _family_c_with_theorems(""))
-    expect_in("LAKE_CACHE_SYMLINK", {f["rule"] for f in findings})
+    rules = {f["rule"] for f in findings}
+    if _nofollow_dir_ops_available():
+        expect_in("LAKE_CACHE_SYMLINK", rules)
+    else:
+        expect_in(_NOFOLLOW_OPEN_RULE, rules)
     expect_true((precious / "KEEP").read_text(encoding="utf-8") == "KEEP\n", findings)
     expect_true((Path(precious)).is_dir(), findings)
 
@@ -851,10 +866,14 @@ def test_run_cmd_and_hidden_eval_never_reach_lake(monkeypatch: pytest.MonkeyPatc
         _write_toml_project(root, proofs)
         res = verify_lean4_project_comparator(root, allow_unsandboxed=True)
         rules = {f["rule"] for f in res.findings}
-        expect_true(
-            "FORBIDDEN_EVAL_COMMAND" in rules or "METAPROGRAM_ESCAPE" in rules,
-            res.findings,
-        )
+        if _nofollow_dir_ops_available():
+            expect_true(
+                "FORBIDDEN_EVAL_COMMAND" in rules or "METAPROGRAM_ESCAPE" in rules,
+                res.findings,
+            )
+        else:
+            expect_in(_NOFOLLOW_OPEN_RULE, rules)
+            expect_false(res.passed)
     for snippet in (hidden, run_cmd):
         findings = _run_family_c_real_lean_turn(
             _family_c_refl_harness(),
@@ -865,3 +884,62 @@ def test_run_cmd_and_hidden_eval_never_reach_lake(monkeypatch: pytest.MonkeyPatc
             "FORBIDDEN_EVAL_COMMAND" in rules or "FORBIDDEN_ELAB_COMMAND" in rules,
             findings,
         )
+
+
+def test_missing_nofollow_open_refuses_without_copying(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Missing `O_DIRECTORY`, `O_NOFOLLOW`, or dir_fd support refuses. It does not follow a copy."""
+    import os
+
+    import mcproof.lean_harness as harness
+    import mcproof.repair_loop as repair
+
+    def _swapped() -> tuple[Path, Path, tuple]:
+        root = tmp_path / uuid.uuid4().hex
+        _write_toml_project(root, _ORIGINAL_PROOFS)
+        victim = tmp_path / f"{root.name}-victim"
+        _make_victim(victim)
+        before = _fingerprint(victim)
+        probe = root / "Probe"
+        shutil.rmtree(probe)
+        probe.symlink_to(victim, target_is_directory=True)
+        return root, victim, before
+
+    def _expect_refusal() -> None:
+        root, victim, before = _swapped()
+        res = verify_lean4_project_comparator(root, allow_unsandboxed=True)
+        expect_false(res.passed)
+        expect_in(_NOFOLLOW_OPEN_RULE, {f["rule"] for f in res.findings})
+        raised = False
+        try:
+            harness._read_project_tree(root)
+        except UntrustedProjectPath as exc:
+            raised = exc.rule == _NOFOLLOW_OPEN_RULE
+        expect_true(raised, "the tree read followed a path or used another rule")
+        try:
+            harness._materialize_trusted_tree({"Probe/file.txt": b"SENTINEL_FILE\n"})
+        except UntrustedProjectPath as exc:
+            raised = exc.rule == _NOFOLLOW_OPEN_RULE
+        else:
+            raised = False
+        expect_true(raised, "materialize copied without a non-following open")
+        expect_false(harness._real_dir(root, "Probe"))
+        findings = repair._family_c_direct_lake_build(root)
+        expect_in(_NOFOLLOW_OPEN_RULE, {f["rule"] for f in findings})
+        expect_true(_fingerprint(victim) == before)
+        expect_true((victim / "file.txt").read_text(encoding="utf-8") == "SENTINEL_FILE\n")
+        expect_true((victim / "dir.d" / "secret").read_text(encoding="utf-8") == "KEEP\n")
+
+    if _nofollow_dir_ops_available():
+        with monkeypatch.context() as hidden:
+            hidden.delattr(os, "O_DIRECTORY", raising=False)
+            hidden.delattr(os, "O_NOFOLLOW", raising=False)
+            expect_false(_nofollow_dir_ops_available())
+            _expect_refusal()
+        expect_true(_nofollow_dir_ops_available())
+        with monkeypatch.context() as hidden:
+            hidden.setattr(os, "supports_dir_fd", frozenset())
+            expect_false(_nofollow_dir_ops_available())
+            _expect_refusal()
+        expect_true(_nofollow_dir_ops_available())
+    else:
+        _expect_refusal()

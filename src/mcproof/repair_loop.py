@@ -1392,6 +1392,7 @@ def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: st
                 "LAKE_CACHE_SYMLINK",
                 "UNTRUSTED_PROJECT_SYMLINK",
                 "UNTRUSTED_PROJECT_FILE",
+                "NOFOLLOW_OPEN_UNAVAILABLE",
             }
             for f in findings
         ):

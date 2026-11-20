@@ -1786,6 +1786,38 @@ class UntrustedProjectPath(Exception):
         self.rule = rule
 
 
+# `lstat(dir_fd=)` is the `stat` implementation. CPython lists `stat` in
+# `os.supports_dir_fd` and does not list `lstat` itself.
+_NOFOLLOW_DIR_OPS = ("open", "stat", "mkdir")
+_NOFOLLOW_OPEN_RULE = "NOFOLLOW_OPEN_UNAVAILABLE"
+
+
+def _nofollow_dir_ops_available() -> bool:
+    """True when a directory can be opened without following a symlink in any component."""
+    if not hasattr(os, "O_DIRECTORY") or not hasattr(os, "O_NOFOLLOW"):
+        return False
+    supported = os.supports_dir_fd
+    return all(getattr(os, name) in supported for name in _NOFOLLOW_DIR_OPS)
+
+
+def _nofollow_unavailable_finding() -> dict[str, Any]:
+    return {
+        "line": 1,
+        "rule": _NOFOLLOW_OPEN_RULE,
+        "message": (
+            "O_DIRECTORY, O_NOFOLLOW, or dir_fd is missing; "
+            "refusing to open the candidate project because a following copy is not safe."
+        ),
+    }
+
+
+def _refuse_nofollow_unavailable() -> None:
+    if _nofollow_dir_ops_available():
+        return
+    finding = _nofollow_unavailable_finding()
+    raise UntrustedProjectPath(str(finding["message"]), rule=_NOFOLLOW_OPEN_RULE)
+
+
 def finding_blocks_comparator(finding: Mapping[str, Any]) -> bool:
     """An elaboration command means the comparator must not run.
 
@@ -1926,6 +1958,8 @@ def _command_findings(rel: str, text: str) -> list[dict[str, Any]]:
 
 def _lake_symlink_finding(proj: Path) -> dict[str, Any] | None:
     """`.lake` as a symlink is a finding. `rmtree` on that path raises, and following it deletes the target."""
+    if not _nofollow_dir_ops_available():
+        return _nofollow_unavailable_finding()
     try:
         root_fd = os.open(proj, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     except OSError as exc:
@@ -1956,6 +1990,7 @@ def _read_project_tree(proj: Path) -> dict[str, bytes]:
     `.lake` and `.git` are not copied. Opening each component with `O_NOFOLLOW`
     does not follow a parent the candidate swapped for a symlink.
     """
+    _refuse_nofollow_unavailable()
     root_fd = os.open(proj, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     try:
         files: dict[str, bytes] = {}
@@ -2015,6 +2050,7 @@ def _trusted_inputs(files: dict[str, bytes]) -> dict[str, bytes]:
 
 def _materialize_trusted_tree(files: dict[str, bytes]) -> Path:
     """A new directory of regular files. Nothing here is a path the candidate chose."""
+    _refuse_nofollow_unavailable()
     root = Path(tempfile.mkdtemp(prefix="mcproof_trusted_"))
     root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     try:
@@ -2064,6 +2100,8 @@ def _write_regular_at(root_fd: int, rel: str, data: bytes) -> None:
 
 def _real_dir(parent: Path, rel: str) -> bool:
     """True when every component of `parent/rel` is a real directory."""
+    if not _nofollow_dir_ops_available():
+        return False
     try:
         dir_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     except OSError:
@@ -2198,7 +2236,11 @@ def verify_lean4_project_comparator(
 
     lake_hit = _lake_symlink_finding(proj)
     if lake_hit is not None:
-        toolchain = _read_toolchain(proj) if (proj / "lean-toolchain").is_file() and not (proj / "lean-toolchain").is_symlink() else "leanprover/lean4:v4.35.0"
+        # The platform refusal must not stat or read through a candidate path.
+        if lake_hit.get("rule") == _NOFOLLOW_OPEN_RULE:
+            toolchain = "leanprover/lean4:v4.35.0"
+        else:
+            toolchain = _read_toolchain(proj) if (proj / "lean-toolchain").is_file() and not (proj / "lean-toolchain").is_symlink() else "leanprover/lean4:v4.35.0"
         theorem_names = ()
         challenge_mod = ""
         findings.append(lake_hit)

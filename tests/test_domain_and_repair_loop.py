@@ -29,7 +29,12 @@ from mcproof.domain_protocol import (
     verify_minimal_goal_stopping,
     verify_rational_lp_certificate,
 )
-from mcproof.lean_harness import linux_bwrap_functional, strip_lean_comments_and_strings
+from mcproof.lean_harness import (
+    _NOFOLLOW_OPEN_RULE,
+    _nofollow_dir_ops_available,
+    linux_bwrap_functional,
+    strip_lean_comments_and_strings,
+)
 from mcproof.paths import repo_root
 from mcproof.repair_loop import (
     MAX_RETRIEVAL_TOKENS_HARD_CAP,
@@ -702,6 +707,9 @@ def test_family_c_midline_eval_commands_rejected_before_lake(monkeypatch: pytest
     decoy_findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), decoy)
     decoy_rules = {f["rule"] for f in decoy_findings}
     expect_false("FORBIDDEN_EVAL_COMMAND" in decoy_rules, decoy_findings)
+    if not _nofollow_dir_ops_available():
+        expect_in(_NOFOLLOW_OPEN_RULE, decoy_rules)
+        expect_false(called["lake"], decoy_findings)
 
 
 def test_family_c_raw_string_and_char_literal_do_not_hide_eval(
@@ -796,6 +804,9 @@ def test_family_c_banned_commands_inside_text_are_not_findings(
     expect_false("FORBIDDEN_EVAL_COMMAND" in rules, findings)
     expect_false("FORBIDDEN_INITIALIZER" in rules, findings)
     expect_false("FORBIDDEN_ELAB_COMMAND" in rules, findings)
+    if not _nofollow_dir_ops_available():
+        expect_in(_NOFOLLOW_OPEN_RULE, rules)
+        expect_false(called["lake"], findings)
 
 
 def _family_c_with_theorems(snippet: str, *, prelude: str = "") -> str:
@@ -923,8 +934,11 @@ def test_family_c_refuses_candidate_build_when_sandbox_is_unavailable(
     monkeypatch.setattr(subprocess, "run", _refuse)
     findings = _family_c_direct_lake_build(tmp_path)
     rules = {f["rule"] for f in findings}
-    expect_eq(rules, {"SANDBOX_UNAVAILABLE"}, str(findings))
-    expect_true(any("unsandboxed" in str(f.get("message", "")) for f in findings), findings)
+    if _nofollow_dir_ops_available():
+        expect_eq(rules, {"SANDBOX_UNAVAILABLE"}, str(findings))
+        expect_true(any("unsandboxed" in str(f.get("message", "")) for f in findings), findings)
+    else:
+        expect_eq(rules, {_NOFOLLOW_OPEN_RULE}, str(findings))
 
 
 def test_family_c_compilable_elab_names_are_not_commands(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -935,7 +949,11 @@ def test_family_c_compilable_elab_names_are_not_commands(monkeypatch: pytest.Mon
         findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), _family_c_with_theorems(snippet))
         rules = {f["rule"] for f in findings}
         expect_false("FORBIDDEN_ELAB_COMMAND" in rules, f"{snippet!r}: {findings}")
-        expect_true(called["lake"], f"{snippet!r} never reached the build: {findings}")
+        if _nofollow_dir_ops_available():
+            expect_true(called["lake"], f"{snippet!r} never reached the build: {findings}")
+        else:
+            expect_in(_NOFOLLOW_OPEN_RULE, rules)
+            expect_false(called["lake"], findings)
 
 
 def test_family_c_non_ascii_and_other_decls_count_as_extra_names(
