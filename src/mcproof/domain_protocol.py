@@ -732,7 +732,7 @@ def audit_transition_certificate(
             )
         else:
             chk_sha = str(pins.get("checker_sha256") or pins.get("checker_auditor_py_sha256") or "")
-            if not pins.get("tcb_manifest_verified", False) or not SHA256_64_RE.match(chk_sha):
+            if not pins.get("tcb_manifest_verified", False) or not SHA256_64_RE.fullmatch(chk_sha):
                 findings.append(
                     {
                         "rule": "CERT_TCB_MANIFEST_UNLOCKED",
@@ -845,7 +845,7 @@ def audit_transition_certificate(
     # F-08: Missing, malformed non-64-hex, or unregistered witness_or_proof_sha256 (fail closed, NEON-D5)
     if status in ("VERIFIED", "PROVEN"):
         w_sha = str(cert.get("witness_or_proof_sha256", ""))
-        if not SHA256_64_RE.match(w_sha):
+        if not SHA256_64_RE.fullmatch(w_sha):
             findings.append(
                 {
                     "rule": "CERT_INVALID_WITNESS_SHA256",
@@ -909,7 +909,7 @@ def _parse_exact_rational(val: Any, *, max_abs_int: int = MAX_CERT_ABS_INT) -> F
         if abs(val) > max_abs_int:
             raise ValueError("integer exceeds cap")
         return Fraction(val, 1)
-    if isinstance(val, str) and STRICT_RATIONAL_RE.match(val):
+    if isinstance(val, str) and STRICT_RATIONAL_RE.fullmatch(val):
         if "/" in val:
             n_str, d_str = val.split("/", 1)
             num, den = int(n_str), int(d_str)
