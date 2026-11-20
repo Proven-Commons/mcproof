@@ -41,7 +41,7 @@ from mcproof.repair_loop import (
     sanitize_oracle_diagnostics,
 )
 
-from helpers import expect_eq, expect_false, expect_in, expect_true, has_lean_toolchain, requires_dep, requires_mde
+from helpers import expect_eq, expect_false, expect_in, expect_true, has_dep, has_lean_toolchain, requires_dep, requires_mde
 
 
 def test_targeted_plane1_retrieval_stays_under_1500_tokens_across_validation_split() -> None:
@@ -578,6 +578,72 @@ def test_family_c_known_bad_proof_reaches_lake_build() -> None:
     blob = "\n".join(str(f.get("message", "")) for f in findings)
     expect_in("noSuchLemma", blob)
     expect_true(bool(re.search(r"\.lean:\d+:\d+", blob)), blob)
+
+
+_REFL_HEADER = "(n : Nat) : n = n"
+
+
+def _family_c_refl_harness() -> dict[str, Any]:
+    return {
+        "oracle_type": "bar_check",
+        "spec_meta": {
+            "pkg": "CrtPair",
+            "bar_status": "in-progress",
+            "test_cmd": "python3 tests/run_tests.py",
+            "theorem_names": ["CrtPair.Spec.crt_mod_left", "CrtPair.Spec.crt_mod_right"],
+            "statements": {
+                "CrtPair.Spec.crt_mod_left": _REFL_HEADER,
+                "CrtPair.Spec.crt_mod_right": _REFL_HEADER,
+            },
+        },
+    }
+
+
+def _family_c_refl_completion() -> str:
+    readme = (repo_root() / "datasets" / "targets" / "family_c" / "PUB-C-V01.md").read_text(encoding="utf-8")
+    return (
+        readme
+        + "\n```lean\n"
+        + "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
+        + "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
+        + "```\n"
+    )
+
+
+def test_family_c_correct_proof_passes_when_manifest_is_kept() -> None:
+    """A correct `rfl` proof yields no findings when the template manifest is kept.
+
+    `bar/check.py` item 3 fails closed without `lake-manifest.json`, including under
+    `--no-lean`. Deleting that file makes this test fail with `BAR_CHECK_FAILED`.
+    The test skips only when `lean` or the pinned `mission` checkout is absent.
+    """
+    if not has_lean_toolchain():
+        pytest.skip(
+            "Lean 4.35.0 (`lean` and `lake`) is absent, so the Family C correct-proof path was not exercised"
+        )
+    if not has_dep("mission"):
+        pytest.skip(
+            "pinned dependency 'mission' is absent, so the Family C bar path was not exercised"
+        )
+    findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), _family_c_refl_completion())
+    expect_eq(findings, [], "a correct proof must not be rejected when lake-manifest.json is kept")
+
+
+def test_family_c_midline_theorem_counts_as_an_extra_name() -> None:
+    """A theorem that does not start a line is still part of the name set."""
+    comp = (
+        "```lean\n"
+        "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
+        "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
+        "def pad := 0 theorem Extra : True := trivial\n"
+        "```\n"
+    )
+    findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), comp)
+    rules = {f["rule"] for f in findings}
+    expect_in("FAMILY_C_THEOREM_NAME_MISMATCH", rules)
+    expect_true(any("Extra" in str(f.get("message", "")) for f in findings), findings)
+    expect_false("LAKE_BUILD_FAILED" in rules, findings)
+    expect_false("BAR_CHECK_FAILED" in rules, findings)
 
 
 def test_grade_item_pins_statements_and_refuses_identity_scaffold() -> None:

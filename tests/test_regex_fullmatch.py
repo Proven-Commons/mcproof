@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib.machinery
+import importlib.util
 import json
 from pathlib import Path
 
@@ -59,3 +61,15 @@ def test_upstream_commit_trailing_newline_rejected(tmp_path: Path) -> None:
     (deps / "DEPS_MANIFEST.json").write_text(json.dumps({"repos": repos}), encoding="utf-8")
     with pytest.raises(StaleLineageError):
         build_lineage_manifest(root, d_dir=deps)
+
+
+def test_bootstrap_deps_rejects_commit_pin_with_trailing_newline(tmp_path: Path) -> None:
+    script = repo_root() / "bin" / "bootstrap-deps"
+    loader = importlib.machinery.SourceFileLoader("bootstrap_deps_under_test", str(script))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    if spec is None:
+        raise AssertionError("bootstrap-deps failed to load")
+    mod = importlib.util.module_from_spec(spec)
+    loader.exec_module(mod)
+    with pytest.raises(ValueError):
+        mod._clone_at_exact_sha("https://example.invalid/repo.git", "a" * 40 + "\n", tmp_path / "dest")

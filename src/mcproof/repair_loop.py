@@ -824,6 +824,9 @@ def _extract_first_json_block(text: str) -> str | None:
 _FAMILY_C_STATUS_VERIFIED_RE = re.compile(r"(?im)^status\s*:\s*verified\b")
 _FAMILY_C_STATUS_NOT_VERIFIED_RE = re.compile(r"(?im)^status\s*:.*not verified")
 _FAMILY_C_SORRY_OR_ADMIT_RE = re.compile(r"\b(sorry|admit)\b")
+_FAMILY_C_DECL_NAME_RE = re.compile(
+    r"\b(?:theorem|lemma)\b[ \t]+(?P<name>[A-Za-z_][A-Za-z0-9_.']*)\b"
+)
 
 
 def _normalize_family_c_statement(text: str) -> str:
@@ -840,6 +843,16 @@ def _family_c_candidate_statements(candidate_lean: str) -> dict[str, str]:
         stmt = _normalize_family_c_statement(f"{full} {match.group('header')}")
         stmts[full] = hashlib.sha256(stmt.encode("utf-8")).hexdigest()
     return stmts
+
+
+def _family_c_all_decl_names(candidate_lean: str) -> set[str]:
+    """Every theorem or lemma name, including one that shares a line with other code.
+
+    `THEOREM_DECL_RE` only sees a declaration that starts a line. A mid-line
+    `theorem Extra` would otherwise sit outside the name set.
+    """
+    cleaned = strip_lean_comments_and_strings(candidate_lean)
+    return {str(match.group("name")) for match in _FAMILY_C_DECL_NAME_RE.finditer(cleaned)}
 
 
 def _family_c_statement_headers(
@@ -932,13 +945,15 @@ def _check_family_c_statement_match(
         return findings
     cand = _family_c_candidate_statements(candidate_lean)
     exp = _family_c_expected_statements(headers)
-    if set(cand) != set(exp):
+    hidden = _family_c_all_decl_names(candidate_lean) - set(cand)
+    if hidden or set(cand) != set(exp):
         findings.append(
             {
                 "rule": "FAMILY_C_THEOREM_NAME_MISMATCH",
                 "message": (
                     "candidate theorem names do not equal challenge meta: "
-                    f"missing={sorted(set(exp) - set(cand))} extra={sorted(set(cand) - set(exp))}."
+                    f"missing={sorted(set(exp) - set(cand))} "
+                    f"extra={sorted((set(cand) - set(exp)) | hidden)}."
                 ),
             }
         )
@@ -1109,7 +1124,8 @@ def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: st
             shutil.copytree(mission_bar[0], root, dirs_exist_ok=True)
             (root / "Clamp.lean").unlink(missing_ok=True)
             shutil.rmtree(root / "Clamp", ignore_errors=True)
-            (root / "lake-manifest.json").unlink(missing_ok=True)
+            # Keep lake-manifest.json. bar/check.py item 3 fails closed when it is
+            # absent, including under --no-lean, so deleting it rejects a correct proof.
         else:
             (root / "lean-toolchain").write_text(_family_c_toolchain_pin(), encoding="utf-8")
         (root / f"{pkg}.lean").write_text(_family_c_root_source(pkg, meta), encoding="utf-8")
