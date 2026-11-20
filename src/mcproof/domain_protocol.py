@@ -665,8 +665,9 @@ def audit_transition_certificate(
     prior_status = str(cert.get("prior_status", "")).strip().upper()
     evidence_kind = str(cert.get("evidence_kind", "")).strip().lower()
 
-    # A7: Reject tier-swap promotions of LINT_PASS / LOWER_BOUND / bounded-subgraph to VERIFIED or PROVEN
-    if status in ("VERIFIED", "PROVEN"):
+    # A7: Reject tier-swap promotions of LINT_PASS / LOWER_BOUND / bounded-subgraph
+    # to VERIFIED, PROVEN, or KNOWN. KNOWN uses this same evidence check.
+    if status in ("VERIFIED", "PROVEN", "KNOWN"):
         if prior_status in NON_VERIFIED_SUBTIERS or evidence_kind in ("static_lint", "lower_bound_only", "bounded_subgraph"):
             findings.append(
                 {

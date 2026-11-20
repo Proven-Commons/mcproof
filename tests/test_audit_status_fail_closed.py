@@ -59,6 +59,31 @@ def test_rejected_and_conjecture_are_not_relabeled_verified() -> None:
     expect_eq(conjecture["epistemic_status"], "CONJECTURE")
 
 
+def test_conjecture_to_known_without_evidence_is_rejected() -> None:
+    """A7 rejects a lower tier promoted to KNOWN with no replayed witness.
+
+    Reverting the KNOWN arm of the tier check lets this certificate pass.
+    """
+    cert = {"epistemic_status": "KNOWN", "prior_status": "CONJECTURE"}
+    result = audit_transition_certificate(cert)
+    expect_false(result["passed"], f"CONJECTURE to KNOWN was accepted: {result}")
+    expect_eq(result["epistemic_status"], "REJECTED")
+    expect_in("CERT_A7_ILLEGAL_TIER_SWAP", _rules(cert))
+
+
+def test_known_with_accepted_evidence_keeps_known() -> None:
+    """KNOWN carrying the witness pins A7 already accepts for VERIFIED stays KNOWN."""
+    cert = {
+        "epistemic_status": "KNOWN",
+        "witness_or_proof_sha256": HEX64,
+        "tcb_pins": {"tcb_manifest_verified": True, "checker_sha256": HEX64},
+    }
+    result = audit_transition_certificate(cert)
+    expect_true(result["passed"], f"KNOWN with witness evidence rejected: {result}")
+    expect_eq(result["epistemic_status"], "KNOWN")
+    expect_false("CERT_A7_ILLEGAL_TIER_SWAP" in _rules(cert), result)
+
+
 def test_verified_with_pins_still_passes() -> None:
     cert = {
         "epistemic_status": "VERIFIED",
