@@ -21,6 +21,9 @@
   "plane1_spec_token_stats": {
     "char_div4_estimate": 26690,
     "cl100k_base_tokens": 30873,
+    "cl100k_tokenizer": "tiktoken/0.14.0:cl100k_base",
+    "qwen35_tokenizer": "Qwen/Qwen3.5-4B (tokenizer.json sha256:5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42)",
+    "qwen35_tokens": 32216,
     "utf8_bytes": 106763,
     "words": 15791
   },
@@ -33,7 +36,7 @@
   },
   "source_lineage": {
     "contested_heads": [],
-    "corpus_tree_sha256": "5bdb7f30363b956e82947f668f98c48f99876e87fb5ed4f785b873e4f4f98305",
+    "corpus_tree_sha256": "93624aae09eea99c3d35ebfa2e9acde1f9ac9c675167461652486850f206b642",
     "domain_commits": {
       "corpus": "7b22e542f0db0f3013ab1439cf5d1947676a5083",
       "formal-verification": "49beff2a0185cfa4032170b614a543c0d6754149",
@@ -41,10 +44,12 @@
     }
   },
   "tracked_plane1_files": {
-    "lean/Mcproof.lean": "e27f69bce4f77b2b0fc308880a84e8e6c0710b578532167f1e27905595f0722c",
-    "lean/Mcproof/Proofs.lean": "27d1ae954c2e3ed1b76df409e0f59f41eca9c1ab13e6f4263d9a88a2ef8c6731",
-    "lean/Mcproof/Spec.lean": "0e4f403806727a088382477a3eddf8f7d67c0377a3e7391af862f7da1a67cca5",
-    "lean/comparator.json": "223b808dc8266557829fa21d515a0b0bbdf3f28a7242b03a23c1d806520d34e8",
+    "lean/Mcproof.lean": "e629ec64b3f433ad01d39efc5c61701a4aec10c612a0786a9bdaeeb1805bf03b",
+    "lean/Mcproof/AdapterBounds.lean": "d1152e3b37dd9fb078bae07419e92b3aeec9ddfae49c6ccd57fb6b0b8d86519a",
+    "lean/Mcproof/Proofs.lean": "09bbd22fe5b6fcb5fd1a7899fdb156f0b49f4953a49cacec10af2ec5042063df",
+    "lean/Mcproof/Spec.lean": "9baf38612b0443614b086efaf214ec7b6abbcf196019090e51d9173fc8a11304",
+    "lean/Mcproof/TransitionBounds.lean": "5d6c3a4efefc2c84b034ebabadb6e59965932158d1964b7d27e8947d056aaf6b",
+    "lean/comparator.json": "47121f42a035fd2f023a06bcc88c8580d9a6f8e06c51cf9625d2bbb0a630a9f1",
     "lean/lakefile.toml": "8540e8392738181588c16176e164496608dc5c89e1d359150d991d6f18c3d0ec",
     "lean/lean-toolchain": "ca5f1f601d34c49079e38d7e7041eb0f2a9c227fbc1df0f404820069a052330c",
     "schemas/dataset-record.v0.1.schema.json": "5891b56778196ac7d9a2ea30c5d673c2f7a3f5daa1da0da34c91518a482cbbea",

@@ -78,6 +78,49 @@ THEOREM_DECL_RE = re.compile(
     r"(?P<kw>theorem|lemma)[ \t]+(?P<name>[A-Za-z_][A-Za-z0-9_.']*)\b(?P<header>.*?)(?::=|\bwhere\b|\|)"
 )
 
+
+def linux_bwrap_functional(*, timeout_sec: float = 5.0) -> bool:
+    """Return True when Linux `bwrap` runs a minimal sandbox and can create `lake comparator`'s `/run/user` session dir."""
+    if not sys.platform.startswith("linux"):
+        return False
+    bwrap_bin = shutil.which("bwrap")
+    if not bwrap_bin:
+        return False
+    try:
+        basic = subprocess.run(
+            [bwrap_bin, "--ro-bind", "/", "/", "true"],
+            capture_output=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+        if basic.returncode != 0:
+            return False
+        uid = os.getuid()
+        lake_compat = subprocess.run(
+            [
+                bwrap_bin,
+                "--ro-bind",
+                "/",
+                "/",
+                "--bind",
+                "/run",
+                "/run",
+                "--bind",
+                "/tmp",
+                "/tmp",
+                "sh",
+                "-c",
+                f"mkdir -p /run/user/{uid} && test -w /run/user/{uid}",
+            ],
+            capture_output=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return lake_compat.returncode == 0
+
+
 AXIOM_AUDIT_TEMPLATE = """import Lean
 import {module_name}
 
@@ -188,6 +231,92 @@ def strip_lean_comments_and_strings(src: str) -> str:
     return "".join(out)
 
 
+def _unwrap_outer_parens(expr: str) -> str:
+    s = expr.strip()
+    while len(s) >= 2 and s[0] == "(" and s[-1] == ")":
+        depth = 0
+        wraps_all = True
+        for idx, ch in enumerate(s):
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+                if depth == 0 and idx < len(s) - 1:
+                    wraps_all = False
+                    break
+        if wraps_all and depth == 0:
+            s = s[1:-1].strip()
+        else:
+            break
+    return s
+
+
+def _split_top_level_arrows(expr: str) -> list[str]:
+    parts: list[str] = []
+    depth = 0
+    start = 0
+    i = 0
+    n = len(expr)
+    while i < n:
+        ch = expr[i]
+        if ch in "([{⟨":
+            depth += 1
+            i += 1
+        elif ch in ")]}⟩":
+            depth = max(0, depth - 1)
+            i += 1
+        elif depth == 0 and expr.startswith("->", i):
+            parts.append(expr[start:i].strip())
+            i += 2
+            start = i
+        elif depth == 0 and ch == "→":
+            parts.append(expr[start:i].strip())
+            i += 1
+            start = i
+        else:
+            i += 1
+    parts.append(expr[start:].strip())
+    return [p for p in parts if p]
+
+
+def _extract_binder_props(prefix: str) -> list[tuple[str, str]]:
+    """Extract `(lhs_names, rhs_type)` from top-level `(...)` binders in a theorem header."""
+    out: list[tuple[str, str]] = []
+    i = 0
+    n = len(prefix)
+    while i < n:
+        if prefix[i] == "(":
+            depth = 1
+            j = i + 1
+            colon_at = -1
+            while j < n and depth > 0:
+                if prefix[j] in "([{⟨":
+                    depth += 1
+                elif prefix[j] in ")]}⟩":
+                    depth -= 1
+                elif prefix[j] == ":" and depth == 1 and colon_at < 0 and prefix[j : j + 2] != ":=":
+                    colon_at = j
+                j += 1
+            if depth == 0 and colon_at > i:
+                lhs = prefix[i + 1 : colon_at].strip()
+                rhs = prefix[colon_at + 1 : j - 1].strip()
+                out.append((lhs, rhs))
+            i = j
+        else:
+            i += 1
+    return out
+
+
+def _is_vacuous_false_prop(raw_prop: str) -> bool:
+    u = re.sub(r"\s+", " ", _unwrap_outer_parens(raw_prop)).strip()
+    if u == "False":
+        return True
+    segs = _split_top_level_arrows(u)
+    if len(segs) == 2 and _unwrap_outer_parens(segs[0]) == "True" and _unwrap_outer_parens(segs[1]) == "False":
+        return True
+    return False
+
+
 def audit_weak_statements(source: str) -> list[dict[str, Any]]:
     """Detect WeakStatement vacuous-hypothesis and tautological-conclusion hazards."""
     cleaned = strip_lean_comments_and_strings(source)
@@ -199,28 +328,52 @@ def audit_weak_statements(source: str) -> list[dict[str, Any]]:
         line_no = cleaned.count("\n", 0, match.start()) + 1
         compact = re.sub(r"\s+", " ", header).strip()
 
-        # 1. Conclusion is literal `True`
-        if re.search(r":\s*True\s*$", compact):
+        depth = 0
+        top_colon_idx = -1
+        for idx_c, ch in enumerate(compact):
+            if ch in "([{⟨":
+                depth += 1
+            elif ch in ")]}⟩":
+                depth = max(0, depth - 1)
+            elif ch == ":" and depth == 0 and compact[idx_c : idx_c + 2] != ":=":
+                top_colon_idx = idx_c
+                break
+
+        binder_prefix = compact[:top_colon_idx] if top_colon_idx >= 0 else compact
+        concl_expr = compact[top_colon_idx + 1 :].strip() if top_colon_idx >= 0 else ""
+        arrow_segs = _split_top_level_arrows(concl_expr) if concl_expr else []
+        final_concl = _unwrap_outer_parens(arrow_segs[-1]) if arrow_segs else ""
+        arrow_premises = arrow_segs[:-1] if len(arrow_segs) > 1 else []
+        binders = _extract_binder_props(binder_prefix)
+
+        # 1. Conclusion is literal `True` (including parenthesized `(True)` or `P -> (True)`)
+        if final_concl == "True":
             findings.append({
                 "line": line_no,
                 "rule": "VACUOUS_TRUE_CONCLUSION",
                 "message": f"theorem '{thm_name}' proves literal True instead of a substantive property",
             })
 
-        # 2. Explicit False hypothesis (`(h : False)` or `False ->` / `False →`)
-        if re.search(r":\s*False\b|\bFalse\s*(?:->|→)", compact):
-            findings.append({
-                "line": line_no,
-                "rule": "VACUOUS_FALSE_HYPOTHESIS",
-                "message": f"theorem '{thm_name}' assumes False, making the implication vacuously true",
-            })
+        # 2. Explicit False or `True -> False` hypothesis in binders or arrow premises (`(False) →`, `(h : True → False)`)
+        has_false_hyp = any(_is_vacuous_false_prop(rhs) for _, rhs in binders) or any(
+            _is_vacuous_false_prop(prem) for prem in arrow_premises
+        )
+        if has_false_hyp or re.search(r":\s*False\b|\bFalse\s*(?:->|→)", compact):
+            # Exclude legitimate negation conclusion `P → False` where `False` is only the final conclusion!
+            if has_false_hyp or any("False" in rhs for _, rhs in binders) or any("False" in p for p in arrow_premises):
+                findings.append({
+                    "line": line_no,
+                    "rule": "VACUOUS_FALSE_HYPOTHESIS",
+                    "message": f"theorem '{thm_name}' assumes False (or True -> False), making the implication vacuously true",
+                })
 
         # 3. Impossible Nat / self-contradictory inequalities (`n < 0` on Nat, `x < x`, `x != x`)
         nat_vars = set()
-        for binder in re.finditer(r"\(([^():]+):\s*Nat\)", compact):
-            for tok in binder.group(1).split():
-                if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_']*", tok):
-                    nat_vars.add(tok)
+        for lhs, rhs in binders:
+            if _unwrap_outer_parens(rhs) == "Nat":
+                for tok in lhs.split():
+                    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_']*", tok):
+                        nat_vars.add(tok)
         for v in sorted(nat_vars):
             if re.search(rf"\b{re.escape(v)}\s*<\s*0\b", compact):
                 findings.append({
@@ -232,10 +385,8 @@ def audit_weak_statements(source: str) -> list[dict[str, Any]]:
         for self_lt in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_']*)\s*(?:<|≠|!=)\s*\1\b", compact):
             prefix = compact[: self_lt.start()].rstrip()
             suffix = compact[self_lt.end() :].lstrip()
-            # Strip enclosing open parentheses on prefix to detect `¬(a ≠ a)` or `Not (a ≠ a)`
             unwrapped_prefix = prefix.rstrip("(").rstrip()
             negated_by_op = unwrapped_prefix.endswith("¬") or bool(re.search(r"\bNot$", unwrapped_prefix))
-            # Also permit explicit irreflexive implication conclusion `: (a < a) -> False`
             unwrapped_suffix = suffix.lstrip(")").lstrip()
             negated_by_false_arrow = bool(
                 re.match(r"^(?:->|→)\s*False\s*$", unwrapped_suffix)
@@ -252,14 +403,18 @@ def audit_weak_statements(source: str) -> list[dict[str, Any]]:
         # 4. Direct contradictory propositional binders `(h1 : P)` and `(h2 : ¬ P)` or `(h2 : P -> False)`
         props: list[str] = []
         neg_props: list[str] = []
-        for hyp in re.finditer(r"\([^():]+:\s*([^()]+)\)", compact):
-            prop = hyp.group(1).strip()
+        for _, rhs in binders:
+            prop = _unwrap_outer_parens(rhs)
             if prop.startswith("¬"):
-                neg_props.append(prop[1:].strip())
+                neg_props.append(_unwrap_outer_parens(prop[1:]))
             elif prop.startswith("Not "):
-                neg_props.append(prop[4:].strip())
+                neg_props.append(_unwrap_outer_parens(prop[4:]))
             else:
-                props.append(prop)
+                segs_p = _split_top_level_arrows(prop)
+                if len(segs_p) == 2 and _unwrap_outer_parens(segs_p[1]) == "False":
+                    neg_props.append(_unwrap_outer_parens(segs_p[0]))
+                else:
+                    props.append(prop)
         overlap = set(props) & set(neg_props)
         if overlap:
             findings.append({
@@ -268,7 +423,482 @@ def audit_weak_statements(source: str) -> list[dict[str, Any]]:
                 "message": f"theorem '{thm_name}' assumes both P and Not P ({sorted(overlap)[0]})",
             })
 
+        # 5. Circular / tautological binder premise identical to conclusion (`(h : P) : P`)
+        if final_concl and final_concl != "True":
+            norm_concl = re.sub(r"\s+", " ", final_concl).strip()
+            for p_hyp in [*props, *[_unwrap_outer_parens(ap) for ap in arrow_premises]]:
+                if re.sub(r"\s+", " ", p_hyp).strip() == norm_concl:
+                    findings.append({
+                        "line": line_no,
+                        "rule": "VACUOUS_TAUTOLOGICAL_HYPOTHESIS",
+                        "message": f"theorem '{thm_name}' assumes its exact conclusion '{norm_concl}' as a premise",
+                    })
+                    break
+
     return findings
+
+
+LEAN_DEF_OR_ABBREV_RE = re.compile(
+    rf"(?ms)^[ \t]*{MODIFIERS_PAT}(?P<kw>def|abbrev)[ \t]+(?P<name>[A-Za-z_][A-Za-z0-9_.']*)\b(?P<rest>.*?)"
+    r"(?=\n[ \t]*(?:@\[[^\]]*\][ \t]*)?(?:(?:scoped|local|private|protected|noncomputable|public)[ \t]+)*"
+    r"(?:def|abbrev|theorem|lemma|structure|inductive|class|instance|axiom|opaque|example|end|namespace)\b|\Z)"
+)
+
+LEAN_TOKEN_RE = re.compile(
+    r":=|=>|<=|>=|!=|==|&&|\|\||->|<-|::|[A-Za-z_][A-Za-z0-9_.']*|[0-9]+|[()\[\]{}:,;|+\-*/%<>^=¬∧∨↔∀∃≤≥≠→←⟨⟩·]|\S"
+)
+
+
+def normalize_lean_tokens(text: str) -> str:
+    """Canonical token-spacing normalizer so `(x: Nat)` and `(x : Nat)` compare equal."""
+    toks: list[str] = []
+    for tok in LEAN_TOKEN_RE.findall(text):
+        if tok == "->":
+            toks.append("→")
+        elif tok == "<-":
+            toks.append("←")
+        else:
+            toks.append(tok)
+    return " ".join(toks)
+
+
+def extract_normalized_lean_defs(source: str) -> dict[str, str]:
+    """Extract `(short_def_name -> normalized_kw_sig_and_body)` from non-sorry Lean `def`/`abbrev` declarations."""
+    cleaned = strip_lean_comments_and_strings(source)
+    defs: dict[str, str] = {}
+    for m in LEAN_DEF_OR_ABBREV_RE.finditer(cleaned):
+        rest = m.group("rest")
+        if re.search(r"\bsorry\b", rest):
+            continue
+        kw = m.group("kw")
+        short_name = m.group("name").split(".")[-1]
+        defs[short_name] = f"{kw} {normalize_lean_tokens(rest)}"
+    return defs
+
+
+def verify_pinned_lean_defs(prompt_source: str, candidate_source: str) -> list[dict[str, Any]]:
+    """Reject candidate Lean modules that redefine a prompt-supplied target `def` or `abbrev` (`CertiFFI` hazard)."""
+    pinned = extract_normalized_lean_defs(prompt_source)
+    if not pinned:
+        return []
+    cand_defs = extract_normalized_lean_defs(candidate_source)
+    findings: list[dict[str, Any]] = []
+    for def_name, expected_norm in sorted(pinned.items()):
+        if def_name in cand_defs and cand_defs[def_name] != expected_norm:
+            findings.append({
+                "line": 1,
+                "rule": "TARGET_DEF_BODY_MUTATED",
+                "message": f"candidate mutated pinned target definition '{def_name}' away from prompt specification",
+            })
+    return findings
+
+
+PROMPT_BACKTICK_THM_RE = re.compile(
+    r"`(?:theorem|lemma)\s+([A-Za-z_][A-Za-z0-9_.']*)\s*([^`]*:[^`]+)`"
+)
+PROMPT_BACKTICK_DEF_RE = re.compile(
+    r"`((?:def|abbrev)\s+[A-Za-z_][A-Za-z0-9_.']*[^`]+)`"
+)
+PROMPT_BACKTICK_TYPE_DECL_RE = re.compile(
+    r"`(?:structure|inductive)\s+([A-Za-z_][A-Za-z0-9_.']*)\b[^`]*`"
+)
+LEAN_NAMESPACE_RE = re.compile(r"(?m)^[ \t]*namespace[ \t]+([A-Za-z_][A-Za-z0-9_.']*)")
+LEAN_DECL_NAME_RE_TEMPLATE = (
+    rf"(?m)^[ \t]*{MODIFIERS_PAT}(?:def|abbrev|structure|inductive)[ \t]+"
+    r"(?:[A-Za-z_][A-Za-z0-9_.']*\.)?{short_name}\b"
+)
+
+CHALLENGE_CMP_DRIVER_TEMPLATE = """import Lean
+
+open Lean Meta
+
+def runCheck (specMod candMod : Name) : CoreM Unit := do
+  let envSpec ← importModules #[{ module := specMod }] {}
+  let envCand ← importModules #[{ module := candMod }] {}
+  for (name, specInfo) in envSpec.constants.map₁.toList do
+    let some idx := envSpec.getModuleIdxFor? name | continue
+    let modName := envSpec.header.moduleNames[idx.toNat]!
+    unless modName == specMod do continue
+    if name.isInternal then continue
+    let strName := name.toString
+    if strName.endsWith ".rec" || strName.endsWith ".recOn" || strName.endsWith ".casesOn" ||
+       strName.endsWith ".brecOn" || strName.endsWith ".below" || strName.endsWith ".ibelow" ||
+       strName.endsWith ".noConfusion" || strName.endsWith ".noConfusionType" ||
+       strName.endsWith ".ctorIdx" || strName.endsWith ".inj" || strName.endsWith ".injEq" ||
+       strName.endsWith ".sizeOf_spec" || strName.endsWith ".elim" then
+      continue
+    let some candInfo := envCand.find? name
+      | IO.println s!"MCPROOF_CMP_ERR\\tMISSING_CHALLENGE_DECLARATION\\t{name}"; continue
+    match specInfo with
+    | .thmInfo st =>
+      match candInfo with
+      | .thmInfo ct =>
+        let (eqTy, _) ← (Meta.isDefEq st.type ct.type).run' {}
+          |>.toIO { fileName := "<cmp>", fileMap := default } { env := envCand }
+        if !eqTy then
+          IO.println s!"MCPROOF_CMP_ERR\\tCHALLENGE_THEOREM_TYPE_MISMATCH\\t{name}"
+      | _ =>
+        IO.println s!"MCPROOF_CMP_ERR\\tCHALLENGE_NOT_A_THEOREM\\t{name}"
+    | .defnInfo sd =>
+      match candInfo with
+      | .defnInfo cd =>
+        let (eqBoth, _) ← (do
+          let tOk ← Meta.isDefEq sd.type cd.type
+          if !tOk then return false
+          Meta.isDefEq sd.value cd.value
+        ).run' {} |>.toIO { fileName := "<cmp>", fileMap := default } { env := envCand }
+        if !eqBoth then
+          IO.println s!"MCPROOF_CMP_ERR\\tCHALLENGE_DEF_MUTATED\\t{name}"
+      | _ =>
+        IO.println s!"MCPROOF_CMP_ERR\\tCHALLENGE_NOT_A_DEF\\t{name}"
+    | .inductInfo si =>
+      match candInfo with
+      | .inductInfo ci =>
+        if si.ctors != ci.ctors || si.numParams != ci.numParams then
+          IO.println s!"MCPROOF_CMP_ERR\\tCHALLENGE_INDUCT_MUTATED\\t{name}"
+      | _ =>
+        IO.println s!"MCPROOF_CMP_ERR\\tCHALLENGE_NOT_AN_INDUCT\\t{name}"
+    | _ => pure ()
+
+#eval runCheck `McproofSpecMod `McproofCandMod
+"""
+
+
+def extract_prompt_lean_obligations(prompt_text: str, fenced_lean_blocks: Sequence[str] = ()) -> dict[str, Any]:
+    """Extract label-free theorem & definition obligations strictly from the prompt text (`NEON-C2`)."""
+    def_snippets: list[str] = list(fenced_lean_blocks)
+    required_defs: list[str] = []
+    theorem_specs: list[tuple[str, str]] = []
+    theorem_names: list[str] = []
+
+    for blk in fenced_lean_blocks:
+        cleaned_blk = strip_lean_comments_and_strings(blk)
+        for dm in LEAN_DEF_OR_ABBREV_RE.finditer(cleaned_blk):
+            dn = dm.group("name").split(".")[-1]
+            if dn not in required_defs:
+                required_defs.append(dn)
+        for tm in THEOREM_DECL_RE.finditer(cleaned_blk):
+            tn = tm.group("name").split(".")[-1]
+            hdr = tm.group("header").strip()
+            if tn not in theorem_names:
+                theorem_names.append(tn)
+            if ":" in hdr:
+                theorem_specs.append((tn, hdr))
+
+    for m_def in PROMPT_BACKTICK_DEF_RE.finditer(prompt_text):
+        snip = m_def.group(1).strip()
+        def_snippets.append(snip)
+        m_n = re.match(r"^(?:def|abbrev)\s+([A-Za-z_][A-Za-z0-9_.']*)\b", snip)
+        if m_n:
+            dn = m_n.group(1).split(".")[-1]
+            if dn not in required_defs:
+                required_defs.append(dn)
+
+    for m_ty in PROMPT_BACKTICK_TYPE_DECL_RE.finditer(prompt_text):
+        tn_ty = m_ty.group(1).split(".")[-1]
+        if tn_ty not in required_defs:
+            required_defs.append(tn_ty)
+
+    for m_thm in PROMPT_BACKTICK_THM_RE.finditer(prompt_text):
+        short_t = m_thm.group(1).split(".")[-1]
+        hdr = re.sub(r":=\s*(?:by\s+)?sorry\s*$", "", m_thm.group(2)).strip()
+        if short_t not in theorem_names:
+            theorem_names.append(short_t)
+        if ":" in hdr and not any(s[0] == short_t for s in theorem_specs):
+            theorem_specs.append((short_t, hdr))
+
+    for raw_t in re.findall(r"\b(?:theorem|lemma)\s+([A-Za-z_][A-Za-z0-9_.']*)\b", prompt_text):
+        st = raw_t.split(".")[-1]
+        if st not in theorem_names:
+            theorem_names.append(st)
+
+    return {
+        "def_snippets": def_snippets,
+        "required_defs": required_defs,
+        "theorem_specs": theorem_specs,
+        "theorem_names": theorem_names,
+    }
+
+
+def verify_lean4_prompt_obligations(
+    prompt_text: str,
+    candidate_source: str,
+    *,
+    fenced_prompt_lean: Sequence[str] = (),
+    lean_project_dir: Path | None = None,
+    run_kernel_type_check: bool = True,
+    timeout_sec: float = 60.0,
+) -> list[dict[str, Any]]:
+    """Verify comment-stripped declarations AND kernel `Meta.isDefEq` theorem types against prompt text (`NEON-C2`)."""
+    obligations = extract_prompt_lean_obligations(prompt_text, fenced_prompt_lean)
+    cleaned_cand = strip_lean_comments_and_strings(candidate_source)
+    findings: list[dict[str, Any]] = []
+
+    declared_thms = {m.group("name").split(".")[-1] for m in THEOREM_DECL_RE.finditer(cleaned_cand)}
+    for req_thm in obligations["theorem_names"]:
+        if req_thm not in declared_thms:
+            findings.append({
+                "line": 1,
+                "rule": "MISSING_PROMPT_THEOREM_NAME",
+                "message": f"Completion must declare and prove prompt theorem `{req_thm}` (not merely mention it in comments).",
+            })
+
+    for req_def in obligations["required_defs"]:
+        pat = LEAN_DECL_NAME_RE_TEMPLATE.format(short_name=re.escape(req_def))
+        if not re.search(pat, cleaned_cand):
+            findings.append({
+                "line": 1,
+                "rule": "MISSING_PROMPT_DEF_DECL",
+                "message": f"Completion omitted required prompt declaration `{req_def}`.",
+            })
+
+    for snip in obligations["def_snippets"]:
+        for df in verify_pinned_lean_defs(snip, candidate_source):
+            if not any(existing.get("message") == df.get("message") for existing in findings):
+                findings.append(df)
+
+    if findings or not run_kernel_type_check or not obligations["theorem_specs"]:
+        return findings
+
+    proj_dir = (lean_project_dir or (repo_root() / "lean")).resolve()
+    lean_bin = find_lean_tool("lean")
+    env = _lean_env()
+    lib_olean_dir = proj_dir / ".lake" / "build" / "lib" / "lean"
+
+    cand_namespaces = LEAN_NAMESPACE_RE.findall(cleaned_cand)
+    open_lines = "\n".join(f"open {ns}" for ns in dict.fromkeys(cand_namespaces))
+    ax_lines: list[str] = []
+    pair_entries: list[str] = []
+    for idx, (short_t, hdr) in enumerate(obligations["theorem_specs"]):
+        ax_name = f"_mcproof_pspec_{idx}"
+        ax_lines.append(f"axiom {ax_name} {hdr}")
+        qual_t = f"{cand_namespaces[0]}.{short_t}" if cand_namespaces else short_t
+        pair_entries.append(f"(`{ax_name}, `{qual_t}, `{short_t})")
+
+    drv_src = (
+        "import Lean\n"
+        "import McproofPromptCand\n"
+        "open Lean Meta\n"
+        f"{open_lines}\n"
+        + "\n".join(ax_lines)
+        + "\n\n#eval show CoreM Unit from do\n"
+        "  let env ← getEnv\n"
+        f"  let pairs : List (Name × Name × Name) := [{', '.join(pair_entries)}]\n"
+        "  for (axN, fullN, shortN) in pairs do\n"
+        "    let some specI := env.find? axN | IO.println s!\"MCPROOF_PSPEC_ERR\\tSPEC_ELAB_FAIL\\t{shortN}\"; continue\n"
+        "    let candOpt := match env.find? fullN with\n"
+        "      | some ci => some ci\n"
+        "      | none => env.find? shortN\n"
+        "    let some candI := candOpt | IO.println s!\"MCPROOF_PSPEC_ERR\\tMISSING_PROMPT_THEOREM_NAME\\t{shortN}\"; continue\n"
+        "    match candI with\n"
+        "    | .thmInfo ct =>\n"
+        "      let (ok, _) ← (Meta.isDefEq specI.type ct.type).run' {}\n"
+        "        |>.toIO { fileName := \"<pspec>\", fileMap := default } { env := env }\n"
+        "      if !ok then IO.println s!\"MCPROOF_PSPEC_ERR\\tPROMPT_THEOREM_TYPE_MISMATCH\\t{shortN}\"\n"
+        "    | _ => IO.println s!\"MCPROOF_PSPEC_ERR\\tPROMPT_DECL_NOT_THEOREM\\t{shortN}\"\n"
+    )
+
+    with tempfile.TemporaryDirectory(prefix="mcproof_pspec_") as td:
+        tdp = Path(td).resolve()
+        cand_f = tdp / "McproofPromptCand.lean"
+        cand_o = tdp / "McproofPromptCand.olean"
+        drv_f = tdp / "McproofPromptSpecDriver.lean"
+        cand_f.write_text(candidate_source, encoding="utf-8")
+        drv_f.write_text(drv_src, encoding="utf-8")
+
+        lean_path_parts = [str(tdp)]
+        if lib_olean_dir.is_dir():
+            lean_path_parts.append(str(lib_olean_dir))
+        sysroot_proc = subprocess.run([lean_bin, "--print-libdir"], capture_output=True, text=True, check=False)
+        if sysroot_proc.returncode == 0 and sysroot_proc.stdout.strip():
+            lean_path_parts.append(sysroot_proc.stdout.strip())
+        run_env = dict(env)
+        run_env["LEAN_PATH"] = os.pathsep.join(lean_path_parts)
+
+        c_proc = subprocess.run(
+            [lean_bin, "-j", "1", "-D", "Elab.async=false", str(cand_f), "-o", str(cand_o)],
+            cwd=tdp,
+            env=run_env,
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+        if c_proc.returncode != 0:
+            return findings
+
+        d_proc = subprocess.run(
+            [lean_bin, "-j", "1", "-D", "Elab.async=false", str(drv_f)],
+            cwd=tdp,
+            env=run_env,
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+        if d_proc.returncode != 0:
+            tail = " | ".join(ln.strip() for ln in ((d_proc.stdout or "") + "\n" + (d_proc.stderr or "")).splitlines()[-4:] if ln.strip())
+            findings.append({
+                "line": 1,
+                "rule": "PROMPT_THEOREM_TYPE_MISMATCH",
+                "message": f"Candidate theorem environment failed prompt statement check: {tail}",
+            })
+        else:
+            for ln in (d_proc.stdout or "").splitlines():
+                if ln.startswith("MCPROOF_PSPEC_ERR\t"):
+                    parts = ln.split("\t")
+                    rule_code = parts[1] if len(parts) > 1 else "PROMPT_THEOREM_TYPE_MISMATCH"
+                    thm_id = parts[2] if len(parts) > 2 else "unknown"
+                    findings.append({
+                        "line": 1,
+                        "rule": rule_code,
+                        "message": f"Candidate declaration `{thm_id}` does not match prompt theorem statement (`{rule_code}`).",
+                    })
+    return findings
+
+
+def verify_lean4_against_challenge(
+    challenge_lean: str,
+    candidate_source: str,
+    *,
+    lean_project_dir: Path | None = None,
+    timeout_sec: float = 60.0,
+) -> list[dict[str, Any]]:
+    """Verify via Lean `Meta.isDefEq` that `candidate_source` implements every def/inductive/theorem in `challenge_lean`."""
+    proj_dir = (lean_project_dir or (repo_root() / "lean")).resolve()
+    lean_bin = find_lean_tool("lean")
+    env = _lean_env()
+    lib_olean_dir = proj_dir / ".lake" / "build" / "lib" / "lean"
+    findings: list[dict[str, Any]] = []
+
+    with tempfile.TemporaryDirectory(prefix="mcproof_chalcmp_") as td:
+        tdp = Path(td).resolve()
+        spec_f = tdp / "McproofSpecMod.lean"
+        spec_o = tdp / "McproofSpecMod.olean"
+        cand_f = tdp / "McproofCandMod.lean"
+        cand_o = tdp / "McproofCandMod.olean"
+        drv_f = tdp / "McproofChalCmpDriver.lean"
+
+        spec_f.write_text(challenge_lean, encoding="utf-8")
+        cand_f.write_text(candidate_source, encoding="utf-8")
+        drv_f.write_text(CHALLENGE_CMP_DRIVER_TEMPLATE, encoding="utf-8")
+
+        lean_path_parts = [str(tdp)]
+        if lib_olean_dir.is_dir():
+            lean_path_parts.append(str(lib_olean_dir))
+        sysroot_proc = subprocess.run([lean_bin, "--print-libdir"], capture_output=True, text=True, check=False)
+        if sysroot_proc.returncode == 0 and sysroot_proc.stdout.strip():
+            lean_path_parts.append(sysroot_proc.stdout.strip())
+        run_env = dict(env)
+        run_env["LEAN_PATH"] = os.pathsep.join(lean_path_parts)
+
+        s_proc = subprocess.run(
+            [lean_bin, "-j", "1", "-D", "Elab.async=false", str(spec_f), "-o", str(spec_o)],
+            cwd=tdp,
+            env=run_env,
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+        c_proc = subprocess.run(
+            [lean_bin, "-j", "1", "-D", "Elab.async=false", str(cand_f), "-o", str(cand_o)],
+            cwd=tdp,
+            env=run_env,
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+        if s_proc.returncode != 0 or c_proc.returncode != 0:
+            findings.append({
+                "line": 1,
+                "rule": "CHALLENGE_COMPARE_BUILD_FAILED",
+                "message": "Failed to compile challenge or candidate module for kernel statement comparison.",
+            })
+            return findings
+
+        cmp_proc = subprocess.run(
+            [lean_bin, "-j", "1", "-D", "Elab.async=false", str(drv_f)],
+            cwd=tdp,
+            env=run_env,
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+        if cmp_proc.returncode != 0:
+            tail = " | ".join(ln.strip() for ln in ((cmp_proc.stdout or "") + "\n" + (cmp_proc.stderr or "")).splitlines()[-4:] if ln.strip())
+            findings.append({
+                "line": 1,
+                "rule": "CHALLENGE_COMPARE_DRIVER_FAILED",
+                "message": f"Kernel challenge comparison driver failed: {tail}",
+            })
+            return findings
+
+        for ln in (cmp_proc.stdout or "").splitlines():
+            if ln.startswith("MCPROOF_CMP_ERR\t"):
+                parts = ln.split("\t")
+                rule_code = parts[1] if len(parts) > 1 else "CHALLENGE_THEOREM_TYPE_MISMATCH"
+                decl_name = parts[2] if len(parts) > 2 else "unknown"
+                findings.append({
+                    "line": 1,
+                    "rule": rule_code,
+                    "message": f"Candidate failed challenge specification check on `{decl_name}` (`{rule_code}`).",
+                })
+    return findings
+
+
+def build_capped_lean_args(
+    lean_bin: str,
+    target_lean: Path,
+    *,
+    out_olean: Path | None = None,
+    max_memory_mib: int | None = 1400,
+) -> list[str]:
+    """Construct single-threaded, synchronous, `--trust=0`, memory-capped Lean 4.35 invocation."""
+    cmd = [lean_bin, "--trust=0", "-j", "1", "-D", "Elab.async=false"]
+    if max_memory_mib is not None and max_memory_mib > 0:
+        cmd.extend(["-M", str(int(max_memory_mib))])
+    cmd.append(str(target_lean))
+    if out_olean is not None:
+        cmd.extend(["-o", str(out_olean)])
+    return cmd
+
+
+def classify_host_resource_failure(returncode: int, combined_output: str) -> str | None:
+    """Return host-limit diagnostic reason when a Lean failure is OOM/signal/disk rather than mathematical."""
+    low = combined_output.lower()
+    if returncode in (-9, 137):
+        return f"process killed by SIGKILL/OOM (rc={returncode})"
+    for marker in (
+        "excessive memory consumption",
+        "memory allocation failed",
+        "out of memory",
+        "no space left on device",
+        "cannot allocate memory",
+    ):
+        if marker in low:
+            return f"host resource limit triggered ({marker})"
+    return None
+
+
+def scrub_challenge_artifacts(project_dir: Path, challenge_module: str) -> list[str]:
+    """Unlink compiled `.olean`/`.ir` artifacts for `challenge_module` so `Spec` always compiles fresh."""
+    if not challenge_module:
+        return []
+    rel_parts = challenge_module.split(".")
+    removed: list[str] = []
+    for base_sub in (Path(".lake/build/lib/lean"), Path(".lake/build/ir")):
+        stem_dir = project_dir / base_sub / Path(*rel_parts[:-1]) if len(rel_parts) > 1 else project_dir / base_sub
+        if not stem_dir.is_dir():
+            continue
+        prefix = rel_parts[-1] + "."
+        for item in sorted(stem_dir.iterdir()):
+            if item.is_file() and item.name.startswith(prefix):
+                item.unlink()
+                removed.append(item.relative_to(project_dir).as_posix())
+    return removed
 
 
 def lint_lean4_source(
@@ -405,6 +1035,7 @@ class LeanVerificationResult:
     findings: tuple[dict[str, Any], ...]
     caveats: tuple[str, ...] = ()
     challenge_sorry_whitelisted_module: str | None = None
+    host_resource_exhausted: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -418,6 +1049,7 @@ class LeanVerificationResult:
             "sandboxed": self.sandboxed,
             "caveats": list(self.caveats),
             "challenge_sorry_whitelisted_module": self.challenge_sorry_whitelisted_module,
+            "host_resource_exhausted": self.host_resource_exhausted,
             "findings": list(self.findings),
         }
 
@@ -436,7 +1068,8 @@ def verify_lean4_source(
     require_theorem: bool = True,
     run_paranoid_leanchecker: bool = True,
     lean_project_dir: Path | None = None,
-    timeout_sec: int = 120,
+    timeout_sec: float = 120,
+    max_memory_mib: int | None = 1400,
 ) -> LeanVerificationResult:
     """Compile a Lean 4 source string, audit source escape hatches, verify kernel collectAxioms, and run leanchecker."""
     proj_dir = (lean_project_dir or (repo_root() / "lean")).resolve()
@@ -488,17 +1121,61 @@ def verify_lean4_source(
         run_env = dict(env)
         run_env["LEAN_PATH"] = os.pathsep.join(lean_path_parts)
 
-        comp = subprocess.run(
-            [lean_bin, str(cand_lean), "-o", str(cand_olean)],
-            cwd=tmp_dir,
-            env=run_env,
-            capture_output=True,
-            text=True,
-            timeout=timeout_sec,
-            check=False,
+        comp_cmd = build_capped_lean_args(
+            lean_bin,
+            cand_lean,
+            out_olean=cand_olean,
+            max_memory_mib=max_memory_mib,
         )
+        try:
+            comp = subprocess.run(
+                comp_cmd,
+                cwd=tmp_dir,
+                env=run_env,
+                capture_output=True,
+                text=True,
+                timeout=timeout_sec,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            findings.append({
+                "line": 1,
+                "rule": "HOST_RESOURCE_EXHAUSTED",
+                "message": f"Lean elaboration timed out after {timeout_sec}s ({exc})",
+            })
+            return LeanVerificationResult(
+                passed=False,
+                toolchain=toolchain,
+                theorems_checked=(),
+                axioms_used=(),
+                nonstandard_axioms=(),
+                sorry_declarations=(),
+                paranoid_kernels_run=(),
+                sandboxed=False,
+                findings=tuple(findings),
+                host_resource_exhausted=True,
+            )
         combined_out = (comp.stdout or "") + "\n" + (comp.stderr or "")
         if comp.returncode != 0:
+            host_reason = classify_host_resource_failure(comp.returncode, combined_out)
+            if host_reason is not None:
+                findings.append({
+                    "line": 1,
+                    "rule": "HOST_RESOURCE_EXHAUSTED",
+                    "message": host_reason,
+                })
+                return LeanVerificationResult(
+                    passed=False,
+                    toolchain=toolchain,
+                    theorems_checked=(),
+                    axioms_used=(),
+                    nonstandard_axioms=(),
+                    sorry_declarations=(),
+                    paranoid_kernels_run=(),
+                    sandboxed=False,
+                    findings=tuple(findings),
+                    host_resource_exhausted=True,
+                )
             tail = " | ".join(line.strip() for line in combined_out.strip().splitlines()[-6:] if line.strip())
             findings.append({
                 "line": 1,
@@ -683,7 +1360,7 @@ def verify_lean4_project_comparator(
         })
 
     # Fail closed before compiling untrusted Lean code when Linux bubblewrap is unavailable unless explicitly opted in
-    bwrap_available = shutil.which("bwrap") is not None and sys.platform.startswith("linux")
+    bwrap_available = linux_bwrap_functional()
     caveats: list[str] = []
     if not bwrap_available:
         if not allow_unsandboxed:
@@ -725,6 +1402,9 @@ def verify_lean4_project_comparator(
             require_theorem=False,
         )
         findings.extend(lint["findings"])
+
+    # Scrub challenge `.olean`/`.ir` before `lake build` so `Spec` always compiles fresh from disk
+    scrub_challenge_artifacts(proj, challenge_mod)
 
     # Run `lake build`
     build_res = subprocess.run(

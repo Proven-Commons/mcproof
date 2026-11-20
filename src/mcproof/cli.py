@@ -9,6 +9,11 @@ import subprocess
 import sys
 from typing import Any, Sequence
 
+from .domain_protocol import (
+    audit_transition_certificate,
+    loads_strict_certificate_json,
+    run_restricted_sandbox_cell,
+)
 from .lineage import build_lineage_manifest, verify_lineage_manifest
 from .oracles import (
     OracleReceipt,
@@ -25,6 +30,11 @@ from .oracles import (
     run_verdicts_oracle,
 )
 from .paths import repo_root
+from .repair_loop import (
+    make_llama_server_generator,
+    retrieve_plane1_excerpt,
+    run_repair_split,
+)
 
 
 def _read_text_or_stdin(path_arg: str) -> str:
@@ -118,6 +128,30 @@ def build_parser() -> argparse.ArgumentParser:
     s_grd.add_argument("--input", default="-", help="Completion file path or '-' for stdin")
     s_grd.add_argument("--expected-tier", default=None, help="Expected claim tier")
     s_grd.add_argument("--fixture-json", default=None, help="Optional JSON fixture with generator_source / valid_cases / planted_mutations")
+
+    # repair
+    s_rep = sub.add_parser("repair", help="Run targeted <=1500-token Plane 1 retrieval or closed-loop k-turn repair")
+    s_rep.add_argument("--dataset", default=None, help="JSONL dataset split path")
+    s_rep.add_argument("--server-url", default="http://127.0.0.1:18080", help="llama-server base URL")
+    s_rep.add_argument("--lora-json", default="[]", help="JSON list of llama-server LoRA specs")
+    s_rep.add_argument("--max-turns", type=int, default=4, help="Maximum repair turns k (default: 4)")
+    s_rep.add_argument("--max-predict", type=int, default=768, help="Max completion tokens per turn")
+    s_rep.add_argument("--retrieval-max-tokens", type=int, default=1250, help="Plane 1 excerpt cap (hard max 1500)")
+    s_rep.add_argument("--no-plane1", action="store_true", help="Disable Plane 1 excerpt retrieval")
+    s_rep.add_argument("--checkpoint-jsonl", default=None, help="Crash-safe JSONL checkpoint path")
+    s_rep.add_argument("--output-json", default=None, help="Output summary JSON path")
+    s_rep.add_argument("--retrieve-only", action="store_true", help="Only retrieve and verify <=1500-token Plane 1 excerpt")
+    s_rep.add_argument("--family", default="A", choices=["A", "B", "C", "D", "a", "b", "c", "d"], help="Family for --retrieve-only")
+    s_rep.add_argument("--prompt", default="", help="Prompt text for --retrieve-only")
+
+    # audit-cert
+    s_crt = sub.add_parser("audit-cert", help="Audit a state-transition / lower-bound certificate JSON for structural soundness")
+    s_crt.add_argument("cert_file", help="Path to certificate JSON file or '-' for stdin")
+
+    # sandbox-cell
+    s_sbx = sub.add_parser("sandbox-cell", help="Execute a 4-second network-free, filesystem-isolated Python micro-computation cell")
+    s_sbx.add_argument("code_file", help="Path to Python snippet or '-' for stdin")
+    s_sbx.add_argument("--timeout", type=float, default=4.0, help="Timeout in seconds (hard-capped at 4.0s)")
 
     # selftest
     s_self = sub.add_parser("selftest", help="Run full Tier 2 oracle and Plane 1 lineage self-test suite")
@@ -234,7 +268,7 @@ def _dispatch(args: argparse.Namespace) -> int:
             manifest = build_lineage_manifest(r_root)
             out_path = r_root / "spec" / "lineage.json"
             out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            out_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
         rep = verify_lineage_manifest(r_root, require_deps=args.require_deps)
         rec = OracleReceipt.create(
             oracle="lineage",
@@ -263,6 +297,88 @@ def _dispatch(args: argparse.Namespace) -> int:
             generator_source=gen_src,
             valid_cases=valid_cases_g,
             planted_mutations=planted_g,
+        )
+        return _emit(rec, args.json)
+
+    if cmd == "repair":
+        if args.retrieve_only:
+            ret = retrieve_plane1_excerpt(
+                family=args.family,
+                prompt_text=args.prompt,
+                max_tokens=args.retrieval_max_tokens,
+            )
+            rec = OracleReceipt.create(
+                oracle="plane1_retrieval",
+                passed=int(ret["estimated_tokens"]) <= 1500,
+                epistemic_status="VERIFIED",
+                checks={k: v for k, v in ret.items() if k not in ("text", "context")},
+                findings=[],
+            )
+            return _emit(rec, args.json)
+        if not args.dataset:
+            raise ValueError("--dataset is required unless --retrieve-only is passed")
+        ds_path = Path(args.dataset)
+        rows = [json.loads(ln) for ln in ds_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+        lora_cfg = json.loads(args.lora_json)
+        gen_fn = make_llama_server_generator(
+            args.server_url,
+            lora=lora_cfg,
+            max_tokens=args.max_predict,
+        )
+        ckpt_p = Path(args.checkpoint_jsonl) if args.checkpoint_jsonl else None
+        split_rep = run_repair_split(
+            rows,
+            gen_fn,
+            max_turns=args.max_turns,
+            retrieval_max_tokens=args.retrieval_max_tokens,
+            include_plane1_retrieval=not args.no_plane1,
+            checkpoint_jsonl=ckpt_p,
+        )
+        if args.output_json:
+            out_p = Path(args.output_json)
+            out_p.parent.mkdir(parents=True, exist_ok=True)
+            out_p.write_text(json.dumps(split_rep, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+        rec = OracleReceipt.create(
+            oracle="repair_loop",
+            passed=True,
+            epistemic_status="VERIFIED",
+            checks={k: v for k, v in split_rep.items() if k != "items"},
+            findings=[],
+        )
+        return _emit(rec, args.json)
+
+    if cmd == "audit-cert":
+        raw_cert = _read_text_or_stdin(args.cert_file)
+        try:
+            cert_obj = loads_strict_certificate_json(raw_cert)
+        except ValueError as exc:
+            rec = OracleReceipt.create(
+                oracle="transition_certificate",
+                passed=False,
+                epistemic_status="REJECTED",
+                checks={"finding_count": 1},
+                findings=[{"rule": "CERT_STRICT_JSON_PARSE_REJECTED", "message": str(exc)}],
+            )
+            return _emit(rec, args.json)
+        rep_c = audit_transition_certificate(cert_obj)
+        rec = OracleReceipt.create(
+            oracle="transition_certificate",
+            passed=bool(rep_c["passed"]),
+            epistemic_status=str(rep_c["epistemic_status"]),
+            checks={"finding_count": rep_c["finding_count"]},
+            findings=rep_c["findings"],
+        )
+        return _emit(rec, args.json)
+
+    if cmd == "sandbox-cell":
+        cell_src = _read_text_or_stdin(args.code_file)
+        sbx = run_restricted_sandbox_cell(cell_src, timeout_sec=args.timeout)
+        rec = OracleReceipt.create(
+            oracle="sandbox_cell",
+            passed=bool(sbx["ok"]),
+            epistemic_status="VERIFIED" if sbx["ok"] else "REJECTED",
+            checks=sbx,
+            findings=[{"rule": "SANDBOX_VIOLATION", "message": v} for v in sbx.get("violations", [])],
         )
         return _emit(rec, args.json)
 

@@ -21,7 +21,7 @@ PROSE_GATE = Path(os.environ.get("MCPROOF_CHECK_PROSE") or (REPO_ROOT / "src" / 
 OUT_JSON = _VERIF_DIR / "oracles_verification_receipt.json"
 
 sys.path.insert(0, str(REPO_ROOT / "src"))
-from mcproof.lean_harness import verify_lean4_project_comparator, verify_lean4_source  # noqa: E402
+from mcproof.lean_harness import linux_bwrap_functional, verify_lean4_project_comparator, verify_lean4_source  # noqa: E402
 from mcproof.lineage import verify_lineage_manifest  # noqa: E402
 from mcproof.mutation import run_f0_gate_and_corruptions  # noqa: E402
 from mcproof.oracles import run_checker_oracle  # noqa: E402
@@ -121,7 +121,7 @@ def main() -> int:
         report["defects"].append(f"pytest failed under -O -B -W error: {pytest_proc.stdout[-400:]} {pytest_proc.stderr[-400:]}")
 
     # 4. Independent Lean 4 `lake build` + 6-kernel `lake comparator --paranoid` + sandbox gate + adversarial cheats
-    has_bwrap = shutil.which("bwrap") is not None and sys.platform.startswith("linux")
+    has_bwrap = linux_bwrap_functional()
     if not has_bwrap:
         fail_closed_sb = verify_lean4_project_comparator(REPO_ROOT / "lean", allow_unsandboxed=False)
         sb_blocked = (not fail_closed_sb.passed) and any(f["rule"] == "SANDBOX_UNAVAILABLE" for f in fail_closed_sb.findings)

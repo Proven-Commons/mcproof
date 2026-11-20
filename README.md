@@ -2,15 +2,15 @@
 
 `mcproof` is the verification harness, Plane 1 rulebook, dataset suite, weight compiler, and serving benchmark for the Siliconcordat Formal Verification MDE. It checks Lean 4.35.0 proofs across six kernels, grades exact-math checkers against planted bugs, compiles `weft` adapters, and audits live `warp-modeld` mounts. Proof authors, verifiers, and researchers use it to test formal reasoning without weakening deterministic gates.
 
-Blueprint and gates live in [siliconcordat/mde issue 4](https://github.com/siliconcordat/mde/issues/4) under the [Master Plan](https://github.com/siliconcordat/.github/blob/main/MASTER-PLAN.md). Companion serving changes live in [siliconcordat/exo](https://github.com/siliconcordat/exo/tree/feat/mde4-phase4-phase6-stack) and [siliconcordat/warp PR 5](https://github.com/siliconcordat/warp/pull/5).
+Blueprint and gates live in [siliconcordat/mde issue 4](https://github.com/siliconcordat/mde/issues/4) under the [Master Plan](https://github.com/siliconcordat/.github/blob/main/MASTER-PLAN.md). Companion serving changes live in [siliconcordat/exo](https://github.com/siliconcordat/exo/tree/feat/mde4-phase4-phase6-stack) and [siliconcordat/warp](https://github.com/siliconcordat/warp/tree/feat/mde4-phase4-live-gate).
 
 ## Unified Repository Layout
 
 | Path | Contents |
 | --- | --- |
-| `src/mcproof/`, `bin/mcproof`, & `bin/bootstrap-deps` | Python 3.11+ Tier 2 oracle runner (`oracles.py`, `lean_harness.py`, `mutation.py`, `lineage.py`, vendored `prose_gate.py`, `cli.py`) and pinned external checkout bootstrap |
-| `docs/CONTINUITY.md` | Capability steward record (`mde:formal-verification`), three-tier contracts, scratch reproduction runbook, and empirical Phase 1 to 6 lessons |
-| `lean/` | Stock-`Init` Lean `v4.35.0` reference library, challenge/solution modules, 190-case differential test suite, and 6-kernel `lake comparator --paranoid` config |
+| `src/mcproof/`, `bin/mcproof`, & `bin/bootstrap-deps` | Python 3.11+ Tier 2 oracle runner, pluggable `DomainOracle` protocol, label-free `repair_loop.py`, `F-01..F-08` certificate auditor, vendored `prose_gate.py`, and CLI |
+| `docs/CONTINUITY.md` & `docs/CROSS_POLLINATION.md` | Capability steward record (`mde:formal-verification`), bidirectional `mcproof`/`soko`/collaborator transfer ledger, and Phase 1 to 6 lessons |
+| `lean/` | Stock-`Init` Lean `v4.35.0` reference library (`29` theorems across `Mcproof.lean`, `TransitionBounds.lean`, and `AdapterBounds.lean`), `370`-case differential suite, and `6`-kernel `lake comparator --paranoid` config |
 | `spec/` & `schemas/` | Audited `32,216`-token (`Qwen3.5-4B`, `30,873` `cl100k_base`) Plane 1 specification (`plane1_formal_spec.md`), SHA-256 `lineage.json`, and canonical `zone-manifest.v0.1.json` |
 | `datasets/` | Frozen public `compile.jsonl` (`96`), `validation.jsonl` (`48`), `hybrid_k0.jsonl` (`2,048` noise + `24` `y=0` anchors), `144` gold targets, `scripts/grade_item.py`, and `SHA256SUMS` (`312953bc...`) |
 | `commitments/` | Public-safe cryptographic commitment (`PUBLIC_HOLDOUT_COMMITMENT.json`, zero prompt text) binding the `242`-item sealed holdout and canary vault |
@@ -42,7 +42,14 @@ On public `validation.jsonl` (`48` items), `P2-B` regressed below bare `B0` and 
 | Rollback fidelity | `0.0` next-token logprob diff after `O(1)` kill switch | `0.0` exact top-20 logprob diff (`5.528 ms` multi-slot flush) | **PASS** |
 | Phase 6 `T-C1` solo preservation | `>= 90%` live behavioral preservation in paired/triple stacks | `0.0%` min live `step0` retention (`weft-eido` `0.0611` live drift vs `0.0019` solo shift, `99.85%` CPU subspace diagnostic) | **FAIL (Live `step0` Drift)** |
 | Phase 6 `T-C3`, `T-C4`, `H1`-`H7` | Base retention, order invariance, and 7 live hazards | `85.0%` vs `84.0%` `W0` (`T-C3`), `0.0` perm/rollback diff (`T-C4`, `4.602 ms`), `7/7` hazards | **PASS** |
-| Phase 6 `T-C5` serving budget | `<= 15%` overhead (`>= -5%` floor), `>= 8k` KV, `<= 7.2 GiB` NVML VRAM | `-33.1%` same-server latency (`benchmark_anomaly = true`), `8192` KV/slot, analytical `4.98 GiB` VRAM (no 8 GiB NVML GPU online) | **FAIL (Timing Anomaly & Analytical VRAM)** |
+| Phase 6 `T-C5` serving budget | `<= 15%` overhead (`>= -5%` floor), `>= 8k` KV, `<= 7.2 GiB` NVML VRAM | Live `UX582HS` RTX 3080 (`-c 65536 -np 8`): `Q8_0` `6.8525 GiB`, `1`-slot `+0.38%`, `8`-slot `-0.66%` (`Q4_K_M` `5.2314 GiB`, `+0.47%` / `+0.48%`) | **PASS (v0.2 Live NVML)** |
+
+### v0.2 Closed-Loop Plane 1 Retrieval and Tier 2 Repair ([Proven-Commons/mcproof issue 5](https://github.com/Proven-Commons/mcproof/issues/5))
+
+Under `100%` label-free `default_inference_oracle` stopping (`<= 1,500`-token Plane 1 retrieval + AST/token state-hash + `seen_fail_sigs` stagnation escape, receipts in `compile/artifacts/evaluation/repair_loop/`):
+
+- **Public `validation.jsonl` (`48` items)**: `B0` climbed from `4/48` (`8.33%` open-loop) to `5/48` (`10.42%`, `k=1`) to `6/48` (`12.50%`, `k=2`) to **`8/48` (`16.67%`, `k=4`, `2.0x` open-loop)** (`A: 1/12, B: 5/12, C: 0/12, D: 2/12`), while single-layer `blk.31` `P2-B` scored `0/48` (`67` stagnation events).
+- **Sealed `private_holdout.jsonl` (`96` items)**: broke the `0/96` single-pass ceiling across both arms (`B0` `0/96 -> 1/96` [`HOLD-C-04` at `k=2..4`], `P2-B` `0/96 -> 1/96` [`HOLD-D-10` at `k=3..4`]).
 
 ## Prerequisites and Fresh-Clone Reproduction
 
@@ -87,11 +94,11 @@ Run the full Tier 2 oracle gates and Family `A` to `D` graders. On Linux, `lake 
 
 - Passing Tier 2 oracles proves only the machine-checked properties enforced by each checker. Whether a theorem statement matches human intent remains a Tier 1 human specification judgment.
 - `datasets/scripts/grade_item.py` grades Family C items by deterministic structural claim-tier and `meta["bar_status"]` replay rather than re-running Lean compilation on prose-only reports.
-- Live GPU runs executed on a local 64 GiB Apple M1 Max (`llama-server 0.5.0`, `$0` cloud). Analytical 8 GiB RTX 3080 VRAM projections (`4.9753 GiB` Linux headless / `6.1753 GiB` Windows WDDM on `Q8_0`) remain unmeasured on live 8 GiB NVML hardware (`vram_measurement_kind = analytical_projection_not_nvml`).
+- Live `8` GiB RTX 3080 `T-C5` telemetry (`stack/results/final/ux582hs_rtx3080_tc5_live_receipt.json`) measured Windows 11 NVIDIA Optimus (`driver 566.07`, `0 MiB` idle WDDM VRAM), while bare-metal Linux kernel execution on `UX582HS` remains tracked separately.
 
 ## What you must trust
 
-- Lean `v4.35.0` and its five bundled external kernels (`leanchecker-paranoid`, `lean4lean`, `nanoda`, `con-leche`, `con-ron`), plus the Lean compiler and C runtime for native binaries (`Classical.choice`, `Quot.sound`, and `propext` measured via `collectAxioms` on `Mcproof.Proofs`).
+- Lean `v4.35.0` and its five bundled external kernels (`leanchecker-paranoid`, `lean4lean`, `nanoda`, `con-leche`, `con-ron`), plus the Lean compiler and C runtime for native binaries. Across the `29` reference theorems, `collectAxioms` and `#print axioms` on `Mcproof.Proofs` use only `{propext, Classical.choice, Quot.sound}`. Axiom-free: `bezoutCheck_sound`, `bezoutCheck_complete`, `ratLeCross_sound`, `scalar_projection_retention_illusion`. Also `Classical.choice`: `clampNat_in_range`, `cleanSegments_safe`, `cleanSegments_singleton`, `prefundedVal_bounded_drop_witness`. The other `21` use `propext` and/or `Quot.sound` only (no custom axioms).
 - Python 3 exact `int` and `fractions.Fraction` arithmetic (`-I -O -B -W error`), `numpy` CPU `float64` linear algebra, and the Rust `tree-sitter` CST parser in `siliconcordat/mde`.
 - Host OS sandboxing (`bwrap` network-unshared read-only root on Linux, or subprocess `-I` environment isolation without OS syscall confinement on macOS and Windows) and SHA-256 digest implementations.
 

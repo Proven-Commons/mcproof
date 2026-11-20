@@ -46,6 +46,8 @@ TRACKED_PLANE1_RELPATHS: tuple[str, ...] = (
     "lean/lakefile.toml",
     "lean/comparator.json",
     "lean/Mcproof.lean",
+    "lean/Mcproof/TransitionBounds.lean",
+    "lean/Mcproof/AdapterBounds.lean",
     "lean/Mcproof/Spec.lean",
     "lean/Mcproof/Proofs.lean",
 )
@@ -200,7 +202,7 @@ def build_lineage_manifest(
     upstream_clean: dict[str, dict[str, Any]] = {}
     for repo_name, info in sorted(upstream_raw.items()):
         commit = str(info["commit"])
-        if not COMMIT_RE.match(commit):
+        if not COMMIT_RE.fullmatch(commit):
             raise StaleLineageError(f"upstream repo {repo_name} commit is not 40-hex: {commit!r}")
         upstream_clean[repo_name] = {
             "url": str(info["url"]),
@@ -290,7 +292,7 @@ def _git_head_sha(repo_path: Path) -> str | None:
     if proc.returncode != 0:
         return None
     head = proc.stdout.strip()
-    return head if COMMIT_RE.match(head) else None
+    return head if COMMIT_RE.fullmatch(head) else None
 
 
 def verify_lineage_manifest(
