@@ -39,6 +39,16 @@ def test_unknown_status_is_rejected() -> None:
     expect_in("CERT_STATUS_UNKNOWN", _rules(cert))
 
 
+def test_known_refused_and_in_progress_are_recognized() -> None:
+    for tier in ("KNOWN", "REFUSED", "IN_PROGRESS"):
+        cert = {"epistemic_status": tier}
+        result = audit_transition_certificate(cert)
+        expect_true(result["passed"], f"{tier} certificate rejected: {result}")
+        expect_eq(result["epistemic_status"], tier)
+        rules = _rules(cert)
+        expect_false("CERT_STATUS_UNKNOWN" in rules, f"unexpected CERT_STATUS_UNKNOWN for {tier}: {rules}")
+
+
 def test_rejected_and_conjecture_are_not_relabeled_verified() -> None:
     rejected = audit_transition_certificate({"epistemic_status": "REJECTED"})
     expect_true(rejected["passed"], f"a plain rejection is not an illegal claim: {rejected}")

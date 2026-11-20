@@ -52,7 +52,7 @@ NON_VERIFIED_SUBTIERS: frozenset[str] = frozenset(
     }
 )
 RECOGNIZED_CERT_STATUSES: frozenset[str] = NON_VERIFIED_SUBTIERS | frozenset(
-    {"VERIFIED", "PROVEN", "REJECTED"}
+    {"VERIFIED", "PROVEN", "REJECTED", "KNOWN", "REFUSED", "IN_PROGRESS"}
 )
 
 ALLOWLISTED_SANDBOX_MODULES: frozenset[str] = frozenset(
