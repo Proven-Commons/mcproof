@@ -603,7 +603,7 @@
     "public_holdout_commitment_sha256": "e7c9b9da52be68c4731e35961c31ec33decf440e4ccb00b2c9072e029054f032",
     "safetensors_checkpoint_fingerprint": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
     "spec_lineage_json_sha256": "344f5506e702dc8dc0ee7374d30af788e3d4c2c370fcdbc877435e133da26a76",
-    "tracked_evidence_merkle_sha256": "fea60d43fe59ba05f226d7f2b543c630fd6b9a8e4efc61817b9133aab5456e98",
+    "tracked_evidence_merkle_sha256": "218957d629427afcf5a967b09d0abc49598f55924a8307a8edb5ca6d4448f76c",
     "vault_sha256sums_manifest_sha256": "b14cf1efeedf7a7c8c15ed57e587c3d18087f557e6ff1807068c4e9c9ef6f6ee",
     "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
   },
@@ -1088,9 +1088,9 @@
         "total": 15
       },
       "pytest_strict": {
-        "executed_total": 34,
-        "passed": 34,
-        "skipped": 0
+        "executed_total": 53,
+        "passed": 53,
+        "skipped": 1
       }
     },
     "stack": {
