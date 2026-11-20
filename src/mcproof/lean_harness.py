@@ -78,6 +78,49 @@ THEOREM_DECL_RE = re.compile(
     r"(?P<kw>theorem|lemma)[ \t]+(?P<name>[A-Za-z_][A-Za-z0-9_.']*)\b(?P<header>.*?)(?::=|\bwhere\b|\|)"
 )
 
+
+def linux_bwrap_functional(*, timeout_sec: float = 5.0) -> bool:
+    """Return True when Linux `bwrap` runs a minimal sandbox and can create `lake comparator`'s `/run/user` session dir."""
+    if not sys.platform.startswith("linux"):
+        return False
+    bwrap_bin = shutil.which("bwrap")
+    if not bwrap_bin:
+        return False
+    try:
+        basic = subprocess.run(
+            [bwrap_bin, "--ro-bind", "/", "/", "true"],
+            capture_output=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+        if basic.returncode != 0:
+            return False
+        uid = os.getuid()
+        lake_compat = subprocess.run(
+            [
+                bwrap_bin,
+                "--ro-bind",
+                "/",
+                "/",
+                "--bind",
+                "/run",
+                "/run",
+                "--bind",
+                "/tmp",
+                "/tmp",
+                "sh",
+                "-c",
+                f"mkdir -p /run/user/{uid} && test -w /run/user/{uid}",
+            ],
+            capture_output=True,
+            timeout=timeout_sec,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return lake_compat.returncode == 0
+
+
 AXIOM_AUDIT_TEMPLATE = """import Lean
 import {module_name}
 
@@ -1317,7 +1360,7 @@ def verify_lean4_project_comparator(
         })
 
     # Fail closed before compiling untrusted Lean code when Linux bubblewrap is unavailable unless explicitly opted in
-    bwrap_available = shutil.which("bwrap") is not None and sys.platform.startswith("linux")
+    bwrap_available = linux_bwrap_functional()
     caveats: list[str] = []
     if not bwrap_available:
         if not allow_unsandboxed:

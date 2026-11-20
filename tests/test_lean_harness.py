@@ -14,6 +14,7 @@ from mcproof.lean_harness import (
     audit_weak_statements,
     classify_host_resource_failure,
     lint_lean4_source,
+    linux_bwrap_functional,
     parse_comparator_stdout,
     scrub_challenge_artifacts,
     verify_lean4_project_comparator,
@@ -114,8 +115,7 @@ def test_lean_env_uses_os_pathsep(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
 def test_project_comparator_fails_closed_when_bwrap_unavailable_without_opt_in(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    orig_which = shutil.which
-    monkeypatch.setattr(shutil, "which", lambda name, *a, **kw: None if name == "bwrap" else orig_which(name, *a, **kw))
+    monkeypatch.setattr("mcproof.lean_harness.linux_bwrap_functional", lambda **kw: False)
     res = verify_lean4_project_comparator(repo_root() / "lean", allow_unsandboxed=False)
     expect_false(res.passed, "comparator must fail closed without bwrap when allow_unsandboxed=False")
     expect_in("SANDBOX_UNAVAILABLE", {f["rule"] for f in res.findings})
@@ -124,16 +124,21 @@ def test_project_comparator_fails_closed_when_bwrap_unavailable_without_opt_in(
 @requires_dep("soko")
 @requires_lean()
 def test_reference_lean_project_passes_six_kernel_comparator() -> None:
-    has_bwrap = shutil.which("bwrap") is not None and sys.platform.startswith("linux")
-    res = verify_lean4_project_comparator(repo_root() / "lean", allow_unsandboxed=not has_bwrap)
+    if not sys.platform.startswith("linux"):
+        pytest.skip("sandboxed `lake comparator --paranoid` requires Linux bubblewrap")
+    if not linux_bwrap_functional():
+        pytest.skip(
+            "Linux bwrap is missing or non-functional on this host "
+            "(minimal `bwrap --ro-bind / / true` or lake `/run/user` session probe failed)"
+        )
+    res = verify_lean4_project_comparator(repo_root() / "lean", allow_unsandboxed=False)
     expect_true(res.passed, f"reference lean project failed: {res.findings}")
     expect_eq(len(res.paranoid_kernels_run), 6, "all 6 bundled Lean 4.35.0 kernels must accept")
     expect_eq(len(res.theorems_checked), 29, "all 29 theorems in comparator.json must be checked")
     expect_eq(len(res.sorry_declarations), 0, "zero sorry declarations allowed in Mcproof.Proofs")
     expect_eq(len(res.nonstandard_axioms), 0, "zero non-standard axioms allowed")
     expect_eq(res.challenge_sorry_whitelisted_module, "Mcproof.Spec")
-    if not has_bwrap:
-        expect_in("UNSANDBOXED_EXECUTION", res.caveats)
+    expect_true(res.sandboxed, "reference project comparator must run inside a working bwrap sandbox")
 
 
 @requires_dep("soko")
@@ -218,7 +223,7 @@ theorem checkedGate_safe (s : String) : checkedGate s = false := rfl
 @requires_dep("soko")
 @requires_lean()
 def test_rejects_planted_cheat_in_project_comparator(tmp_path: Path) -> None:
-    has_bwrap = shutil.which("bwrap") is not None and sys.platform.startswith("linux")
+    allow_unsandboxed = not linux_bwrap_functional()
     work = tmp_path / "lean_copy"
     shutil.copytree(
         repo_root() / "lean",
@@ -230,7 +235,7 @@ def test_rejects_planted_cheat_in_project_comparator(tmp_path: Path) -> None:
         proofs_file.read_text(encoding="utf-8") + "\naxiom planted_cheat : False\n",
         encoding="utf-8",
     )
-    res = verify_lean4_project_comparator(work, allow_unsandboxed=not has_bwrap)
+    res = verify_lean4_project_comparator(work, allow_unsandboxed=allow_unsandboxed)
     expect_false(res.passed, "project comparator must reject planted axiom")
     rules = {f["rule"] for f in res.findings}
     expect_in("EXTRA_AXIOM_DECL", rules)

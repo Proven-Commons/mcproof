@@ -98,7 +98,7 @@ Run the full Tier 2 oracle gates and Family `A` to `D` graders. On Linux, `lake 
 
 ## What you must trust
 
-- Lean `v4.35.0` and its five bundled external kernels (`leanchecker-paranoid`, `lean4lean`, `nanoda`, `con-leche`, `con-ron`), plus the Lean compiler and C runtime for native binaries (`Quot.sound` and `propext` measured via `collectAxioms` across all `29` reference theorems, with zero `Classical.choice`).
+- Lean `v4.35.0` and its five bundled external kernels (`leanchecker-paranoid`, `lean4lean`, `nanoda`, `con-leche`, `con-ron`), plus the Lean compiler and C runtime for native binaries. Across the `29` reference theorems, `collectAxioms` and `#print axioms` on `Mcproof.Proofs` use only `{propext, Classical.choice, Quot.sound}`. Axiom-free: `bezoutCheck_sound`, `bezoutCheck_complete`, `ratLeCross_sound`, `scalar_projection_retention_illusion`. Also `Classical.choice`: `clampNat_in_range`, `cleanSegments_safe`, `cleanSegments_singleton`, `prefundedVal_bounded_drop_witness`. The other `21` use `propext` and/or `Quot.sound` only (no custom axioms).
 - Python 3 exact `int` and `fractions.Fraction` arithmetic (`-I -O -B -W error`), `numpy` CPU `float64` linear algebra, and the Rust `tree-sitter` CST parser in `siliconcordat/mde`.
 - Host OS sandboxing (`bwrap` network-unshared read-only root on Linux, or subprocess `-I` environment isolation without OS syscall confinement on macOS and Windows) and SHA-256 digest implementations.
 
