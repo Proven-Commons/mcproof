@@ -903,6 +903,60 @@ def _family_c_forbidden_eval_findings(candidate_lean: str) -> list[dict[str, Any
     ]
 
 
+# `initialize` / `builtin_initialize` and the `@[init]` / `@[builtin_init]` attributes run IO
+# during `lake build`. `run_cmd`, `run_elab`, `run_tac`, and `elab` do too, before the
+# comparator's own lint. Word boundaries keep these off names such as `elaborate`.
+_FAMILY_C_INITIALIZER_RE = re.compile(
+    r"\b(?:builtin_initialize|initialize)\b|@\[[^\]]*?\b(?:builtin_init|init)\b"
+)
+_FAMILY_C_ELAB_COMMAND_RE = re.compile(r"\b(?:run_cmd|run_elab|run_tac|elab)\b")
+
+
+def _family_c_unique_matches(rx: re.Pattern[str], cleaned: str) -> list[str]:
+    found: list[str] = []
+    for match in rx.finditer(cleaned):
+        cmd = match.group(0)
+        if cmd not in found:
+            found.append(cmd)
+    return found
+
+
+def _family_c_initializer_findings(candidate_lean: str) -> list[dict[str, Any]]:
+    """Reject initializers before `lake build`. They execute IO while the project builds."""
+    cleaned = strip_lean_comments_and_strings(candidate_lean)
+    found = _family_c_unique_matches(_FAMILY_C_INITIALIZER_RE, cleaned)
+    if not found:
+        return []
+    return [
+        {
+            "rule": "FORBIDDEN_INITIALIZER",
+            "message": (
+                "candidate contains a Lean initializer that runs during lake build: "
+                + ", ".join(found)
+                + "."
+            ),
+        }
+    ]
+
+
+def _family_c_elab_command_findings(candidate_lean: str) -> list[dict[str, Any]]:
+    """Reject elaboration commands before the first `lake build`, not only in the comparator."""
+    cleaned = strip_lean_comments_and_strings(candidate_lean)
+    found = _family_c_unique_matches(_FAMILY_C_ELAB_COMMAND_RE, cleaned)
+    if not found:
+        return []
+    return [
+        {
+            "rule": "FORBIDDEN_ELAB_COMMAND",
+            "message": (
+                "candidate contains a Lean elaboration command that runs during lake build: "
+                + ", ".join(found)
+                + "."
+            ),
+        }
+    ]
+
+
 def _family_c_statement_headers(
     meta: Mapping[str, Any], theorem_names: Sequence[str]
 ) -> dict[str, str] | None:
@@ -1126,6 +1180,8 @@ def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: st
             }
         )
     findings.extend(_family_c_forbidden_eval_findings(candidate_lean))
+    findings.extend(_family_c_initializer_findings(candidate_lean))
+    findings.extend(_family_c_elab_command_findings(candidate_lean))
     findings.extend(_check_family_c_statement_match(meta, thms, candidate_lean))
     if findings:
         return findings

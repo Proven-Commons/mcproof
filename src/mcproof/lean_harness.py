@@ -186,8 +186,144 @@ def _load_soko_lean4_auditor() -> Any:
     return mod
 
 
+def _is_lean_letter_like(ch: str) -> bool:
+    """Lean `isLetterLike` ranges used to keep identifier tokens intact."""
+    o = ord(ch)
+    if 0x3B1 <= o <= 0x3C9 and o != 0x3BB:
+        return True
+    if 0x391 <= o <= 0x3A9 and o not in (0x3A0, 0x3A3):
+        return True
+    if 0x3CA <= o <= 0x3FB or 0x1F00 <= o <= 0x1FFE:
+        return True
+    if 0x2100 <= o <= 0x214F or 0x1D49C <= o <= 0x1D59F:
+        return True
+    if 0x00C0 <= o <= 0x00FF and o not in (0x00D7, 0x00F7):
+        return True
+    return 0x0100 <= o <= 0x017F
+
+
+def _is_lean_subscript_alnum(ch: str) -> bool:
+    o = ord(ch)
+    return (
+        0x2080 <= o <= 0x2089
+        or 0x2090 <= o <= 0x209C
+        or 0x1D62 <= o <= 0x1D6A
+        or o == 0x2C7C
+    )
+
+
+def _is_lean_id_first(ch: str) -> bool:
+    return ch.isalpha() or ch == "_" or _is_lean_letter_like(ch)
+
+
+def _is_lean_id_rest(ch: str) -> bool:
+    return (
+        ch.isalnum()
+        or ch in "_'!?"
+        or _is_lean_letter_like(ch)
+        or _is_lean_subscript_alnum(ch)
+    )
+
+
+def _is_hex_digit(ch: str) -> bool:
+    return ch.isdigit() or "a" <= ch <= "f" or "A" <= ch <= "F"
+
+
+def _lean_ident_end(src: str, i: int) -> int:
+    """End index of the identifier that starts at `i`, including dotted segments and `«...»` parts."""
+    n = len(src)
+    while i < n:
+        if src[i] == "«":
+            j = src.find("»", i + 1)
+            i = n if j < 0 else j + 1
+        elif _is_lean_id_first(src[i]):
+            i += 1
+            while i < n and _is_lean_id_rest(src[i]):
+                i += 1
+        else:
+            break
+        if i < n and src[i] == "." and i + 1 < n and (src[i + 1] == "«" or _is_lean_id_first(src[i + 1])):
+            i += 1
+            continue
+        break
+    return i
+
+
+def _is_raw_str_start(src: str, i: int) -> bool:
+    """True when `src[i]` is `r` and the token is `r` plus zero or more `#` plus `"`."""
+    if i >= len(src) or src[i] != "r":
+        return False
+    j = i + 1
+    while j < len(src) and src[j] == "#":
+        j += 1
+    return j < len(src) and src[j] == '"'
+
+
+def _append_raw_string(src: str, i: int, out: list[str]) -> int:
+    """Blank a Lean raw string (`r"..."`, `r#"..."#`, any hash count). `\\` is not an escape."""
+    n = len(src)
+    j = i + 1
+    hashes = 0
+    while j < n and src[j] == "#":
+        hashes += 1
+        j += 1
+    if j >= n or src[j] != '"':
+        out.append(src[i])
+        return i + 1
+    j += 1
+    out.append('"')
+    while j < n:
+        if src[j] == '"':
+            k = j + 1
+            seen = 0
+            while seen < hashes and k < n and src[k] == "#":
+                seen += 1
+                k += 1
+            if seen == hashes:
+                j = k
+                break
+        if src[j] == "\n":
+            out.append("\n")
+        j += 1
+    out.append('"')
+    return j
+
+
+def _char_lit_end(src: str, i: int) -> int | None:
+    """End index of a Lean character literal at `i`, or None when `src[i:]` is not one.
+
+    Covers `'a'`, `'"'`, and escapes (`'\\n'`, `'\\''`, `'\\"'`, `'\\\\'`, `\\xNN`, `\\uNNNN`).
+    `''` is not a character literal.
+    """
+    n = len(src)
+    if i >= n or src[i] != "'" or i + 1 >= n or src[i + 1] == "'":
+        return None
+    j = i + 1
+    if src[j] == "\\":
+        if j + 1 >= n:
+            return None
+        nxt = src[j + 1]
+        if nxt in "\\\"'rnt":
+            j += 2
+        elif nxt == "x" and j + 3 < n and _is_hex_digit(src[j + 2]) and _is_hex_digit(src[j + 3]):
+            j += 4
+        elif nxt == "u" and j + 5 < n and all(_is_hex_digit(src[j + k]) for k in range(2, 6)):
+            j += 6
+        else:
+            return None
+    else:
+        j += 1
+    if j < n and src[j] == "'":
+        return j + 1
+    return None
+
+
 def strip_lean_comments_and_strings(src: str) -> str:
-    """Strip `--` line comments, nested `/- ... -/` block comments, and string literals while keeping line numbers."""
+    """Strip `--` line comments, nested `/- ... -/` block comments, and string literals while keeping line numbers.
+
+    Raw strings (`r"..."`, `r#"..."#`, any number of hashes) do not treat `\\` as an escape.
+    Character literals, including `'"'` and escaped forms, are kept so a following command stays visible.
+    """
     out: list[str] = []
     i = 0
     n = len(src)
@@ -211,6 +347,20 @@ def strip_lean_comments_and_strings(src: str) -> str:
             j = src.find("\n", i)
             i = n if j < 0 else j
             continue
+        if _is_raw_str_start(src, i):
+            i = _append_raw_string(src, i, out)
+            continue
+        if src[i] == "«" or _is_lean_id_first(src[i]):
+            j = _lean_ident_end(src, i)
+            out.append(src[i:j])
+            i = j
+            continue
+        if src[i] == "'":
+            end = _char_lit_end(src, i)
+            if end is not None:
+                out.append(src[i:end])
+                i = end
+                continue
         if src[i] == '"':
             i += 1
             out.append('"')

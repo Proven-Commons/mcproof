@@ -27,6 +27,7 @@ from mcproof.domain_protocol import (
     verify_minimal_goal_stopping,
     verify_rational_lp_certificate,
 )
+from mcproof.lean_harness import strip_lean_comments_and_strings
 from mcproof.paths import repo_root
 from mcproof.repair_loop import (
     MAX_RETRIEVAL_TOKENS_HARD_CAP,
@@ -698,6 +699,110 @@ def test_family_c_midline_eval_commands_rejected_before_lake(monkeypatch: pytest
     decoy_findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), decoy)
     decoy_rules = {f["rule"] for f in decoy_findings}
     expect_false("FORBIDDEN_EVAL_COMMAND" in decoy_rules, decoy_findings)
+
+
+def test_family_c_raw_string_and_char_literal_do_not_hide_eval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A real `#eval` after a raw string or a character literal is rejected before lake.
+
+    `r"\\"`, `r#"\\"#, `r###"\\"###`, `'"'`, and `'\\"'` used to desync the stripper,
+    so the command vanished from the pre-lake check and from the comparator lint.
+    Reverting the lexer makes `stripped` lose `#eval` and lets lake run.
+    """
+    called = _family_c_block_lake(monkeypatch)
+    snippets = (
+        'def s := r"\\"\n#eval (1 : Nat)\n',
+        'def s := r#"\\"#\n#eval (1 : Nat)\n',
+        'def s := r###"\\"###\n#eval (1 : Nat)\n',
+        "def c := '\"'\n#eval (1 : Nat)\n",
+        "def c := '\\\"'\n#eval (1 : Nat)\n",
+    )
+    for snippet in snippets:
+        called["lake"] = False
+        stripped = strip_lean_comments_and_strings(snippet)
+        expect_in("#eval", stripped, snippet)
+        findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), _family_c_with_theorems(snippet))
+        rules = {f["rule"] for f in findings}
+        expect_false(called["lake"], f"lake ran for {snippet!r}: {findings}")
+        expect_in("FORBIDDEN_EVAL_COMMAND", rules, snippet)
+        expect_true(any("#eval" in str(f.get("message", "")) for f in findings), findings)
+        expect_false("LAKE_BUILD_FAILED" in rules, findings)
+
+
+def test_family_c_initializers_rejected_before_lake(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`initialize`, `@[init]`, `builtin_initialize`, and `@[builtin_init]` never reach lake."""
+    called = _family_c_block_lake(monkeypatch)
+    cases = (
+        ("initialize do pure ()\n", "initialize"),
+        ("@[init] def pwnInit : IO Unit := pure ()\n", "@[init"),
+        ("builtin_initialize do pure ()\n", "builtin_initialize"),
+        ("@[builtin_init] def pwnBuilt : IO Unit := pure ()\n", "@[builtin_init"),
+        ("@[inline, init] def pwnInline : IO Unit := pure ()\n", "init"),
+    )
+    for snippet, needle in cases:
+        called["lake"] = False
+        findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), _family_c_with_theorems(snippet))
+        rules = {f["rule"] for f in findings}
+        expect_false(called["lake"], f"lake ran for {needle}: {findings}")
+        expect_in("FORBIDDEN_INITIALIZER", rules, needle)
+        expect_true(any(needle in str(f.get("message", "")) for f in findings), findings)
+        expect_false("LAKE_BUILD_FAILED" in rules, findings)
+
+
+def test_family_c_elab_commands_rejected_before_lake(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`run_cmd`, `run_elab`, `run_tac`, and `elab` are rejected before the first lake build."""
+    called = _family_c_block_lake(monkeypatch)
+    cases = (
+        ("run_cmd pure ()\n", "run_cmd"),
+        ("run_elab pure ()\n", "run_elab"),
+        ("run_tac pure ()\n", "run_tac"),
+        ('elab "pwn" : command => pure ()\n', "elab"),
+        ("def pad := 0\nrun_cmd pure ()\n", "run_cmd"),
+    )
+    for snippet, needle in cases:
+        called["lake"] = False
+        findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), _family_c_with_theorems(snippet))
+        rules = {f["rule"] for f in findings}
+        expect_false(called["lake"], f"lake ran for {needle}: {findings}")
+        expect_in("FORBIDDEN_ELAB_COMMAND", rules, needle)
+        expect_true(any(needle in str(f.get("message", "")) for f in findings), findings)
+        expect_false("LAKE_BUILD_FAILED" in rules, findings)
+
+
+def test_family_c_banned_commands_inside_text_are_not_findings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Comments, docstrings, strings, and README prose are not elaboration commands."""
+    called = _family_c_block_lake(monkeypatch)
+    comp = (
+        "The README mentions #eval, initialize, @[init], builtin_initialize, "
+        "run_cmd, run_elab, run_tac, and elab.\n\n"
+        "```lean\n"
+        "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
+        "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
+        "-- #eval initialize @[init] builtin_initialize run_cmd run_elab run_tac elab\n"
+        "/-- #eval initialize @[init] builtin_initialize run_cmd run_elab run_tac elab -/\n"
+        'def note := "#eval initialize @[init] builtin_initialize run_cmd run_elab run_tac elab"\n'
+        'def raw := r"#eval initialize @[init] run_cmd run_elab run_tac elab"\n'
+        "def ch := '\"'\n"
+        "```\n"
+    )
+    findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), comp)
+    rules = {f["rule"] for f in findings}
+    expect_false("FORBIDDEN_EVAL_COMMAND" in rules, findings)
+    expect_false("FORBIDDEN_INITIALIZER" in rules, findings)
+    expect_false("FORBIDDEN_ELAB_COMMAND" in rules, findings)
+
+
+def _family_c_with_theorems(snippet: str) -> str:
+    return (
+        "```lean\n"
+        "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
+        "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
+        + snippet
+        + "```\n"
+    )
 
 
 def test_family_c_non_ascii_and_other_decls_count_as_extra_names(
