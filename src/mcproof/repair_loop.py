@@ -37,6 +37,8 @@ from .lean_harness import (
     THEOREM_DECL_RE,
     CandidateSandboxUnavailable,
     _lean_env,
+    _restore_project_files,
+    _snapshot_project_files,
     linux_bwrap_functional,
     run_confined_command,
     strip_lean_comments_and_strings,
@@ -1358,17 +1360,19 @@ def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: st
         # `lake build` is the formal signal. Its message keeps `.lean:line:column` lines.
         # The comparator's own tail keeps only the last 6 lines, which can drop that error.
         # Kernel checks run only after this build succeeds.
+        trusted_inputs = _snapshot_project_files(root)
         findings.extend(_family_c_build_side_effect_findings(candidate_lean))
         findings.extend(_family_c_direct_lake_build(root))
+        # The build can plant lakefile.lean and rewrite Proofs.lean. Put the
+        # trusted copies back, and drop the cache, before any later lake command.
+        _restore_project_files(root, trusted_inputs)
+        _restore_trusted_text(proofs_path, proofs_text)
+        _restore_trusted_text(comparator_path, comparator_text)
         if any(
             f.get("rule") in {"LAKE_BUILD_FAILED", "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE", "SANDBOX_UNAVAILABLE"}
             for f in findings
         ):
             return findings
-        # The candidate build can rewrite these. The kernel and the next reader
-        # must see the source this turn wrote, not the replacement.
-        _restore_trusted_text(proofs_path, proofs_text)
-        _restore_trusted_text(comparator_path, comparator_text)
         try:
             lean_res = verify_lean4_project_comparator(root, allow_unsandboxed=False)
         except FileNotFoundError as exc:

@@ -108,9 +108,7 @@ class CandidateSandboxUnavailable(RuntimeError):
 _SANDBOX_SYS_RO = ("/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc")
 _SANDBOX_TMPFS = ("/tmp", "/run", "/home", "/root", "/agent", "/workspace", "/opt", "/var")
 _SANDBOX_CPU_SEC = 600
-# Lean reserves a large virtual map, and `RLIMIT_NPROC` counts every thread of
-# this uid. These caps still fail closed; they are high enough for `lake build`.
-_SANDBOX_AS_BYTES = 32 * 1024 * 1024 * 1024
+# `RLIMIT_NPROC` counts every thread of this uid. 8192 is enough for `lake build`.
 _SANDBOX_NOFILE = 4096
 _SANDBOX_NPROC = 8192
 _SANDBOX_PROBE_SOCKS = ("/run/cursor/api.sock", "/run/host-services/ssh-auth.sock")
@@ -145,6 +143,22 @@ else:
     raise SystemExit(5)
 raise SystemExit(0)
 """
+
+
+def _address_space_cap_bytes() -> int:
+    """Virtual-memory cap for a confined process: this host's `MemTotal`, not more.
+
+    A fixed cap above the machine's RAM does not contain a memory hog.
+    """
+    try:
+        for line in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
+            if line.startswith("MemTotal:"):
+                kb = int(line.split()[1])
+                if kb > 0:
+                    return kb * 1024
+    except (OSError, ValueError, IndexError):
+        pass
+    return 1024 * 1024 * 1024
 
 
 def _toolchain_elan_home() -> str:
@@ -195,7 +209,7 @@ def _confine_argv(
     argv: list[str] = [
         prlimit_bin,
         f"--cpu={_SANDBOX_CPU_SEC}",
-        f"--as={_SANDBOX_AS_BYTES}",
+        f"--as={_address_space_cap_bytes()}",
         f"--nofile={_SANDBOX_NOFILE}",
         f"--nproc={_SANDBOX_NPROC}",
         "--",
@@ -208,6 +222,7 @@ def _confine_argv(
             bwrap_bin,
             "--new-session",
             "--unshare-all",
+            "--unshare-net",
             "--die-with-parent",
             "--dev",
             "/dev",
@@ -221,7 +236,9 @@ def _confine_argv(
     for directory in _SANDBOX_TMPFS:
         if Path(directory).is_dir():
             argv.extend(("--tmpfs", directory))
-    argv.extend(("--dir", "/tmp/home"))
+    # Lake's own sandbox mounts a tmpfs on `/run/user`. The directory has to
+    # exist; an empty tmpfs over `/run` would make that mkdir fail.
+    argv.extend(("--dir", "/tmp/home", "--dir", "/run/user"))
     elan = _toolchain_elan_home()
     if elan:
         argv.extend(("--ro-bind", elan, elan))
@@ -1570,7 +1587,7 @@ def verify_lean4_source(
                 nonstandard_axioms=(),
                 sorry_declarations=(),
                 paranoid_kernels_run=(),
-                sandboxed=False,
+                sandboxed=True,
                 findings=tuple(findings),
                 host_resource_exhausted=True,
             )
@@ -1604,7 +1621,7 @@ def verify_lean4_source(
                     nonstandard_axioms=(),
                     sorry_declarations=(),
                     paranoid_kernels_run=(),
-                    sandboxed=False,
+                    sandboxed=True,
                     findings=tuple(findings),
                     host_resource_exhausted=True,
                 )
@@ -1622,7 +1639,7 @@ def verify_lean4_source(
                 nonstandard_axioms=(),
                 sorry_declarations=(),
                 paranoid_kernels_run=(),
-                sandboxed=False,
+                sandboxed=True,
                 findings=tuple(findings),
             )
 
@@ -1760,6 +1777,66 @@ def verify_lean4_source(
     )
 
 
+def finding_blocks_comparator(finding: Mapping[str, Any]) -> bool:
+    """An `#eval` or `run_meta` finding means the comparator must not run.
+
+    Those commands plant files during the build. The comparator elaborates
+    `lakefile.lean`, so it must not start once one of them has been seen.
+    """
+    rule = str(finding.get("rule", ""))
+    message = str(finding.get("message", ""))
+    if rule == "FORBIDDEN_EVAL_COMMAND":
+        return True
+    return rule in {"METAPROGRAM_ESCAPE", "FORBIDDEN_BUILD_SIDE_EFFECT"} and "run_meta" in message
+
+
+def _snapshot_project_files(proj: Path) -> dict[str, bytes]:
+    """In-memory copies of the project files a later build is allowed to read."""
+    snap: dict[str, bytes] = {}
+    toml_present = (proj / "lakefile.toml").is_file()
+    for path in sorted(proj.rglob("*")):
+        if any(part in {".lake", ".git"} for part in path.parts):
+            continue
+        if not (path.is_symlink() or path.is_file()):
+            continue
+        # Lake elaborates lakefile.lean in preference to lakefile.toml. The lean
+        # file beside a toml is the candidate's plant, not a trusted input.
+        if toml_present and path.name.startswith("lakefile.") and path.name != "lakefile.toml":
+            continue
+        snap[path.relative_to(proj).as_posix()] = path.read_bytes()
+    return snap
+
+
+def _restore_project_files(proj: Path, snap: dict[str, bytes], *, clear_cache: bool = True) -> None:
+    """Put the snapshot back and drop a candidate lakefile.
+
+    `.lake` is cleared before the next Lake command so that command elaborates
+    the configuration again. The last restore leaves the cache: the comparator
+    has already run, and its writable directory holds nothing we trust.
+    """
+    for path in list(proj.iterdir()):
+        # A lakefile.lean beside lakefile.toml is the candidate's plant. A manifest
+        # the trusted build just wrote is not: `lake comparator` needs that file,
+        # and one that was in the snapshot is written back below.
+        if path.name.startswith("lakefile.") and path.name not in snap:
+            if path.is_symlink() or path.is_file():
+                path.unlink()
+            elif path.is_dir():
+                shutil.rmtree(path)
+    for rel, data in snap.items():
+        dest = proj / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if dest.is_symlink() or dest.is_file():
+            dest.unlink()
+        elif dest.is_dir():
+            shutil.rmtree(dest)
+        dest.write_bytes(data)
+    if clear_cache:
+        lake = proj / ".lake"
+        if lake.exists():
+            shutil.rmtree(lake)
+
+
 def verify_lean4_project_comparator(
     project_dir: Path | None = None,
     *,
@@ -1893,6 +1970,24 @@ def verify_lean4_project_comparator(
         )
         findings.extend(lint["findings"])
 
+    if any(finding_blocks_comparator(item) for item in findings):
+        return LeanVerificationResult(
+            passed=False,
+            toolchain=toolchain,
+            theorems_checked=theorem_names,
+            axioms_used=(),
+            nonstandard_axioms=(),
+            sorry_declarations=(),
+            paranoid_kernels_run=(),
+            sandboxed=False,
+            findings=tuple(findings),
+            caveats=tuple(caveats),
+            challenge_sorry_whitelisted_module=challenge_mod or None,
+        )
+
+    trusted_files = _snapshot_project_files(proj)
+    _restore_project_files(proj, trusted_files)
+
     # Scrub challenge `.olean`/`.ir` before `lake build` so `Spec` always compiles fresh from disk
     scrub_challenge_artifacts(proj, challenge_mod)
 
@@ -1944,6 +2039,7 @@ def verify_lean4_project_comparator(
             "rule": "LAKE_BUILD_FAILED",
             "message": f"`lake build` failed: {tail}",
         })
+        _restore_project_files(proj, trusted_files)
         return LeanVerificationResult(
             passed=False,
             toolchain=toolchain,
@@ -2037,19 +2133,19 @@ def verify_lean4_project_comparator(
                         "message": f"solution declaration '{decl_name}' uses unpermitted axioms: {sorted(extra_axs)}",
                     })
 
-    cmp_cmd = [lake_bin, "comparator", "--paranoid"]
-    if not bwrap_available:
-        cmp_cmd.append("--inadvisably-no-sandbox")
+    # The build may have planted lakefile.lean again. Restore before Lake elaborates it.
+    _restore_project_files(proj, trusted_files)
 
-    cmp_res = subprocess.run(
-        cmp_cmd,
-        cwd=proj,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=timeout_sec,
-        check=False,
-    )
+    # Lake's own sandbox is `--ro-bind / /` and `--share-net`. Run it inside ours.
+    try:
+        cmp_res = run_confined_command(
+            [lake_bin, "comparator", "--paranoid"],
+            cwd=proj,
+            env=env,
+            timeout_sec=timeout_sec,
+        )
+    except CandidateSandboxUnavailable as exc:
+        return refuse_sandbox(str(exc))
     kernels_accepted, solution_ok, spoof_findings = parse_comparator_stdout(cmp_res.stdout or "", solution_mod)
     findings.extend(spoof_findings)
 
@@ -2077,6 +2173,8 @@ def verify_lean4_project_comparator(
         and solution_ok
         and len(kernels_accepted) == 6
     )
+    # The comparator elaborates the project and can rewrite a trusted file after the earlier restore.
+    _restore_project_files(proj, trusted_files, clear_cache=False)
     return LeanVerificationResult(
         passed=passed,
         toolchain=toolchain,

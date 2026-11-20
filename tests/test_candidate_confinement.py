@@ -11,8 +11,11 @@ raises on malformed `comparator.json`.
 from __future__ import annotations
 
 import io
+import json
 from pathlib import Path
 import shutil
+import socket
+import threading
 import uuid
 
 import pytest
@@ -20,8 +23,8 @@ import pytest
 from helpers import expect_false, expect_in, expect_true, has_dep, has_lean_toolchain
 from mcproof.cli import main as cli_main
 from mcproof.lean_harness import (
-    _SANDBOX_AS_BYTES,
     _SANDBOX_CPU_SEC,
+    _address_space_cap_bytes,
     _spawn_confined,
     linux_bwrap_functional,
     lint_lean4_source,
@@ -250,7 +253,14 @@ def test_confined_process_has_resource_limits(tmp_path: Path) -> None:
     proc = _spawn_confined(["python3", "-c", script], cwd=tmp_path, caller_env={}, timeout_sec=30)
     lines = [ln.strip() for ln in (proc.stdout or "").splitlines() if ln.strip()]
     expect_true(len(lines) == 2, proc.stdout + (proc.stderr or ""))
-    expect_true(int(lines[0]) == _SANDBOX_AS_BYTES, lines)
+    memtotal = 0
+    for line in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
+        if line.startswith("MemTotal:"):
+            memtotal = int(line.split()[1]) * 1024
+    soft = int(lines[0])
+    # A fixed 32 GiB cap is above this host. Unlimited is -1, and -1 <= MemTotal.
+    expect_true(memtotal > 0 and soft > 0 and soft <= memtotal, (soft, memtotal))
+    expect_true(soft == _address_space_cap_bytes(), (soft, _address_space_cap_bytes()))
     expect_true(int(lines[1]) == _SANDBOX_CPU_SEC, lines)
 
 
@@ -315,3 +325,202 @@ def test_malformed_comparator_json_is_a_finding(tmp_path: Path) -> None:
     res = verify_lean4_project_comparator(tmp_path)
     expect_false(res.passed)
     expect_in("COMPARATOR_JSON_MALFORMED", {f["rule"] for f in res.findings})
+
+
+_ORIGINAL_PROOFS = "import Probe\ntheorem Probe.Proofs.goal : True := trivial\n"
+
+
+def _write_toml_project(root: Path, proofs: str) -> None:
+    (root / "Probe").mkdir(parents=True)
+    (root / "lean-toolchain").write_text("leanprover/lean4:v4.35.0\n", encoding="utf-8")
+    (root / "lakefile.toml").write_text(
+        'name = "probe"\nversion = "0.1.0"\n'
+        'defaultTargets = ["Probe", "Probe.Proofs"]\n\n'
+        '[[lean_lib]]\nname = "Probe"\n\n[[lean_lib]]\nname = "Probe.Proofs"\n',
+        encoding="utf-8",
+    )
+    (root / "Probe.lean").write_text("theorem probeRoot : True := trivial\n", encoding="utf-8")
+    (root / "Probe" / "Proofs.lean").write_text(proofs, encoding="utf-8")
+    (root / "comparator.json").write_text(
+        '{"challenge_module":"Probe","solution_module":"Probe.Proofs",'
+        '"theorem_names":["Probe.Proofs.goal"],'
+        '"permitted_axioms":["propext","Quot.sound","Classical.choice"]}\n',
+        encoding="utf-8",
+    )
+
+
+def test_planted_lakefile_is_not_elaborated(tmp_path: Path) -> None:
+    """Lake prefers lakefile.lean. Leaving it in place elaborates the hidden #eval."""
+    _skip_without_confinement()
+    _skip_without_soko()
+    root = tmp_path / "proj"
+    _write_toml_project(root, _ORIGINAL_PROOFS)
+    marker = root / "plant-marker.txt"
+    (root / "lakefile.lean").write_text(
+        "def s := r##\"foo\"#\n"
+        "#eval do\n"
+        f"  IO.FS.writeFile {json.dumps(str(marker))} \"ELABORATED\"\n"
+        f"  IO.FS.writeFile {json.dumps(str(root / 'Probe' / 'Proofs.lean'))} \"ELABORATED\\n\"\n",
+        encoding="utf-8",
+    )
+    verify_lean4_project_comparator(root, allow_unsandboxed=False)
+    expect_false(marker.is_file(), "the planted lakefile was elaborated")
+    expect_false((root / "lakefile.lean").exists(), "the planted lakefile was kept")
+    expect_true(
+        (root / "Probe" / "Proofs.lean").read_text(encoding="utf-8") == _ORIGINAL_PROOFS,
+        (root / "Probe" / "Proofs.lean").read_text(encoding="utf-8"),
+    )
+
+
+def test_comparator_cannot_see_the_host(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A host `lake comparator` re-elaborates a cold lakefile and this report shows the host."""
+    _skip_without_confinement()
+    _skip_without_soko()
+    monkeypatch.setenv("MCPROOF_SANDBOX_SENTINEL", "leakme-parent-env")
+    root = tmp_path / "proj"
+    (root / "Probe").mkdir(parents=True)
+    (root / "lean-toolchain").write_text("leanprover/lean4:v4.35.0\n", encoding="utf-8")
+    (root / "Probe.lean").write_text("theorem probeRoot : True := trivial\n", encoding="utf-8")
+    (root / "Probe" / "Proofs.lean").write_text(_ORIGINAL_PROOFS, encoding="utf-8")
+    (root / "comparator.json").write_text(
+        '{"challenge_module":"Probe","solution_module":"Probe.Proofs",'
+        '"theorem_names":["Probe.Proofs.goal"],'
+        '"permitted_axioms":["propext","Quot.sound","Classical.choice"]}\n',
+        encoding="utf-8",
+    )
+    hits: list[bytes] = []
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+    server.settimeout(0.2)
+    port = server.getsockname()[1]
+    stop = threading.Event()
+
+    def serve() -> None:
+        while not stop.is_set():
+            try:
+                conn, _addr = server.accept()
+            except TimeoutError:
+                continue
+            except OSError:
+                return
+            try:
+                hits.append(conn.recv(64))
+            finally:
+                conn.close()
+
+    thread = threading.Thread(target=serve, daemon=True)
+    thread.start()
+    (root / "probe.py").write_text(
+        "import os, socket\n"
+        "from pathlib import Path\n"
+        "phase = Path('probe-phase.txt')\n"
+        "tag = 'comparator' if phase.is_file() else 'build'\n"
+        "if not phase.is_file():\n"
+        "    phase.write_text('done\\n')\n"
+        "git = Path('/agent/repos/mcproof/.git/config')\n"
+        "sock = '0'\n"
+        "try:\n"
+        "    h = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)\n"
+        "    h.settimeout(0.3)\n"
+        "    h.connect('/run/host-services/ssh-auth.sock')\n"
+        "    sock = '1'\n"
+        "    h.close()\n"
+        "except OSError:\n"
+        "    pass\n"
+        "tcp = '0'\n"
+        "try:\n"
+        f"    c = socket.create_connection(('127.0.0.1', {port}), 0.3)\n"
+        "    c.sendall(b'NET_OK')\n"
+        "    c.close()\n"
+        "    tcp = '1'\n"
+        "except OSError:\n"
+        "    pass\n"
+        "env = os.environ.get('MCPROOF_SANDBOX_SENTINEL', '')\n"
+        "proc = Path('/proc/1/environ').read_bytes().decode('utf-8', 'replace') if Path('/proc/1/environ').is_file() else ''\n"
+        "sent = '1' if ('leakme-parent-env' in env or 'leakme-parent-env' in proc) else '0'\n"
+        "lake = Path('.lake')\n"
+        "lake.mkdir(exist_ok=True)\n"
+        "(lake / 'probe-report.txt').write_text(f'{tag} GIT={1 if git.is_file() else 0} SOCK={sock} TCP={tcp} SENTINEL={sent}\\n')\n"
+        "proofs = Path('Probe/Proofs.lean')\n"
+        "if tag == 'build':\n"
+        "    proofs.write_text(proofs.read_text() + '-- rewritten-by-probe\\n')\n"
+        "else:\n"
+        "    try:\n"
+        "        proofs.write_text('ELABORATED\\n')\n"
+        "    except OSError:\n"
+        "        pass\n",
+        encoding="utf-8",
+    )
+    (root / "lakefile.lean").write_text(
+        "import Lake\nopen Lake DSL\n\n"
+        "run_cmd IO.Process.output { cmd := \"python3\", args := #[\"probe.py\"] }\n\n"
+        "package «probe»\n\n@[default_target]\nlean_lib «Probe»\nlean_lib «Probe.Proofs»\n",
+        encoding="utf-8",
+    )
+    try:
+        verify_lean4_project_comparator(root, allow_unsandboxed=False)
+        report_path = root / ".lake" / "probe-report.txt"
+        report = report_path.read_text(encoding="utf-8") if report_path.is_file() else ""
+        expect_true(report.startswith("comparator "), report)
+        expect_true("GIT=0" in report and "SOCK=0" in report and "TCP=0" in report, report)
+        expect_true("SENTINEL=0" in report and "leakme-parent-env" not in report, report)
+        expect_true(hits == [], hits)
+        expect_true(
+            (root / "Probe" / "Proofs.lean").read_text(encoding="utf-8") == _ORIGINAL_PROOFS,
+            (root / "Probe" / "Proofs.lean").read_text(encoding="utf-8"),
+        )
+    finally:
+        stop.set()
+        server.close()
+        thread.join(timeout=2)
+
+
+def test_eval_or_run_meta_never_runs_the_comparator(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Removing the early return reaches `lake comparator` and this fails."""
+    _skip_without_soko()
+    if not has_lean_toolchain():
+        pytest.skip("Lean is absent, so the comparator stop was not exercised")
+
+    import mcproof.lean_harness as harness
+
+    real_run = harness.subprocess.run
+    real_confined = harness.run_confined_command
+
+    def reject_run(argv, *args, **kwargs):
+        if any(str(part) == "comparator" for part in argv):
+            raise AssertionError(f"comparator ran: {argv}")
+        return real_run(argv, *args, **kwargs)
+
+    def reject_confined(argv, *args, **kwargs):
+        if any(str(part) == "comparator" for part in argv):
+            raise AssertionError(f"comparator ran: {argv}")
+        return real_confined(argv, *args, **kwargs)
+
+    monkeypatch.setattr(harness, "run_confined_command", reject_confined)
+    monkeypatch.setattr(harness.subprocess, "run", reject_run)
+    samples = (
+        _ORIGINAL_PROOFS + "#eval IO.println \"hi\"\n",
+        "import Lean\n" + _ORIGINAL_PROOFS + "run_meta do pure ()\n",
+    )
+    for proofs in samples:
+        root = tmp_path / uuid.uuid4().hex
+        _write_toml_project(root, proofs)
+        res = verify_lean4_project_comparator(root, allow_unsandboxed=False)
+        rules = {f["rule"] for f in res.findings}
+        expect_true(
+            "FORBIDDEN_EVAL_COMMAND" in rules or any("run_meta" in str(f.get("message", "")) for f in res.findings),
+            res.findings,
+        )
+
+
+def test_confined_compile_error_reports_sandboxed() -> None:
+    """The compile ran inside the sandbox. Reporting sandboxed=False makes this fail."""
+    _skip_without_confinement()
+    _skip_without_soko()
+    res = verify_lean4_source(
+        'theorem t (n : Nat) : n = n := rfl\ndef s := r##"foo"#\n',
+    )
+    expect_in("LEAN_COMPILE_ERROR", {f["rule"] for f in res.findings})
+    expect_true(res.sandboxed is True, res)
