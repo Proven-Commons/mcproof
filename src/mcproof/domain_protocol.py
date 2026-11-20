@@ -9,7 +9,8 @@ Defines the clean domain boundary for `Proven-Commons/mcproof` (`mde:formal-veri
    sandbox usable by any `DomainOracle` closed-loop repair runner.
 4. `audit_transition_certificate`, `verify_dual_product_parity`, and `audit_portfolio_bounds`:
    deterministic soundness checkers enforcing non-tautological `must_fail_controls` (`A6`), rejecting
-   `LINT_PASS` / `LOWER_BOUND` tier-swap promotions (`A7`), and catching all 8 abstract certificate
+   `LINT_PASS` / `LOWER_BOUND` tier-swap promotions (`A7`), requiring a KNOWN `citation`
+   (`source`, `reference`, `artifact_sha256`), and catching all 8 abstract certificate
    unsoundness classes (`F-01` through `F-08`).
 """
 
@@ -636,13 +637,90 @@ def audit_portfolio_bounds(
     }
 
 
+def _known_citation_findings(cert: Mapping[str, Any]) -> list[dict[str, str]]:
+    """Require a KNOWN citation. Proof digests and `tcb_pins` are not one.
+
+    `cert["citation"]` is `{"source", "reference", "artifact_sha256"}`.
+    `source` and `reference` are strings that still contain text after stripping
+    whitespace. `artifact_sha256` is the cited artifact and matches `^[0-9a-f]{64}$`.
+    """
+    citation = cert.get("citation")
+    if not isinstance(citation, Mapping):
+        return [
+            {
+                "rule": "CERT_KNOWN_CITATION_MISSING",
+                "message": (
+                    "KNOWN requires citation.source, citation.reference, and "
+                    "citation.artifact_sha256. witness_or_proof_sha256 and tcb_pins are not a citation."
+                ),
+            }
+        ]
+    findings: list[dict[str, str]] = []
+    for key in ("source", "reference"):
+        if key not in citation or citation.get(key) is None:
+            findings.append(
+                {
+                    "rule": "CERT_KNOWN_CITATION_MISSING",
+                    "message": f"KNOWN citation.{key} is absent.",
+                }
+            )
+            continue
+        value = citation.get(key)
+        if not isinstance(value, str):
+            findings.append(
+                {
+                    "rule": "CERT_KNOWN_CITATION_MALFORMED",
+                    "message": f"KNOWN citation.{key} must be a non-empty string.",
+                }
+            )
+        elif not value.strip():
+            findings.append(
+                {
+                    "rule": "CERT_KNOWN_CITATION_MISSING",
+                    "message": f"KNOWN citation.{key} is blank.",
+                }
+            )
+    if "artifact_sha256" not in citation or citation.get("artifact_sha256") is None:
+        findings.append(
+            {
+                "rule": "CERT_KNOWN_CITATION_MISSING",
+                "message": "KNOWN citation.artifact_sha256 is absent.",
+            }
+        )
+    else:
+        digest = citation.get("artifact_sha256")
+        if not isinstance(digest, str) or not digest.strip():
+            findings.append(
+                {
+                    "rule": "CERT_KNOWN_CITATION_MISSING" if isinstance(digest, str) else "CERT_KNOWN_CITATION_MALFORMED",
+                    "message": (
+                        "KNOWN citation.artifact_sha256 is blank."
+                        if isinstance(digest, str)
+                        else "KNOWN citation.artifact_sha256 must match ^[0-9a-f]{64}$."
+                    ),
+                }
+            )
+        elif not SHA256_64_RE.fullmatch(digest):
+            findings.append(
+                {
+                    "rule": "CERT_KNOWN_CITATION_MALFORMED",
+                    "message": f"KNOWN citation.artifact_sha256 must match ^[0-9a-f]{64}$ (got {digest!r}).",
+                }
+            )
+    return findings
+
+
 def audit_transition_certificate(
     cert: Mapping[str, Any],
     *,
     require_must_fail_controls: bool = False,
     registered_artifact_digests: frozenset[str] | None = None,
 ) -> dict[str, Any]:
-    """Domain-general fail-closed auditor covering `F-01..F-08` plus `A6`/`A7` control and tier-swap gates."""
+    """Domain-general fail-closed auditor covering `F-01..F-08` plus `A6`/`A7` and KNOWN citations.
+
+    A KNOWN certificate carries `citation`: `source` and `reference` are non-empty
+    strings, and `artifact_sha256` is a lowercase 64-hex digest of the cited artifact.
+    """
     findings: list[dict[str, str]] = []
     status = str(cert.get("epistemic_status", "")).strip().upper()
     proof_mode = str(cert.get("proof_mode", "")).strip().lower()
@@ -666,7 +744,7 @@ def audit_transition_certificate(
     evidence_kind = str(cert.get("evidence_kind", "")).strip().lower()
 
     # A7: Reject tier-swap promotions of LINT_PASS / LOWER_BOUND / bounded-subgraph
-    # to VERIFIED, PROVEN, or KNOWN. KNOWN uses this same evidence check.
+    # to VERIFIED, PROVEN, or KNOWN. A citation does not make a lower prior legal.
     if status in ("VERIFIED", "PROVEN", "KNOWN"):
         if prior_status in NON_VERIFIED_SUBTIERS or evidence_kind in ("static_lint", "lower_bound_only", "bounded_subgraph"):
             findings.append(
@@ -682,6 +760,9 @@ def audit_transition_certificate(
                     "message": f"Rejected witness cannot carry epistemic_status={status}.",
                 }
             )
+
+    if status == "KNOWN":
+        findings.extend(_known_citation_findings(cert))
 
     # A6: Non-empty, distinct, non-tautological must_fail_controls
     if require_must_fail_controls or "must_fail_controls" in cert or "control_records" in cert:
