@@ -8,7 +8,7 @@
 - `corpus_tree_sha256`: `5bdb7f30363b956e82947f668f98c48f99876e87fb5ed4f785b873e4f4f98305`
 - Base GGUF (`Qwen3.5-4B-Q8_0.gguf`, `4,482,403,488` B, `has_ssm_recurrent = true` parsed from GGUF header): `10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1`
 - Safetensors checkpoint fingerprint (cross-bound via `verify_supplied_checkpoint_against_served_gguf`): `1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64`
-- `mde:formal-verification` (`P2-B` F16 GGUF, `189,408` B): `728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5` (`int4/int8` slab `58,357` B, `int4/f16` slab `78,803` B)
+- `mde:formal-verification` (`P2-B` F16 GGUF, `189,408` B): `01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa` (`int4/int8` slab `58,357` B, `int4/f16` slab `78,803` B)
 - `mde:corpus` (F16 GGUF, `189,184` B): `d81bab6b8c5555674dbbe29e38566435fedc1828d652fbfbf12f35f9562ea640`
 - `mde:weft-eido` (F16 GGUF, `189,184` B): `71bedfeee40d0b11a559f73d1c720822a1281452859f43a250bf86bc2755bb86`
 

@@ -8,7 +8,7 @@
   },
   "derivation_recipe": {
     "compiler": "weft/0.1.0",
-    "harvested_activations_meta_sha256": "36df5b5734b1c0b2f538f2393bf9a02f2823634f8d776d6d62c1d312a1602933",
+    "harvested_activations_meta_sha256": "12031b25dd24555f03d9bc5e3cb9d76e6525e135238d5c2f324bc2d54c35a6ad",
     "harvested_activations_npz_sha256": "413a112304d3f80c27e76d16558900f82c16692151275ac488206d202aea72be",
     "lambda_leakage": 250.0,
     "lambda_ridge": 4.0,

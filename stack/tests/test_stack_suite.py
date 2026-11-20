@@ -36,6 +36,7 @@ from mcproof_stack.phase6_composition import (  # noqa: E402
     parse_and_validate_grader_process,
     reconcile_mixed_grader_result,
     run_phase6_composition,
+    single_mode_retention_exit_ok,
 )
 from mcproof_stack.runtime import (  # noqa: E402
     GGUF_MAGIC,
@@ -293,6 +294,30 @@ class TestPureStackHelpers(unittest.TestCase):
         self.assertFalse(res_internal_kept["passed"])
         self.assertEqual(res_internal_kept["formal_block_corruptions"], 2)
         self.assertEqual(res_internal_kept["prose_rule_leaks"], 1)
+
+        # Single-mode retention: exit 1 with plausible counts is still a failed gate.
+        single_stdout = json.dumps({"total_count": 4, "total_passed": 4, "accuracy_pct": 100.0})
+        single_ok, single_payload = parse_and_validate_grader_process(
+            1,
+            single_stdout,
+            "",
+            grader_name="retention_grader",
+            required_int_keys=("total_count",),
+            any_of_int_keys=(("total_passed", "passed_count", "correct"),),
+        )
+        self.assertFalse(single_ok)
+        self.assertEqual(single_payload["total_passed"], 4)
+        self.assertFalse(single_mode_retention_exit_ok(single_ok, True, True))
+        self.assertTrue(single_mode_retention_exit_ok(True, True, True))
+        holdout_ok, _holdout_payload = parse_and_validate_grader_process(
+            1,
+            json.dumps({"total_count": 4, "total_passed": 3}),
+            "",
+            grader_name="holdout_grader",
+            required_int_keys=("total_count",),
+            any_of_int_keys=(("total_passed", "passed_count", "overall_passed"),),
+        )
+        self.assertFalse(holdout_ok)
 
         # Crash exit code (2) or invalid JSON schema raises RuntimeError
         with self.assertRaises(RuntimeError):
