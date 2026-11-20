@@ -646,6 +646,93 @@ def test_family_c_midline_theorem_counts_as_an_extra_name() -> None:
     expect_false("BAR_CHECK_FAILED" in rules, findings)
 
 
+def _family_c_block_lake(monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
+    """Record a lake or comparator call and return no findings from either."""
+    called = {"lake": False}
+
+    def _no_lake(*_args: object, **_kwargs: object) -> list[dict[str, Any]]:
+        called["lake"] = True
+        return []
+
+    def _no_cmp(*_args: object, **_kwargs: object) -> Any:
+        called["lake"] = True
+        return type("Cmp", (), {"findings": ()})()
+
+    monkeypatch.setattr("mcproof.repair_loop._family_c_direct_lake_build", _no_lake)
+    monkeypatch.setattr("mcproof.repair_loop.verify_lean4_project_comparator", _no_cmp)
+    return called
+
+
+def test_family_c_midline_eval_commands_rejected_before_lake(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every command in the eval lint is rejected before `lake`, including mid-line.
+
+    The turn reads `FORBIDDEN_EVAL_COMMAND` itself. Putting the start-of-line
+    anchor back on that pattern lets these completions reach lake and this test fails.
+    A `#eval` or `#reduce` that sits in a comment or a string does not.
+    """
+    called = _family_c_block_lake(monkeypatch)
+    for command in ("#eval", "#reduce", "#check", "#print", "#synth"):
+        called["lake"] = False
+        comp = (
+            "```lean\n"
+            "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
+            "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
+            f"def pad := 0 {command} (1 : Nat)\n"
+            "```\n"
+        )
+        findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), comp)
+        rules = {f["rule"] for f in findings}
+        expect_false(called["lake"], f"lake ran for {command}: {findings}")
+        expect_in("FORBIDDEN_EVAL_COMMAND", rules, command)
+        expect_true(any(command in str(f.get("message", "")) for f in findings), findings)
+        expect_false("LAKE_BUILD_FAILED" in rules, findings)
+    decoy = (
+        "```lean\n"
+        "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
+        "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
+        "-- #eval IO.println \"x\"\n"
+        "def note := \"#reduce\"\n"
+        "```\n"
+    )
+    called["lake"] = False
+    decoy_findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), decoy)
+    decoy_rules = {f["rule"] for f in decoy_findings}
+    expect_false("FORBIDDEN_EVAL_COMMAND" in decoy_rules, decoy_findings)
+
+
+def test_family_c_non_ascii_and_other_decls_count_as_extra_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`«Extra»`, `α`, `café`, `instance`, `example`, and `abbrev` are extra names."""
+    called = _family_c_block_lake(monkeypatch)
+    cases = (
+        ("theorem «Extra» : True := trivial\n", "«Extra»"),
+        ("def pad := 0 theorem «Extra» : True := trivial\n", "«Extra»"),
+        ("theorem α : True := trivial\n", "α"),
+        ("def pad := 0 theorem α : True := trivial\n", "α"),
+        ("theorem café : True := trivial\n", "café"),
+        ("instance extraInst : Inhabited Unit := ⟨()⟩\n", "extraInst"),
+        ("def pad := 0 instance extraInst : Inhabited Unit := ⟨()⟩\n", "extraInst"),
+        ("example : True := trivial\n", "example"),
+        ("abbrev FooN := Nat\n", "FooN"),
+    )
+    for snippet, needle in cases:
+        called["lake"] = False
+        comp = (
+            "```lean\n"
+            "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
+            "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
+            + snippet
+            + "```\n"
+        )
+        findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), comp)
+        rules = {f["rule"] for f in findings}
+        expect_false(called["lake"], f"lake ran for {needle}: {findings}")
+        expect_in("FAMILY_C_THEOREM_NAME_MISMATCH", rules, needle)
+        expect_true(any(needle in str(f.get("message", "")) for f in findings), findings)
+        expect_false("LAKE_BUILD_FAILED" in rules, findings)
+
+
 def test_grade_item_pins_statements_and_refuses_identity_scaffold() -> None:
     script = repo_root() / "datasets" / "scripts" / "grade_item.py"
     spec = importlib.util.spec_from_file_location("grade_item_under_test", script)

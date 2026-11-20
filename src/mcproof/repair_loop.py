@@ -33,6 +33,7 @@ from typing import Any, Callable, Mapping, Sequence
 import urllib.request
 
 from .lean_harness import (
+    BAR_FORBIDDEN_RULES,
     THEOREM_DECL_RE,
     _lean_env,
     strip_lean_comments_and_strings,
@@ -824,8 +825,18 @@ def _extract_first_json_block(text: str) -> str | None:
 _FAMILY_C_STATUS_VERIFIED_RE = re.compile(r"(?im)^status\s*:\s*verified\b")
 _FAMILY_C_STATUS_NOT_VERIFIED_RE = re.compile(r"(?im)^status\s*:.*not verified")
 _FAMILY_C_SORRY_OR_ADMIT_RE = re.compile(r"\b(sorry|admit)\b")
+# Lean atomic names include `«quoted»` forms and non-ASCII letters such as `α` and `café`.
+_LEAN_NAME_ATOM = r"(?:«[^»]*»|_*(?:[^\W\d_])[\w!?']*)"
+_LEAN_NAME = rf"{_LEAN_NAME_ATOM}(?:\.{_LEAN_NAME_ATOM})*"
 _FAMILY_C_DECL_NAME_RE = re.compile(
-    r"\b(?:theorem|lemma)\b[ \t]+(?P<name>[A-Za-z_][A-Za-z0-9_.']*)\b"
+    rf"\b(?:theorem|lemma)\b[ \t]+(?P<name>{_LEAN_NAME})"
+)
+_FAMILY_C_OTHER_DECL_RE = re.compile(
+    rf"(?<![\w@\[])(?:"
+    rf"instance\b(?:[ \t]+(?P<inst>{_LEAN_NAME}))?(?=[ \t]*:)"
+    rf"|example\b(?:[ \t]+(?P<ex>{_LEAN_NAME}))?(?=[ \t]*:)"
+    rf"|abbrev\b[ \t]+(?P<abbrev>{_LEAN_NAME})"
+    rf")"
 )
 
 
@@ -846,13 +857,50 @@ def _family_c_candidate_statements(candidate_lean: str) -> dict[str, str]:
 
 
 def _family_c_all_decl_names(candidate_lean: str) -> set[str]:
-    """Every theorem or lemma name, including one that shares a line with other code.
+    """Declaration names the line-start ASCII theorem regex does not keep.
 
-    `THEOREM_DECL_RE` only sees a declaration that starts a line. A mid-line
-    `theorem Extra` would otherwise sit outside the name set.
+    Includes a mid-line `theorem`, a `«quoted»` or non-ASCII name, and
+    `instance`, `example`, and `abbrev`. An unnamed `example` or `instance`
+    is recorded under that keyword.
     """
     cleaned = strip_lean_comments_and_strings(candidate_lean)
-    return {str(match.group("name")) for match in _FAMILY_C_DECL_NAME_RE.finditer(cleaned)}
+    names = {str(match.group("name")) for match in _FAMILY_C_DECL_NAME_RE.finditer(cleaned)}
+    for match in _FAMILY_C_OTHER_DECL_RE.finditer(cleaned):
+        if match.group(0).startswith("instance"):
+            names.add(str(match.group("inst") or "instance"))
+        elif match.group(0).startswith("example"):
+            names.add(str(match.group("ex") or "example"))
+        elif match.group("abbrev"):
+            names.add(str(match.group("abbrev")))
+    return names
+
+
+def _family_c_forbidden_eval_findings(candidate_lean: str) -> list[dict[str, Any]]:
+    """Reject every command in the `FORBIDDEN_EVAL_COMMAND` lint, including mid-line.
+
+    The scan uses that lint's own pattern on comment-stripped and string-stripped
+    source. A hit returns before `lake build`, because those commands run candidate
+    code during elaboration.
+    """
+    cleaned = strip_lean_comments_and_strings(candidate_lean)
+    rx = dict(BAR_FORBIDDEN_RULES)["FORBIDDEN_EVAL_COMMAND"]
+    found: list[str] = []
+    for match in rx.finditer(cleaned):
+        cmd = match.group(0)
+        if cmd not in found:
+            found.append(cmd)
+    if not found:
+        return []
+    return [
+        {
+            "rule": "FORBIDDEN_EVAL_COMMAND",
+            "message": (
+                "candidate contains a Lean command that runs during elaboration: "
+                + ", ".join(found)
+                + "."
+            ),
+        }
+    ]
 
 
 def _family_c_statement_headers(
@@ -1077,6 +1125,7 @@ def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: st
                 "message": "solution module uses 'sorry' or 'admit'; the turn fails.",
             }
         )
+    findings.extend(_family_c_forbidden_eval_findings(candidate_lean))
     findings.extend(_check_family_c_statement_match(meta, thms, candidate_lean))
     if findings:
         return findings

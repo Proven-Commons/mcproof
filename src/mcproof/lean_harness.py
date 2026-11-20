@@ -59,8 +59,9 @@ BAR_FORBIDDEN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
         ),
     ),
     (
+        # Not only at the start of a line. A mid-line `#eval` still runs during elaboration.
         "FORBIDDEN_EVAL_COMMAND",
-        re.compile(r"(?m)^[ \t]*#(?:eval|reduce|check|print|synth)\b"),
+        re.compile(r"#(?:eval|reduce|check|print|synth)\b"),
     ),
 )
 
