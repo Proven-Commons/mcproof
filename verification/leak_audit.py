@@ -162,12 +162,15 @@ def audit_directory_zero_leaks(
                 f"SECURITY VIOLATION: public vs vault 8-gram Jaccard {max_jaccard:.6f} > {max_8gram_jaccard_cap}"
             )
 
-    return {
+    summary = {
         "files_checked": files_checked,
         "vault_prompts_checked": len(vault_prompts),
         "head_mid_tail_windows_per_file": windows_per_file,
         "max_public_vs_vault_8gram_jaccard": round(max_jaccard, 6),
     }
+    if not vault_prompts:
+        summary["vault_comparison"] = "not_performed_no_vault_dir"
+    return summary
 
 
 def main() -> int:
@@ -183,7 +186,10 @@ def main() -> int:
         vault_prompts,
         public_datasets_dir=repo_root / "datasets",
     )
-    print(json.dumps({"passed": True, **summary}, indent=2, sort_keys=True))
+    result = {"passed": True, **summary}
+    if not vault_prompts:
+        result["vault_comparison"] = "not_performed_no_vault_dir"
+    print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 
 

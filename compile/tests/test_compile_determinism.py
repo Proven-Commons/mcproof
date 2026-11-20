@@ -169,9 +169,23 @@ def test_cached_activations_npz_hmac_sha256_verification() -> None:
             verify_cached_activations_npz(npz_path)
 
         meta_path = npz_path.with_suffix(".meta.json")
+        provenance = {
+            "torch_version": "2.8.0",
+            "device": "cpu",
+            "forward_dtype": "bfloat16",
+            "platform": "test-platform",
+        }
+        # Provenance-less sidecars fail closed even when the NPZ digest matches.
         meta_path.write_text(json.dumps({"npz_sha256": true_sha}) + "\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="harvest_runtime"):
+            verify_cached_activations_npz(npz_path)
+        meta_path.write_text(
+            json.dumps({"harvest_runtime": provenance, "npz_sha256": true_sha}) + "\n",
+            encoding="utf-8",
+        )
         verified = verify_cached_activations_npz(npz_path)
         _require(verified["npz_sha256"] == true_sha, "expected matching npz_sha256")
+        _require(verified["harvest_runtime"]["device"] == "cpu", "expected harvest_runtime.device")
 
         # 1-byte tamper in cached NPZ fails closed via hmac.compare_digest
         raw = bytearray(npz_path.read_bytes())
@@ -373,7 +387,9 @@ def test_evaluator_b1_exact_parity_and_fail_closed_oracle_grading() -> None:
 
 
 def test_start_server_redirects_stdout_to_log_file_avoiding_pipe_deadlock() -> None:
-    with tempfile.TemporaryDirectory() as td:
+    # Windows releases the inherited srv.log handle shortly after _stop_server.
+    # ignore_cleanup_errors avoids a deterministic WinError 32 during TemporaryDirectory teardown.
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as td:
         log_path = Path(td) / "srv.log"
         code = (
             "import http.server, sys\n"
@@ -495,7 +511,18 @@ def test_zero_byte_9_of_9_rederivation_tamper_and_warp_gates() -> None:
         )
         npz_sha = hashlib.sha256(npz_path.read_bytes()).hexdigest()
         npz_path.with_suffix(".meta.json").write_text(
-            json.dumps({"npz_sha256": npz_sha, "step_metadata": []}) + "\n",
+            json.dumps(
+                {
+                    "harvest_runtime": {
+                        "torch_version": "2.8.0",
+                        "device": "cpu",
+                        "platform": "test-platform",
+                    },
+                    "npz_sha256": npz_sha,
+                    "step_metadata": [],
+                }
+            )
+            + "\n",
             encoding="utf-8",
         )
 

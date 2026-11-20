@@ -27,7 +27,7 @@
         "swa_checkpoints": 0
       },
       "runtime_flags_sha256": "df1b49bd87c005bf9d30a5c9487f9328aa302053827e0781d6186517774a691d",
-      "slot_manifest_digest": "ae3d921d10b8aadd8cc4f7eea4a36ebf7395ed258ee709b6e602724f196d6f5f",
+      "slot_manifest_digest": "0d363a202d291bd5e25e44cce061d1b35ad9b072a23001138c328e4a25d6a412",
       "zone_hint": "formal_proof",
       "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
     }

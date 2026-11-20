@@ -26,7 +26,7 @@
     "tokenizer_sha256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
     "weights_sha256": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64"
   },
-  "derivation_digest": "32afb58d7df80cc5643c6ae0e771333b67ce4045104c5137c53249f89a6eccd6",
+  "derivation_digest": "ddc488f2a432f00f0ffcb758714a05a0c6bf1dd85d6ddd11d67079b67ec803f3",
   "domain": "formal-verification",
   "llama_adapter_id": 2,
   "runtime_flags_sha256": "df1b49bd87c005bf9d30a5c9487f9328aa302053827e0781d6186517774a691d",

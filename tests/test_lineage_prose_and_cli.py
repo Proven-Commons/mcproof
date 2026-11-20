@@ -338,3 +338,12 @@ def test_leak_audit_ignores_public_spec_boilerplate_and_catches_real_vault_leak(
         public_spec_path=r_root / "spec" / "plane1_formal_spec.md",
     )
     expect_eq(summary["files_checked"], 1, "expected 1 file audited")
+    expect_true("vault_comparison" not in summary, "vault comparison ran, so it must not be labeled skipped")
+
+    standalone = audit_directory_zero_leaks(sub, [], public_spec_path=r_root / "spec" / "plane1_formal_spec.md")
+    expect_eq(standalone["vault_prompts_checked"], 0, "standalone audit has no vault prompts")
+    expect_eq(
+        standalone["vault_comparison"],
+        "not_performed_no_vault_dir",
+        "empty vault must be labeled, not attested as a 0.0 Jaccard",
+    )

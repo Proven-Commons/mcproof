@@ -11,7 +11,7 @@
       "max_spectral_sq_den": 100,
       "max_spectral_sq_num": 1600
     },
-    "harvested_activations_meta_sha256": "36df5b5734b1c0b2f538f2393bf9a02f2823634f8d776d6d62c1d312a1602933",
+    "harvested_activations_meta_sha256": "12031b25dd24555f03d9bc5e3cb9d76e6525e135238d5c2f324bc2d54c35a6ad",
     "harvested_activations_npz_sha256": "413a112304d3f80c27e76d16558900f82c16692151275ac488206d202aea72be",
     "k0_trace_normalization": "1/sqrt(n_k0_noise)",
     "lambda_leakage": 250.0,
@@ -109,7 +109,7 @@
   },
   "p2b": {
     "binding_path": "compile/artifacts/p2b/formal-verification.p2b.binding.json",
-    "binding_sha256": "32afb58d7df80cc5643c6ae0e771333b67ce4045104c5137c53249f89a6eccd6",
+    "binding_sha256": "ddc488f2a432f00f0ffcb758714a05a0c6bf1dd85d6ddd11d67079b67ec803f3",
     "certificate_path": "compile/artifacts/p2b/formal-verification.p2b.certificate.json",
     "certificate_sha256": "56820652f47de5866a57fd39bbb092ea2c14c658f2671dbcbcafcc2fa5180b76",
     "factor_f16_digest": "7ffa87806e74b2c01adb871412031d2aade0a61f43b69a987f3eaee8de162801",
@@ -118,7 +118,7 @@
     "gate_policy_path": "compile/artifacts/p2b/formal-verification.p2b.gate_policy.json",
     "gguf_f16_bytes": 189408,
     "gguf_f16_path": "compile/artifacts/p2b/formal-verification.p2b.f16.gguf",
-    "gguf_f16_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+    "gguf_f16_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
     "slab_f16_path": "compile/artifacts/p2b/formal-verification.p2b.f16.wfsl",
     "slab_f16_sha256": "7f68b13bac77427e1734d32bf6e5593d61975313abfd62fe1041f878f7b15164",
     "slab_int4_f16_bytes": 78803,
@@ -139,7 +139,7 @@
     },
     "formal-verification": {
       "gguf_path": "compile/artifacts/composition/formal-verification.f16.gguf",
-      "gguf_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+      "gguf_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
       "warp_bundle_path": "compile/artifacts/composition/formal-verification.warp_bundle.json"
     },
     "weft-eido": {

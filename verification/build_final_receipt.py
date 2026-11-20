@@ -276,15 +276,23 @@ def main() -> int:
         or val_sc.get("phase5_preview_on_public_validation")
         or val_sc
     )
-    p2b_rel_public = float(
-        val_head.get(
-            "p2b_relative_failure_reduction_vs_b0",
-            val_sc.get("p2b_relative_failure_reduction_vs_b0", -1.0),
-        )
-    )
+    def _measured_rel(mapping: Mapping[str, Any]) -> float | None:
+        if "p2b_relative_failure_reduction_vs_b0" not in mapping:
+            return None
+        raw = mapping["p2b_relative_failure_reduction_vs_b0"]
+        if raw is None:
+            return None
+        return float(raw)
+
+    # A missing measurement stays null and fails the gate. It must not become -1.0.
+    p2b_rel_public = _measured_rel(val_head)
+    if p2b_rel_public is None:
+        p2b_rel_public = _measured_rel(val_sc)
     efficacy_verdict = str(val_head.get("efficacy_verdict", val_sc.get("efficacy_verdict", "")))
-    public_validation_efficacy_passed = (
-        efficacy_verdict != "REJECTED_NEGATIVE_EFFICACY" and p2b_rel_public > 0.0
+    public_validation_efficacy_passed = bool(
+        p2b_rel_public is not None
+        and efficacy_verdict != "REJECTED_NEGATIVE_EFFICACY"
+        and p2b_rel_public > 0.0
     )
 
     b1_sop_tokens = int(b1["plane1_spec_qwen35_tokens"])
@@ -462,7 +470,7 @@ def main() -> int:
                 "p2b_files": rederive["files"],
                 "loud_column_ablation": compiler["loud_column_headline"],
                 "public_validation_48_arms": val_arms,
-                "public_validation_p2b_relative_failure_reduction_vs_b0": val_sc.get(
+                "public_validation_p2b_relative_failure_reduction_vs_b0": val_head.get(
                     "p2b_relative_failure_reduction_vs_b0"
                 ),
             },

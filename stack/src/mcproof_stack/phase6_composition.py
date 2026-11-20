@@ -130,6 +130,11 @@ def parse_and_validate_grader_process(
     return (returncode == 0), parsed
 
 
+def single_mode_retention_exit_ok(w0_ok: bool, routed_ok: bool, naive_ok: bool) -> bool:
+    """Single-mode T-C3 honors every retention-grader exit. Exit 1 is a failed gate."""
+    return bool(w0_ok and routed_ok and naive_ok)
+
+
 def reconcile_mixed_grader_result(
     *,
     internal_formal_corruptions: int,
@@ -1730,9 +1735,10 @@ def run_phase6_composition(
                             acc_v = float(rj.get("accuracy_pct", (p_cnt / n_ret) * 100.0))
                             return r_ok, p_cnt, acc_v
 
-                        _, w0_passed, w0_acc = _score_ret_single(ret_w0_file)
-                        _, routed_passed, routed_acc = _score_ret_single(ret_rt_file)
-                        _, naive_passed, naive_acc = _score_ret_single(ret_nv_file)
+                        w0_ok, w0_passed, w0_acc = _score_ret_single(ret_w0_file)
+                        rt_ok, routed_passed, routed_acc = _score_ret_single(ret_rt_file)
+                        nv_ok, naive_passed, naive_acc = _score_ret_single(ret_nv_file)
+                        ret_grader_gate_ok = single_mode_retention_exit_ok(w0_ok, rt_ok, nv_ok)
                     else:
                         def _score_ret_paired(base_file: Path, cand_file: Path) -> tuple[bool, dict[str, Any]]:
                             if has_paired_ph:
@@ -2121,18 +2127,20 @@ def run_phase6_composition(
                             encoding="utf-8",
                         )
 
+                    holdout_grader_exit_ok: bool | None = None
                     if holdout_grader_cmd:
                         oracle_graded_n = len(fe_rows)
                         has_hg_ph = any("{responses_jsonl}" in tok for tok in holdout_grader_cmd)
+                        holdout_exit_oks: list[bool] = []
 
-                        def _score_holdout_arm(arm_file: Path) -> int:
+                        def _score_holdout_arm(arm_file: Path) -> tuple[bool, int]:
                             hcmd = (
                                 [tok.replace("{responses_jsonl}", str(arm_file)) for tok in holdout_grader_cmd]
                                 if has_hg_ph
                                 else [*holdout_grader_cmd, "--responses", str(arm_file)]
                             )
                             hproc = subprocess.run(hcmd, capture_output=True, text=True, timeout=300.0, check=False)
-                            _, hj = parse_and_validate_grader_process(
+                            h_ok, hj = parse_and_validate_grader_process(
                                 hproc.returncode,
                                 hproc.stdout,
                                 hproc.stderr,
@@ -2140,21 +2148,33 @@ def run_phase6_composition(
                                 required_int_keys=("total_count",),
                                 any_of_int_keys=(("total_passed", "passed_count", "overall_passed"),),
                             )
-                            return int(
+                            cnt = int(
                                 hj.get(
                                     "total_passed",
                                     hj.get("passed_count", hj.get("overall_passed", 0)),
                                 )
                             )
+                            return h_ok, cnt
 
-                        w0_oracle_cnt = _score_holdout_arm(fe_w0_f)
-                        solo_oracle_cnt = _score_holdout_arm(fe_solo_f)
+                        def _adopt_holdout(arm_file: Path, internal_cnt: int) -> int:
+                            h_ok, cnt = _score_holdout_arm(arm_file)
+                            holdout_exit_oks.append(h_ok)
+                            # Exit 1 keeps the internal count. A rejected grader cannot overwrite it.
+                            return cnt if h_ok else internal_cnt
+
+                        w0_oracle_cnt = _adopt_holdout(fe_w0_f, w0_oracle_cnt)
+                        solo_oracle_cnt = _adopt_holdout(fe_solo_f, solo_oracle_cnt)
                         paired_oracle_cnt = (
-                            solo_oracle_cnt if fe_rows_paired == fe_rows_solo else _score_holdout_arm(fe_pair_f)
+                            solo_oracle_cnt
+                            if fe_rows_paired == fe_rows_solo
+                            else _adopt_holdout(fe_pair_f, paired_oracle_cnt)
                         )
                         triple_oracle_cnt = (
-                            paired_oracle_cnt if fe_rows_triple == fe_rows_paired else _score_holdout_arm(fe_trip_f)
+                            paired_oracle_cnt
+                            if fe_rows_triple == fe_rows_paired
+                            else _adopt_holdout(fe_trip_f, triple_oracle_cnt)
                         )
+                        holdout_grader_exit_ok = bool(holdout_exit_oks) and all(holdout_exit_oks)
 
                     solo_gain = solo_oracle_cnt - w0_oracle_cnt
                     paired_gain_ret: float | None = (
@@ -2171,6 +2191,7 @@ def run_phase6_composition(
                         "dataset": fe_path.name,
                         "count": len(fe_rows),
                         "external_grader_used": bool(holdout_grader_cmd),
+                        "holdout_grader_exit_ok": holdout_grader_exit_ok,
                         "oracle_graded_count": oracle_graded_n,
                         "w0_oracle_passed": w0_oracle_cnt,
                         "solo_fv_oracle_passed": solo_oracle_cnt,
