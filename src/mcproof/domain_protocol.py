@@ -42,6 +42,8 @@ MAX_SANDBOX_TIMEOUT_SEC = 4.0
 MAX_CERT_ABS_INT = 10**60
 STRICT_RATIONAL_RE = re.compile(r"^-?[0-9]+(?:/[1-9][0-9]*)?$")
 SHA256_64_RE = re.compile(r"^[0-9a-f]{64}$")
+# Zero-width and word-joiner marks. Unicode whitespace is rejected separately.
+_CITATION_INVISIBLE_CHARS = frozenset("\u200b\u200c\u200d\u2060\ufeff")
 NON_VERIFIED_SUBTIERS: frozenset[str] = frozenset(
     {
         "LINT_PASS",
@@ -637,12 +639,21 @@ def audit_portfolio_bounds(
     }
 
 
+def _citation_text_visible(value: str) -> bool:
+    """True when `value` has a printable character that is not whitespace or invisible."""
+    return any(
+        ch.isprintable() and not ch.isspace() and ch not in _CITATION_INVISIBLE_CHARS
+        for ch in value
+    )
+
+
 def _known_citation_findings(cert: Mapping[str, Any]) -> list[dict[str, str]]:
     """Require a KNOWN citation. Proof digests and `tcb_pins` are not one.
 
     `cert["citation"]` is `{"source", "reference", "artifact_sha256"}`.
-    `source` and `reference` are strings that still contain text after stripping
-    whitespace. `artifact_sha256` is the cited artifact and matches `^[0-9a-f]{64}$`.
+    `source` and `reference` need at least one printable, non-invisible character.
+    `artifact_sha256` matches `^[0-9a-f]{64}$` and is not 64 zeros.
+    A REJECTED or REFUSED prior plus a valid citation is intended to promote to KNOWN.
     """
     citation = cert.get("citation")
     if not isinstance(citation, Mapping):
@@ -673,11 +684,11 @@ def _known_citation_findings(cert: Mapping[str, Any]) -> list[dict[str, str]]:
                     "message": f"KNOWN citation.{key} must be a non-empty string.",
                 }
             )
-        elif not value.strip():
+        elif not _citation_text_visible(value):
             findings.append(
                 {
                     "rule": "CERT_KNOWN_CITATION_MISSING",
-                    "message": f"KNOWN citation.{key} is blank.",
+                    "message": f"KNOWN citation.{key} is blank or has no visible character.",
                 }
             )
     if "artifact_sha256" not in citation or citation.get("artifact_sha256") is None:
@@ -700,11 +711,14 @@ def _known_citation_findings(cert: Mapping[str, Any]) -> list[dict[str, str]]:
                     ),
                 }
             )
-        elif not SHA256_64_RE.fullmatch(digest):
+        elif not SHA256_64_RE.fullmatch(digest) or digest == "0" * 64:
             findings.append(
                 {
                     "rule": "CERT_KNOWN_CITATION_MALFORMED",
-                    "message": f"KNOWN citation.artifact_sha256 must match ^[0-9a-f]{64}$ (got {digest!r}).",
+                    "message": (
+                        "KNOWN citation.artifact_sha256 must match ^[0-9a-f]{64}$ "
+                        f"and must not be 64 zeros (got {digest!r})."
+                    ),
                 }
             )
     return findings
