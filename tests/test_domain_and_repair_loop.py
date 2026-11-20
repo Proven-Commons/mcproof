@@ -7,8 +7,10 @@ import io
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 from typing import Any, Mapping, Sequence
+import uuid
 
 import pytest
 
@@ -27,10 +29,11 @@ from mcproof.domain_protocol import (
     verify_minimal_goal_stopping,
     verify_rational_lp_certificate,
 )
-from mcproof.lean_harness import strip_lean_comments_and_strings
+from mcproof.lean_harness import linux_bwrap_functional, strip_lean_comments_and_strings
 from mcproof.paths import repo_root
 from mcproof.repair_loop import (
     MAX_RETRIEVAL_TOKENS_HARD_CAP,
+    _family_c_direct_lake_build,
     _run_family_c_real_lean_turn,
     compute_candidate_state_hash,
     compute_failure_signature,
@@ -795,14 +798,144 @@ def test_family_c_banned_commands_inside_text_are_not_findings(
     expect_false("FORBIDDEN_ELAB_COMMAND" in rules, findings)
 
 
-def _family_c_with_theorems(snippet: str) -> str:
+def _family_c_with_theorems(snippet: str, *, prelude: str = "") -> str:
     return (
         "```lean\n"
-        "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
-        "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
+        + prelude
+        + "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
+        + "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
         + snippet
         + "```\n"
     )
+
+
+def _skip_without_family_c_sandbox() -> None:
+    if not has_lean_toolchain():
+        pytest.skip(
+            "Lean 4.35.0 (`lean` and `lake`) is absent, so the Family C sandbox path was not exercised"
+        )
+    if not linux_bwrap_functional():
+        pytest.skip(
+            "Linux bwrap is missing or non-functional, so the Family C sandbox path was not exercised"
+        )
+
+
+def _expect_family_c_marker_absent(snippet: str, *, prelude: str = "") -> None:
+    """The host marker must stay absent. A passthrough sandbox writes it and this fails."""
+    marker = Path("/tmp") / f"mcproof-sandbox-marker-{uuid.uuid4().hex}"
+    marker.unlink(missing_ok=True)
+    body = snippet.replace("MARKER", str(marker))
+    try:
+        _run_family_c_real_lean_turn(
+            _family_c_refl_harness(),
+            _family_c_with_theorems(body, prelude=prelude),
+        )
+        expect_false(
+            marker.is_file(),
+            f"candidate wrote {marker}; the sandbox did not confine the build",
+        )
+    finally:
+        marker.unlink(missing_ok=True)
+
+
+def test_family_c_attribute_init_cannot_write_a_host_marker() -> None:
+    """`attribute [init]` runs when the axiom driver imports the built module.
+
+    The pre-lake regex only matches `@[`, so it does not keep this marker absent.
+    Disabling the sandbox lets the import write the host file and this test fails.
+    """
+    _skip_without_family_c_sandbox()
+    _expect_family_c_marker_absent(
+        'def pwnInit : IO Unit := IO.FS.writeFile "MARKER" "p"\nattribute [init] pwnInit\n'
+    )
+
+
+def test_family_c_short_raw_string_cannot_write_a_host_marker() -> None:
+    """A raw string closed with fewer hashes hides `#eval` from the stripper.
+
+    Lean still runs the command. The marker stays absent only while the lake build
+    is confined. A passthrough sandbox writes it and this test fails.
+    """
+    _skip_without_family_c_sandbox()
+    _expect_family_c_marker_absent(
+        'def s := r##"foo"#\n#eval IO.FS.writeFile "MARKER" "p"\n'
+    )
+
+
+def test_family_c_lambda_and_sigma_raw_string_cannot_write_a_host_marker() -> None:
+    """`λ` and `Σ` hide a raw string from the stripper. Lean still runs the `#eval`."""
+    _skip_without_family_c_sandbox()
+    for snippet in (
+        'def s := λr"\\"\n#eval IO.FS.writeFile "MARKER" "p"\n',
+        'def s := Σr"\\"\n#eval IO.FS.writeFile "MARKER" "p"\n',
+    ):
+        _expect_family_c_marker_absent(snippet)
+
+
+def test_family_c_unclosed_char_literal_cannot_write_a_host_marker() -> None:
+    """An unclosed `'\"` hides the next `#eval`. Lean reports the error and still runs it."""
+    _skip_without_family_c_sandbox()
+    _expect_family_c_marker_absent(
+        'def c := \'"\n#eval IO.FS.writeFile "MARKER" "p"\n'
+    )
+
+
+def test_family_c_interpolation_cannot_write_a_host_marker() -> None:
+    """`s!\"{\"}\"` hides the next `#eval`. Lean still runs it during the lake build."""
+    _skip_without_family_c_sandbox()
+    _expect_family_c_marker_absent(
+        'def s := s!"{"}"\n#eval IO.FS.writeFile "MARKER" "p"\n'
+    )
+
+
+def test_family_c_run_meta_cannot_write_a_host_marker() -> None:
+    """`run_meta` runs in the first lake build, before the comparator flags it."""
+    _skip_without_family_c_sandbox()
+    _expect_family_c_marker_absent(
+        'run_meta do IO.FS.writeFile "MARKER" "p"\n',
+        prelude="import Lean\n",
+    )
+
+
+def test_family_c_elab_rules_cannot_write_a_host_marker() -> None:
+    """`elab_rules` runs in the first lake build, before the comparator flags it."""
+    _skip_without_family_c_sandbox()
+    _expect_family_c_marker_absent(
+        'syntax "pwn" : command\n'
+        "elab_rules : command\n"
+        '  | `(command| pwn) => do IO.FS.writeFile "MARKER" "p"\n'
+        "pwn\n",
+        prelude="import Lean\n",
+    )
+
+
+def test_family_c_refuses_candidate_build_when_sandbox_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A candidate build is refused when `bwrap` is unavailable. This needs neither Lean nor bwrap."""
+    monkeypatch.setattr("mcproof.repair_loop.linux_bwrap_functional", lambda **_kwargs: False)
+    monkeypatch.setattr("mcproof.lean_harness.linux_bwrap_functional", lambda **_kwargs: False)
+
+    def _refuse(cmd: object, *_args: object, **_kwargs: object) -> None:
+        raise AssertionError(f"candidate command ran without a sandbox: {cmd}")
+
+    monkeypatch.setattr(subprocess, "run", _refuse)
+    findings = _family_c_direct_lake_build(tmp_path)
+    rules = {f["rule"] for f in findings}
+    expect_eq(rules, {"SANDBOX_UNAVAILABLE"}, str(findings))
+    expect_true(any("unsandboxed" in str(f.get("message", "")) for f in findings), findings)
+
+
+def test_family_c_compilable_elab_names_are_not_commands(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`elab'`, `x.elab`, and `«elab»` compile. The bare-word ban must not reject them."""
+    called = _family_c_block_lake(monkeypatch)
+    for snippet in ("def elab' := 1\n", "def x.elab := 1\n", "def «elab» := 1\n", "def elab.foo := 1\n"):
+        called["lake"] = False
+        findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), _family_c_with_theorems(snippet))
+        rules = {f["rule"] for f in findings}
+        expect_false("FORBIDDEN_ELAB_COMMAND" in rules, f"{snippet!r}: {findings}")
+        expect_true(called["lake"], f"{snippet!r} never reached the build: {findings}")
 
 
 def test_family_c_non_ascii_and_other_decls_count_as_extra_names(

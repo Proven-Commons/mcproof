@@ -35,7 +35,10 @@ import urllib.request
 from .lean_harness import (
     BAR_FORBIDDEN_RULES,
     THEOREM_DECL_RE,
+    CandidateSandboxUnavailable,
     _lean_env,
+    linux_bwrap_functional,
+    run_confined_command,
     strip_lean_comments_and_strings,
     verify_lean4_against_challenge,
     verify_lean4_project_comparator,
@@ -905,11 +908,23 @@ def _family_c_forbidden_eval_findings(candidate_lean: str) -> list[dict[str, Any
 
 # `initialize` / `builtin_initialize` and the `@[init]` / `@[builtin_init]` attributes run IO
 # during `lake build`. `run_cmd`, `run_elab`, `run_tac`, and `elab` do too, before the
-# comparator's own lint. Word boundaries keep these off names such as `elaborate`.
+# comparator's own lint. Identifier characters include `'`, `.`, and `«»`, which are not
+# `\w`, so the boundary is explicit: `elab'`, `x.elab`, and `«elab»` stay legal names.
+_FAMILY_C_NAME_EDGE = r"\w.'»«"
 _FAMILY_C_INITIALIZER_RE = re.compile(
-    r"\b(?:builtin_initialize|initialize)\b|@\[[^\]]*?\b(?:builtin_init|init)\b"
+    rf"(?<![{_FAMILY_C_NAME_EDGE}])(?:builtin_initialize|initialize)(?![{_FAMILY_C_NAME_EDGE}])"
+    r"|@\[[^\]]*?\b(?:builtin_init|init)\b"
 )
-_FAMILY_C_ELAB_COMMAND_RE = re.compile(r"\b(?:run_cmd|run_elab|run_tac|elab)\b")
+_FAMILY_C_ELAB_COMMAND_RE = re.compile(
+    rf"\b(?:run_cmd|run_elab|run_tac)\b|(?<![{_FAMILY_C_NAME_EDGE}])elab(?![{_FAMILY_C_NAME_EDGE}])"
+)
+# These run during the build or the later import. They are recorded, and the build still
+# runs inside the sandbox. Returning here would hide a sandbox that no longer confines.
+_FAMILY_C_BUILD_SIDE_EFFECT_RE = re.compile(
+    r"(?m)^[ \t]*attribute[ \t]*\[[^\]]*\b(?:builtin_init|init)\b"
+    r"|\brun_meta\b"
+    r"|\belab_rules\b"
+)
 
 
 def _family_c_unique_matches(rx: re.Pattern[str], cleaned: str) -> list[str]:
@@ -950,6 +965,27 @@ def _family_c_elab_command_findings(candidate_lean: str) -> list[dict[str, Any]]
             "rule": "FORBIDDEN_ELAB_COMMAND",
             "message": (
                 "candidate contains a Lean elaboration command that runs during lake build: "
+                + ", ".join(found)
+                + "."
+            ),
+        }
+    ]
+
+
+def _family_c_build_side_effect_findings(candidate_lean: str) -> list[dict[str, Any]]:
+    """Record `attribute [init]`, `run_meta`, and `elab_rules` without skipping the build.
+
+    The sandbox is what stops the write. These findings stay on the result either way.
+    """
+    cleaned = strip_lean_comments_and_strings(candidate_lean)
+    found = _family_c_unique_matches(_FAMILY_C_BUILD_SIDE_EFFECT_RE, cleaned)
+    if not found:
+        return []
+    return [
+        {
+            "rule": "FORBIDDEN_BUILD_SIDE_EFFECT",
+            "message": (
+                "candidate contains a command that runs during compilation or import: "
                 + ", ".join(found)
                 + "."
             ),
@@ -1086,11 +1122,24 @@ def _family_c_lake_failure_message(stdout: str, stderr: str) -> str:
     return " | ".join(kept[-8:])
 
 
+def _family_c_sandbox_unavailable_finding() -> dict[str, Any]:
+    return {
+        "rule": "SANDBOX_UNAVAILABLE",
+        "message": (
+            "Linux bubblewrap (`bwrap`) is unavailable; "
+            "refusing to compile or import candidate Lean unsandboxed."
+        ),
+    }
+
+
 def _family_c_direct_lake_build(root: Path) -> list[dict[str, Any]]:
-    """Run `lake build` when the comparator's auditor checkout is absent.
+    """Run `lake build` on candidate text inside the bubblewrap sandbox.
 
     A missing `soko` tree must not hide a Lean error. A missing `lean`/`lake` still fails closed.
+    A missing sandbox refuses the build. There is no unsandboxed fallback.
     """
+    if not linux_bwrap_functional():
+        return [_family_c_sandbox_unavailable_finding()]
     try:
         lake_bin = find_lean_tool("lake")
         env = _lean_env()
@@ -1101,15 +1150,15 @@ def _family_c_direct_lake_build(root: Path) -> list[dict[str, Any]]:
                 "message": f"Lean toolchain unavailable; turn fails closed: {exc}",
             }
         ]
-    build_res = subprocess.run(
-        [lake_bin, "build"],
-        cwd=root,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=300,
-        check=False,
-    )
+    try:
+        build_res = run_confined_command(
+            [lake_bin, "build"],
+            cwd=root,
+            env=env,
+            timeout_sec=300,
+        )
+    except CandidateSandboxUnavailable:
+        return [_family_c_sandbox_unavailable_finding()]
     if build_res.returncode != 0:
         return [
             {
@@ -1299,11 +1348,15 @@ def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: st
         # `lake build` is the formal signal. Its message keeps `.lean:line:column` lines.
         # The comparator's own tail keeps only the last 6 lines, which can drop that error.
         # Kernel checks run only after this build succeeds.
+        findings.extend(_family_c_build_side_effect_findings(candidate_lean))
         findings.extend(_family_c_direct_lake_build(root))
-        if any(f.get("rule") in {"LAKE_BUILD_FAILED", "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE"} for f in findings):
+        if any(
+            f.get("rule") in {"LAKE_BUILD_FAILED", "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE", "SANDBOX_UNAVAILABLE"}
+            for f in findings
+        ):
             return findings
         try:
-            lean_res = verify_lean4_project_comparator(root, allow_unsandboxed=True)
+            lean_res = verify_lean4_project_comparator(root, allow_unsandboxed=False)
         except FileNotFoundError as exc:
             if _lean_exception_is_missing_toolchain(exc):
                 findings.append(

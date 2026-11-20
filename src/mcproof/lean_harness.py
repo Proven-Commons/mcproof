@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from .paths import dep_repo, elan_bin_dir, find_lean_tool, repo_root
 
@@ -59,6 +59,11 @@ BAR_FORBIDDEN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
         ),
     ),
     (
+        # `attribute [init]` is not `@[init]`. It still runs when the module is imported.
+        "FORBIDDEN_INIT_ATTRIBUTE",
+        re.compile(r"(?m)^[ \t]*attribute[ \t]*\[[^\]]*\b(?:builtin_init|init)\b"),
+    ),
+    (
         # Not only at the start of a line. A mid-line `#eval` still runs during elaboration.
         "FORBIDDEN_EVAL_COMMAND",
         re.compile(r"#(?:eval|reduce|check|print|synth)\b"),
@@ -80,46 +85,116 @@ THEOREM_DECL_RE = re.compile(
 )
 
 
+class CandidateSandboxUnavailable(RuntimeError):
+    """`bwrap` cannot confine a candidate Lean run. Callers must not fall back to the host."""
+
+
 def linux_bwrap_functional(*, timeout_sec: float = 5.0) -> bool:
-    """Return True when Linux `bwrap` runs a minimal sandbox and can create `lake comparator`'s `/run/user` session dir."""
+    """Return True when `bwrap` can start a network-unshared sandbox over a read-only root.
+
+    A writable host `/run/user` is not required. The candidate sandbox covers `/tmp`,
+    `/home`, and `/run/user` with its own `tmpfs` when those paths exist.
+    """
     if not sys.platform.startswith("linux"):
         return False
     bwrap_bin = shutil.which("bwrap")
     if not bwrap_bin:
         return False
     try:
-        basic = subprocess.run(
-            [bwrap_bin, "--ro-bind", "/", "/", "true"],
-            capture_output=True,
-            timeout=timeout_sec,
-            check=False,
-        )
-        if basic.returncode != 0:
-            return False
-        uid = os.getuid()
-        lake_compat = subprocess.run(
-            [
-                bwrap_bin,
-                "--ro-bind",
-                "/",
-                "/",
-                "--bind",
-                "/run",
-                "/run",
-                "--bind",
-                "/tmp",
-                "/tmp",
-                "sh",
-                "-c",
-                f"mkdir -p /run/user/{uid} && test -w /run/user/{uid}",
-            ],
+        probe = subprocess.run(
+            [bwrap_bin, "--ro-bind", "/", "/", "--unshare-net", "--die-with-parent", "true"],
             capture_output=True,
             timeout=timeout_sec,
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
         return False
-    return lake_compat.returncode == 0
+    return probe.returncode == 0
+
+
+def run_confined_command(
+    cmd: Sequence[str],
+    *,
+    cwd: Path,
+    env: Mapping[str, str] | None = None,
+    timeout_sec: float = 300,
+    readable_dirs: Sequence[Path] = (),
+) -> subprocess.CompletedProcess[str]:
+    """Run `cmd` in the bubblewrap sandbox Lake's comparator uses.
+
+    `/` is read-only. Home directories and `/tmp` are covered, then only `cwd` is
+    bound writable. `readable_dirs` are bound read-only afterwards so a scratch
+    under `/tmp` can still see oleans. There is no network. A missing `bwrap`
+    raises `CandidateSandboxUnavailable` and never runs `cmd` on the host.
+    """
+    if not linux_bwrap_functional():
+        raise CandidateSandboxUnavailable(
+            "Linux bubblewrap (`bwrap`) is unavailable; refusing to run candidate Lean unsandboxed."
+        )
+    bwrap_bin = shutil.which("bwrap")
+    if not bwrap_bin:
+        raise CandidateSandboxUnavailable(
+            "Linux bubblewrap (`bwrap`) is unavailable; refusing to run candidate Lean unsandboxed."
+        )
+    cwd_path = Path(cwd).resolve()
+    cwd_s = str(cwd_path)
+    base = dict(env or os.environ)
+    elan_raw = base.get("ELAN_HOME") or str(Path.home() / ".elan")
+    elan_path = str(Path(elan_raw).resolve()) if elan_raw and Path(elan_raw).is_dir() else ""
+    path = base.get("PATH") or "/usr/bin:/bin"
+    if not any(part in {"/usr/bin", "/bin"} for part in path.split(os.pathsep)):
+        path = os.pathsep.join(("/usr/bin", "/bin", path))
+    args: list[str] = [
+        bwrap_bin,
+        "--ro-bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+    ]
+    for cover in ("/home", "/root", "/tmp"):
+        if Path(cover).is_dir():
+            args.extend(("--tmpfs", cover))
+    if Path("/run/user").is_dir():
+        args.extend(("--tmpfs", "/run/user"))
+    args.extend(("--dir", "/tmp/home"))
+    if elan_path:
+        args.extend(("--ro-bind", elan_path, elan_path))
+    for extra in readable_dirs:
+        extra_path = Path(extra).resolve()
+        extra_s = str(extra_path)
+        if not extra_path.exists():
+            continue
+        if extra_s == cwd_s or extra_path.is_relative_to(cwd_path):
+            continue
+        args.extend(("--ro-bind", extra_s, extra_s))
+    args.extend(("--bind", cwd_s, cwd_s, "--clearenv", "--setenv", "HOME", "/tmp/home", "--setenv", "PATH", path, "--setenv", "TMPDIR", "/tmp"))
+    if elan_path:
+        args.extend(("--setenv", "ELAN_HOME", elan_path))
+    if base.get("LEAN_PATH"):
+        args.extend(("--setenv", "LEAN_PATH", base["LEAN_PATH"]))
+    for key in ("LANG", "LC_ALL"):
+        if base.get(key):
+            args.extend(("--setenv", key, base[key]))
+    args.extend(
+        (
+            "--unshare-all",
+            "--die-with-parent",
+            "--chdir",
+            cwd_s,
+            "--",
+            *cmd,
+        )
+    )
+    return subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        timeout=timeout_sec,
+        check=False,
+    )
 
 
 AXIOM_AUDIT_TEMPLATE = """import Lean
@@ -1557,16 +1632,47 @@ def verify_lean4_project_comparator(
     # Scrub challenge `.olean`/`.ir` before `lake build` so `Spec` always compiles fresh from disk
     scrub_challenge_artifacts(proj, challenge_mod)
 
-    # Run `lake build`
-    build_res = subprocess.run(
-        [lake_bin, "build"],
-        cwd=proj,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=timeout_sec,
-        check=False,
-    )
+    def refuse_sandbox(message: str) -> LeanVerificationResult:
+        findings.append({
+            "line": 1,
+            "rule": "SANDBOX_UNAVAILABLE",
+            "message": message,
+        })
+        return LeanVerificationResult(
+            passed=False,
+            toolchain=toolchain,
+            theorems_checked=theorem_names,
+            axioms_used=(),
+            nonstandard_axioms=(),
+            sorry_declarations=(),
+            paranoid_kernels_run=(),
+            sandboxed=False,
+            findings=tuple(findings),
+            caveats=tuple(caveats),
+            challenge_sorry_whitelisted_module=challenge_mod or None,
+        )
+
+    # Run `lake build`. Candidate text is compiled here, so a missing sandbox refuses.
+    try:
+        if bwrap_available:
+            build_res = run_confined_command(
+                [lake_bin, "build"],
+                cwd=proj,
+                env=env,
+                timeout_sec=timeout_sec,
+            )
+        else:
+            build_res = subprocess.run(
+                [lake_bin, "build"],
+                cwd=proj,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=timeout_sec,
+                check=False,
+            )
+    except CandidateSandboxUnavailable as exc:
+        return refuse_sandbox(str(exc))
     if build_res.returncode != 0:
         tail = " | ".join(line.strip() for line in ((build_res.stdout or "") + "\n" + (build_res.stderr or "")).splitlines()[-6:] if line.strip())
         findings.append({
@@ -1605,15 +1711,29 @@ def verify_lean4_project_comparator(
         if lib_olean_dir.is_dir():
             lean_path_parts.append(str(lib_olean_dir))
         ax_env["LEAN_PATH"] = os.pathsep.join(lean_path_parts)
-        ax_run = subprocess.run(
-            [lean_bin, str(audit_driver)],
-            cwd=ax_tmp,
-            env=ax_env,
-            capture_output=True,
-            text=True,
-            timeout=timeout_sec,
-            check=False,
-        )
+        # Import runs `initialize` / `attribute [init]`. The project is readable;
+        # only the driver directory is writable, and it is not a trusted output.
+        try:
+            if bwrap_available:
+                ax_run = run_confined_command(
+                    [lean_bin, str(audit_driver)],
+                    cwd=ax_tmp,
+                    env=ax_env,
+                    timeout_sec=timeout_sec,
+                    readable_dirs=(proj,),
+                )
+            else:
+                ax_run = subprocess.run(
+                    [lean_bin, str(audit_driver)],
+                    cwd=ax_tmp,
+                    env=ax_env,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_sec,
+                    check=False,
+                )
+        except CandidateSandboxUnavailable as exc:
+            return refuse_sandbox(str(exc))
         if ax_run.returncode != 0:
             tail = " | ".join(line.strip() for line in ((ax_run.stdout or "") + "\n" + (ax_run.stderr or "")).splitlines()[-4:] if line.strip())
             findings.append({
