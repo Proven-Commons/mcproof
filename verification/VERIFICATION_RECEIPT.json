@@ -594,7 +594,7 @@
     "datasets_sha256sums_manifest_sha256": "312953bc99bb42e6cbef1d1a3c240975f2baf3c60506df6c9eef06a678d45d56",
     "lean_toolchain": "leanprover/lean4:v4.35.0",
     "llama_server_version": "0.5.0 (build 11146, commit 7fe450e19)",
-    "p2b_artifact_commit": "f4c74a1e609c9d197b813a7141344c6e2cd72b08",
+    "p2b_artifact_commit": "6c40a4c3dea2380101dd1392ec6a344b1ff96dee",
     "p2b_artifact_commit_verified_in_odb": true,
     "p2b_f16_gguf_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
     "plane1_formal_spec_cl100k_tokens": 30873,
