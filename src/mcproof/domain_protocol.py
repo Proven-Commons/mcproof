@@ -51,6 +51,9 @@ NON_VERIFIED_SUBTIERS: frozenset[str] = frozenset(
         "UNVERIFIED_CALLER_BOUNDS",
     }
 )
+RECOGNIZED_CERT_STATUSES: frozenset[str] = NON_VERIFIED_SUBTIERS | frozenset(
+    {"VERIFIED", "PROVEN", "REJECTED"}
+)
 
 ALLOWLISTED_SANDBOX_MODULES: frozenset[str] = frozenset(
     {
@@ -643,6 +646,22 @@ def audit_transition_certificate(
     findings: list[dict[str, str]] = []
     status = str(cert.get("epistemic_status", "")).strip().upper()
     proof_mode = str(cert.get("proof_mode", "")).strip().lower()
+
+    # An omitted or invented status has no checks to fail, so it must not pass.
+    if not status:
+        findings.append(
+            {
+                "rule": "CERT_STATUS_ABSENT",
+                "message": "Certificate omits epistemic_status.",
+            }
+        )
+    elif status not in RECOGNIZED_CERT_STATUSES:
+        findings.append(
+            {
+                "rule": "CERT_STATUS_UNKNOWN",
+                "message": f"epistemic_status {status!r} is not a recognized certificate status.",
+            }
+        )
     prior_status = str(cert.get("prior_status", "")).strip().upper()
     evidence_kind = str(cert.get("evidence_kind", "")).strip().lower()
 
@@ -861,9 +880,16 @@ def audit_transition_certificate(
             )
 
     passed = len(findings) == 0
+    # Do not relabel a lower bound, a conjecture, or a rejection as VERIFIED.
+    if not passed:
+        out_status = "REJECTED"
+    elif status in ("VERIFIED", "PROVEN"):
+        out_status = "VERIFIED"
+    else:
+        out_status = status
     return {
         "passed": passed,
-        "epistemic_status": "VERIFIED" if passed else "REJECTED",
+        "epistemic_status": out_status,
         "finding_count": len(findings),
         "findings": findings,
     }
