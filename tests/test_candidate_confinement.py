@@ -349,23 +349,37 @@ def _write_toml_project(root: Path, proofs: str) -> None:
     )
 
 
-def test_planted_lakefile_is_not_elaborated(tmp_path: Path) -> None:
-    """Lake prefers lakefile.lean. Leaving it in place elaborates the hidden #eval."""
+def test_planted_lakefile_is_not_elaborated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Lake prefers lakefile.lean. Copying it into the trusted tree elaborates the plant."""
     _skip_without_confinement()
     _skip_without_soko()
+    import mcproof.lean_harness as harness
+
     root = tmp_path / "proj"
     _write_toml_project(root, _ORIGINAL_PROOFS)
     marker = root / "plant-marker.txt"
     (root / "lakefile.lean").write_text(
-        "def s := r##\"foo\"#\n"
-        "#eval do\n"
-        f"  IO.FS.writeFile {json.dumps(str(marker))} \"ELABORATED\"\n"
-        f"  IO.FS.writeFile {json.dumps(str(root / 'Probe' / 'Proofs.lean'))} \"ELABORATED\\n\"\n",
+        "import Lean\n"
+        "elab \"pwnPlant\" : command => do\n"
+        "  let _ ← IO.FS.writeFile \"plant-marker.txt\" \"ELABORATED\"\n"
+        "pwnPlant\n",
         encoding="utf-8",
     )
+    real = harness.run_confined_command
+    elaborated: list[str] = []
+
+    def _wrap(argv, *args, **kwargs):
+        res = real(argv, *args, **kwargs)
+        if any(str(part) == "build" for part in argv):
+            cwd = Path(kwargs.get("cwd") or ".")
+            if (cwd / "lakefile.lean").exists() or (cwd / "plant-marker.txt").is_file():
+                elaborated.append(str(cwd))
+        return res
+
+    monkeypatch.setattr(harness, "run_confined_command", _wrap)
     verify_lean4_project_comparator(root, allow_unsandboxed=False)
-    expect_false(marker.is_file(), "the planted lakefile was elaborated")
-    expect_false((root / "lakefile.lean").exists(), "the planted lakefile was kept")
+    expect_false(marker.is_file(), "the planted lakefile was elaborated on the caller tree")
+    expect_true(elaborated == [], elaborated)
     expect_true(
         (root / "Probe" / "Proofs.lean").read_text(encoding="utf-8") == _ORIGINAL_PROOFS,
         (root / "Probe" / "Proofs.lean").read_text(encoding="utf-8"),
@@ -380,7 +394,20 @@ def test_comparator_cannot_see_the_host(monkeypatch: pytest.MonkeyPatch, tmp_pat
     root = tmp_path / "proj"
     (root / "Probe").mkdir(parents=True)
     (root / "lean-toolchain").write_text("leanprover/lean4:v4.35.0\n", encoding="utf-8")
-    (root / "Probe.lean").write_text("theorem probeRoot : True := trivial\n", encoding="utf-8")
+    (root / "lakefile.toml").write_text(
+        'name = "probe"\nversion = "0.1.0"\n'
+        'defaultTargets = ["Probe", "Probe.Proofs"]\n\n'
+        '[[lean_lib]]\nname = "Probe"\n\n[[lean_lib]]\nname = "Probe.Proofs"\n',
+        encoding="utf-8",
+    )
+    (root / "Probe.lean").write_text(
+        "import Lean\n"
+        "elab \"pwnProbe\" : command => do\n"
+        "  let _ ← IO.Process.output { cmd := \"python3\", args := #[\"probe.py\"] }\n"
+        "pwnProbe\n"
+        "theorem probeRoot : True := trivial\n",
+        encoding="utf-8",
+    )
     (root / "Probe" / "Proofs.lean").write_text(_ORIGINAL_PROOFS, encoding="utf-8")
     (root / "comparator.json").write_text(
         '{"challenge_module":"Probe","solution_module":"Probe.Proofs",'
@@ -417,8 +444,11 @@ def test_comparator_cannot_see_the_host(monkeypatch: pytest.MonkeyPatch, tmp_pat
         "from pathlib import Path\n"
         "phase = Path('probe-phase.txt')\n"
         "tag = 'comparator' if phase.is_file() else 'build'\n"
-        "if not phase.is_file():\n"
-        "    phase.write_text('done\\n')\n"
+        "try:\n"
+        "    if not phase.is_file():\n"
+        "        phase.write_text('done\\n')\n"
+        "except OSError:\n"
+        "    pass\n"
         "git = Path('/agent/repos/mcproof/.git/config')\n"
         "sock = '0'\n"
         "try:\n"
@@ -453,17 +483,23 @@ def test_comparator_cannot_see_the_host(monkeypatch: pytest.MonkeyPatch, tmp_pat
         "        pass\n",
         encoding="utf-8",
     )
-    (root / "lakefile.lean").write_text(
-        "import Lake\nopen Lake DSL\n\n"
-        "run_cmd IO.Process.output { cmd := \"python3\", args := #[\"probe.py\"] }\n\n"
-        "package «probe»\n\n@[default_target]\nlean_lib «Probe»\nlean_lib «Probe.Proofs»\n",
-        encoding="utf-8",
-    )
+    import mcproof.lean_harness as harness
+
+    real = harness.run_confined_command
+    reports: list[str] = []
+
+    def _wrap(argv, *args, **kwargs):
+        res = real(argv, *args, **kwargs)
+        if any(str(part) == "comparator" for part in argv):
+            report_path = Path(kwargs.get("cwd") or ".") / ".lake" / "probe-report.txt"
+            reports.append(report_path.read_text(encoding="utf-8") if report_path.is_file() else "")
+        return res
+
+    monkeypatch.setattr(harness, "run_confined_command", _wrap)
     try:
         verify_lean4_project_comparator(root, allow_unsandboxed=False)
-        report_path = root / ".lake" / "probe-report.txt"
-        report = report_path.read_text(encoding="utf-8") if report_path.is_file() else ""
-        expect_true(report.startswith("comparator "), report)
+        report = reports[-1] if reports else ""
+        expect_true(bool(reports), "the comparator command did not run")
         expect_true("GIT=0" in report and "SOCK=0" in report and "TCP=0" in report, report)
         expect_true("SENTINEL=0" in report and "leakme-parent-env" not in report, report)
         expect_true(hits == [], hits)
@@ -524,3 +560,308 @@ def test_confined_compile_error_reports_sandboxed() -> None:
     )
     expect_in("LEAN_COMPILE_ERROR", {f["rule"] for f in res.findings})
     expect_true(res.sandboxed is True, res)
+
+
+class _Failed:
+    returncode = 1
+    stdout = ""
+    stderr = "failed"
+
+
+def _fingerprint(root: Path) -> tuple:
+    rows = []
+    for path in sorted(root.rglob("*")):
+        rel = path.relative_to(root).as_posix()
+        if path.is_symlink():
+            rows.append((rel, "symlink", str(path.readlink())))
+        elif path.is_dir():
+            rows.append((rel, "dir", ""))
+        else:
+            rows.append((rel, "file", path.read_bytes()))
+    return tuple(rows)
+
+
+def _make_victim(path: Path) -> None:
+    path.mkdir()
+    (path / "file.txt").write_text("SENTINEL_FILE\n", encoding="utf-8")
+    (path / "dir.d").mkdir()
+    (path / "dir.d" / "secret").write_text("KEEP\n", encoding="utf-8")
+    (path / "CANARY").write_text("CANARY\n", encoding="utf-8")
+
+
+def _plant_restore_targets(root: Path) -> None:
+    """Files a restore would copy. `dir.d` is a file here and a directory in the victim."""
+    for name in ("Probe", "CrtPair", "notes"):
+        directory = root / name
+        directory.mkdir(exist_ok=True)
+        (directory / "file.txt").write_text(f"project-{name}-file\n", encoding="utf-8")
+        (directory / "dir.d").write_text(f"project-{name}-dir\n", encoding="utf-8")
+
+
+def _swap_parents(root: Path, victims: dict[str, Path]) -> None:
+    for name, victim in victims.items():
+        dest = root / name
+        if dest.is_symlink():
+            continue
+        if dest.is_dir():
+            shutil.rmtree(dest)
+        elif dest.exists():
+            dest.unlink()
+        dest.symlink_to(victim, target_is_directory=True)
+
+
+def _assert_victims_unchanged(victims: dict[str, Path], before: dict[str, tuple]) -> None:
+    for name, victim in victims.items():
+        expect_true(_fingerprint(victim) == before[name], name)
+        expect_true((victim / "file.txt").read_text(encoding="utf-8") == "SENTINEL_FILE\n", name)
+        expect_true((victim / "dir.d" / "secret").read_text(encoding="utf-8") == "KEEP\n", name)
+        expect_true((victim / "CANARY").read_text(encoding="utf-8") == "CANARY\n", name)
+        expect_true(victim.is_dir() and not victim.is_symlink(), name)
+
+
+def test_verify_parent_symlink_restore_does_not_touch_the_host(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A build that swaps Probe, CrtPair, or notes must not make the restore write the host."""
+    _skip_without_confinement()
+    _skip_without_soko()
+    import mcproof.lean_harness as harness
+
+    root = tmp_path / "proj"
+    _write_toml_project(root, _ORIGINAL_PROOFS)
+    _plant_restore_targets(root)
+    victims = {name: tmp_path / f"victim-{name}" for name in ("Probe", "CrtPair", "notes")}
+    for victim in victims.values():
+        _make_victim(victim)
+    before = {name: _fingerprint(path) for name, path in victims.items()}
+    called = {"build": False}
+
+    def _fake(argv, *args, **kwargs):
+        if any(str(part) == "build" for part in argv):
+            called["build"] = True
+            _swap_parents(root, victims)
+            return _Failed()
+        raise AssertionError(f"unexpected command: {argv}")
+
+    monkeypatch.setattr(harness, "run_confined_command", _fake)
+    verify_lean4_project_comparator(root, allow_unsandboxed=False)
+    expect_true(called["build"], "the build never ran, so the symlink swap was not tested")
+    _assert_victims_unchanged(victims, before)
+
+
+def test_family_c_parent_symlink_restore_does_not_touch_the_host(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Family C's failure path must not write the host through a swapped parent directory."""
+    _skip_without_confinement()
+    import mcproof.lean_harness as harness
+    import mcproof.repair_loop as repair
+
+    victims = {name: tmp_path / f"victim-{name}" for name in ("Probe", "CrtPair", "notes")}
+    for victim in victims.values():
+        _make_victim(victim)
+    before = {name: _fingerprint(path) for name, path in victims.items()}
+    called = {"build": False}
+
+    def _read(proj: Path):
+        _plant_restore_targets(Path(proj))
+        return harness._read_project_tree(proj)
+
+    def _fake(argv, *args, **kwargs):
+        if any(str(part) == "build" for part in argv):
+            called["build"] = True
+            _swap_parents(Path(kwargs["cwd"]), victims)
+            return _Failed()
+        raise AssertionError(f"unexpected command: {argv}")
+
+    monkeypatch.setattr(repair, "_read_project_tree", _read)
+    monkeypatch.setattr(repair, "run_confined_command", _fake)
+    findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), _family_c_with_theorems(""))
+    expect_true(called["build"], f"the build never ran: {findings}")
+    expect_in("LAKE_BUILD_FAILED", {f["rule"] for f in findings})
+    _assert_victims_unchanged(victims, before)
+
+
+def test_lake_symlink_is_a_finding(tmp_path: Path) -> None:
+    """`.lake` as a symlink is a finding. Following it, or rmtree on it, touches the target."""
+    root = tmp_path / "proj"
+    _write_toml_project(root, _ORIGINAL_PROOFS)
+    precious = tmp_path / "precious"
+    precious.mkdir()
+    (precious / "KEEP").write_text("KEEP\n", encoding="utf-8")
+    lake = root / ".lake"
+    lake.symlink_to(precious, target_is_directory=True)
+    res = verify_lean4_project_comparator(root, allow_unsandboxed=True)
+    expect_in("LAKE_CACHE_SYMLINK", {f["rule"] for f in res.findings})
+    expect_true((precious / "KEEP").read_text(encoding="utf-8") == "KEEP\n")
+    expect_true(lake.is_symlink())
+
+
+def test_family_c_lake_symlink_is_a_finding(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The Family C build must not raise, follow, or delete through a `.lake` symlink."""
+    import mcproof.repair_loop as repair
+
+    precious = tmp_path / "precious"
+    precious.mkdir()
+    (precious / "KEEP").write_text("KEEP\n", encoding="utf-8")
+
+    def _wrap(root: Path):
+        lake = Path(root) / ".lake"
+        if lake.is_symlink():
+            lake.unlink()
+        elif lake.is_dir():
+            shutil.rmtree(lake)
+        elif lake.exists():
+            lake.unlink()
+        lake.symlink_to(precious, target_is_directory=True)
+        return repair_build(root)
+
+    repair_build = repair._family_c_direct_lake_build
+    monkeypatch.setattr(repair, "_family_c_direct_lake_build", _wrap)
+    findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), _family_c_with_theorems(""))
+    expect_in("LAKE_CACHE_SYMLINK", {f["rule"] for f in findings})
+    expect_true((precious / "KEEP").read_text(encoding="utf-8") == "KEEP\n", findings)
+    expect_true((Path(precious)).is_dir(), findings)
+
+
+def test_build_created_manifest_does_not_reach_the_comparator(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A manifest written by the build must not be the one `lake comparator` reads."""
+    _skip_without_confinement()
+    _skip_without_soko()
+    import mcproof.lean_harness as harness
+
+    root = tmp_path / "proj"
+    _write_toml_project(root, _ORIGINAL_PROOFS)
+    real = harness.run_confined_command
+    build_cwds: list[Path] = []
+    seen: list[str] = []
+
+    def _wrap(argv, *args, **kwargs):
+        res = real(argv, *args, **kwargs)
+        cwd = Path(kwargs.get("cwd") or ".").resolve()
+        if any(str(part) == "build" for part in argv):
+            (cwd / "lake-manifest.json").write_text('{"evil-path-dep": true}\n', encoding="utf-8")
+            build_cwds.append(cwd)
+        if any(str(part) == "comparator" for part in argv):
+            manifest = cwd / "lake-manifest.json"
+            seen.append(manifest.read_text(encoding="utf-8") if manifest.is_file() else "")
+            expect_false(cwd in build_cwds, f"comparator reused the build directory {cwd}")
+        return res
+
+    monkeypatch.setattr(harness, "run_confined_command", _wrap)
+    verify_lean4_project_comparator(root, allow_unsandboxed=False)
+    expect_true(bool(seen), "the comparator did not run")
+    expect_true(all("evil-path-dep" not in text for text in seen), seen)
+
+
+def test_family_c_build_created_manifest_does_not_reach_the_comparator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Family C's comparator copy is the pre-build tree, not the tree the build rewrote."""
+    _skip_without_confinement()
+    _skip_without_soko()
+    import mcproof.lean_harness as harness
+    import mcproof.repair_loop as repair
+
+    real = harness.run_confined_command
+    build_cwds: list[Path] = []
+    seen: list[str] = []
+
+    def _wrap(argv, *args, **kwargs):
+        res = real(argv, *args, **kwargs)
+        cwd = Path(kwargs.get("cwd") or ".").resolve()
+        if any(str(part) == "build" for part in argv):
+            (cwd / "lake-manifest.json").write_text('{"evil-path-dep": true}\n', encoding="utf-8")
+            build_cwds.append(cwd)
+        if any(str(part) == "comparator" for part in argv):
+            manifest = cwd / "lake-manifest.json"
+            seen.append(manifest.read_text(encoding="utf-8") if manifest.is_file() else "")
+            expect_false(cwd in build_cwds, f"comparator reused the build directory {cwd}")
+        return res
+
+    real_verify = repair.verify_lean4_project_comparator
+    entered: list[str] = []
+
+    def _verify(project_dir, *args, **kwargs):
+        manifest = Path(project_dir) / "lake-manifest.json"
+        entered.append(manifest.read_text(encoding="utf-8") if manifest.is_file() else "")
+        return real_verify(project_dir, *args, **kwargs)
+
+    monkeypatch.setattr(harness, "run_confined_command", _wrap)
+    monkeypatch.setattr(repair, "run_confined_command", _wrap)
+    monkeypatch.setattr(repair, "verify_lean4_project_comparator", _verify)
+    _run_family_c_real_lean_turn(_family_c_refl_harness(), _family_c_with_theorems(""))
+    expect_true(bool(seen), "the comparator did not run")
+    expect_true(all("evil-path-dep" not in text for text in seen), seen)
+    expect_true(bool(entered), "verify was not given a trusted tree")
+    expect_true(all("evil-path-dep" not in text for text in entered), entered)
+
+
+def test_allow_unsandboxed_does_not_run_lake_on_the_host(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A failed bwrap probe refuses the build. The flag must not run lake on the host."""
+    _skip_without_soko()
+    import mcproof.lean_harness as harness
+
+    monkeypatch.setattr(harness, "linux_bwrap_functional", lambda **_kwargs: False)
+    real_run = harness.subprocess.run
+
+    def _host(argv, *args, **kwargs):
+        if any(part in {"lake", "lean"} or str(part).endswith(("/lake", "/lean")) for part in argv):
+            raise AssertionError(f"candidate command ran on the host: {argv}")
+        return real_run(argv, *args, **kwargs)
+
+    def _confined(argv, *args, **kwargs):
+        raise AssertionError(f"candidate command ran without a working sandbox: {argv}")
+
+    monkeypatch.setattr(harness.subprocess, "run", _host)
+    monkeypatch.setattr(harness, "run_confined_command", _confined)
+    root = tmp_path / "proj"
+    _write_toml_project(root, _ORIGINAL_PROOFS)
+    res = verify_lean4_project_comparator(root, allow_unsandboxed=True)
+    expect_false(res.passed)
+    expect_in("SANDBOX_UNAVAILABLE", {f["rule"] for f in res.findings})
+
+
+def test_run_cmd_and_hidden_eval_never_reach_lake(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """`run_cmd` and a `#eval` after a short raw-string closer never reach lake."""
+    import mcproof.lean_harness as harness
+    import mcproof.repair_loop as repair
+
+    real_run = harness.subprocess.run
+
+    def _boom(argv, *args, **kwargs):
+        parts = [str(part) for part in argv]
+        if any(part == "lake" or part.endswith("/lake") or part == "lean" or part.endswith("/lean") for part in parts):
+            raise AssertionError(f"lake ran: {argv}")
+        if any(part in {"build", "comparator", "update"} for part in parts):
+            raise AssertionError(f"lake ran: {argv}")
+        return real_run(argv, *args, **kwargs)
+
+    monkeypatch.setattr(harness, "run_confined_command", _boom)
+    monkeypatch.setattr(harness.subprocess, "run", _boom)
+    monkeypatch.setattr(repair, "run_confined_command", _boom)
+    hidden = 'def s := r##"foo"#\n#eval IO.FS.writeFile "/tmp/mcproof-should-not-run" "p"\n'
+    run_cmd = "run_cmd do pure ()\n"
+    for proofs in (_ORIGINAL_PROOFS + hidden, _ORIGINAL_PROOFS + run_cmd):
+        root = tmp_path / uuid.uuid4().hex
+        _write_toml_project(root, proofs)
+        res = verify_lean4_project_comparator(root, allow_unsandboxed=True)
+        rules = {f["rule"] for f in res.findings}
+        expect_true(
+            "FORBIDDEN_EVAL_COMMAND" in rules or "METAPROGRAM_ESCAPE" in rules,
+            res.findings,
+        )
+    for snippet in (hidden, run_cmd):
+        findings = _run_family_c_real_lean_turn(
+            _family_c_refl_harness(),
+            _family_c_with_theorems(snippet),
+        )
+        rules = {f["rule"] for f in findings}
+        expect_true(
+            "FORBIDDEN_EVAL_COMMAND" in rules or "FORBIDDEN_ELAB_COMMAND" in rules,
+            findings,
+        )

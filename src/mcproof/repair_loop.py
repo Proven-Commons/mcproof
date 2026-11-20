@@ -36,9 +36,13 @@ from .lean_harness import (
     BAR_FORBIDDEN_RULES,
     THEOREM_DECL_RE,
     CandidateSandboxUnavailable,
+    UntrustedProjectPath,
+    _lake_symlink_finding,
+    _lean_commands_that_may_run,
     _lean_env,
-    _restore_project_files,
-    _snapshot_project_files,
+    _materialize_trusted_tree,
+    _read_project_tree,
+    _trusted_inputs,
     linux_bwrap_functional,
     run_confined_command,
     strip_lean_comments_and_strings,
@@ -975,15 +979,6 @@ def _family_c_elab_command_findings(candidate_lean: str) -> list[dict[str, Any]]
     ]
 
 
-def _restore_trusted_text(path: Path, text: str) -> None:
-    """Write `text` back, including when the candidate replaced `path` with a symlink."""
-    if path.is_symlink() or path.is_file():
-        path.unlink()
-    elif path.is_dir():
-        shutil.rmtree(path)
-    path.write_text(text, encoding="utf-8")
-
-
 def _family_c_build_side_effect_findings(candidate_lean: str) -> list[dict[str, Any]]:
     """Record `attribute [init]`, `run_meta`, and `elab_rules` without skipping the build.
 
@@ -1150,6 +1145,9 @@ def _family_c_direct_lake_build(root: Path) -> list[dict[str, Any]]:
     A missing `soko` tree must not hide a Lean error. A missing `lean`/`lake` still fails closed.
     A missing sandbox refuses the build. There is no unsandboxed fallback.
     """
+    lake_hit = _lake_symlink_finding(root)
+    if lake_hit is not None:
+        return [lake_hit]
     if not linux_bwrap_functional():
         return [_family_c_sandbox_unavailable_finding()]
     try:
@@ -1243,6 +1241,19 @@ def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: st
     findings.extend(_family_c_forbidden_eval_findings(candidate_lean))
     findings.extend(_family_c_initializer_findings(candidate_lean))
     findings.extend(_family_c_elab_command_findings(candidate_lean))
+    for cmd in _lean_commands_that_may_run(candidate_lean):
+        if any(cmd in str(item.get("message", "")) for item in findings):
+            continue
+        if cmd.startswith("#"):
+            findings.append({
+                "rule": "FORBIDDEN_EVAL_COMMAND",
+                "message": "candidate contains a Lean command that runs during elaboration: " + cmd + ".",
+            })
+        else:
+            findings.append({
+                "rule": "FORBIDDEN_ELAB_COMMAND",
+                "message": "candidate contains a Lean elaboration command that runs during lake build: " + cmd + ".",
+            })
     findings.extend(_check_family_c_statement_match(meta, thms, candidate_lean))
     if findings:
         return findings
@@ -1359,24 +1370,53 @@ def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: st
                         findings.append({"rule": "BAR_CHECK_ITEM_FAIL", "message": f"bar item {req_i} did not pass"})
         # `lake build` is the formal signal. Its message keeps `.lean:line:column` lines.
         # The comparator's own tail keeps only the last 6 lines, which can drop that error.
-        # Kernel checks run only after this build succeeds.
-        trusted_inputs = _snapshot_project_files(root)
+        # Kernel checks run only after this build succeeds, and they run on a fresh
+        # copy of the files taken before the build. The candidate tree is not written again.
+        lake_hit = _lake_symlink_finding(root)
+        if lake_hit is not None:
+            findings.append(lake_hit)
+            return findings
+        try:
+            trusted_inputs = _trusted_inputs(_read_project_tree(root))
+        except UntrustedProjectPath as exc:
+            findings.append({"rule": exc.rule, "message": str(exc)})
+            return findings
         findings.extend(_family_c_build_side_effect_findings(candidate_lean))
         findings.extend(_family_c_direct_lake_build(root))
-        # The build can plant lakefile.lean and rewrite Proofs.lean. Put the
-        # trusted copies back, and drop the cache, before any later lake command.
-        _restore_project_files(root, trusted_inputs)
-        _restore_trusted_text(proofs_path, proofs_text)
-        _restore_trusted_text(comparator_path, comparator_text)
         if any(
-            f.get("rule") in {"LAKE_BUILD_FAILED", "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE", "SANDBOX_UNAVAILABLE"}
+            f.get("rule")
+            in {
+                "LAKE_BUILD_FAILED",
+                "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE",
+                "SANDBOX_UNAVAILABLE",
+                "LAKE_CACHE_SYMLINK",
+                "UNTRUSTED_PROJECT_SYMLINK",
+                "UNTRUSTED_PROJECT_FILE",
+            }
             for f in findings
         ):
             return findings
+        fresh = _materialize_trusted_tree(trusted_inputs)
         try:
-            lean_res = verify_lean4_project_comparator(root, allow_unsandboxed=False)
-        except FileNotFoundError as exc:
-            if _lean_exception_is_missing_toolchain(exc):
+            try:
+                lean_res = verify_lean4_project_comparator(fresh, allow_unsandboxed=False)
+            except FileNotFoundError as exc:
+                if _lean_exception_is_missing_toolchain(exc):
+                    findings.append(
+                        {
+                            "rule": "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE",
+                            "message": f"Lean toolchain unavailable; turn fails closed: {exc}",
+                        }
+                    )
+                    return findings
+                findings.append(
+                    {
+                        "rule": "FAMILY_C_LEAN_AUDIT_DEPS_UNAVAILABLE",
+                        "message": f"lake build passed, but the comparator auditor checkout is missing: {exc}",
+                    }
+                )
+                return findings
+            except (OSError, RuntimeError) as exc:
                 findings.append(
                     {
                         "rule": "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE",
@@ -1384,23 +1424,10 @@ def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: st
                     }
                 )
                 return findings
-            findings.append(
-                {
-                    "rule": "FAMILY_C_LEAN_AUDIT_DEPS_UNAVAILABLE",
-                    "message": f"lake build passed, but the comparator auditor checkout is missing: {exc}",
-                }
-            )
-            return findings
-        except (OSError, RuntimeError) as exc:
-            findings.append(
-                {
-                    "rule": "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE",
-                    "message": f"Lean toolchain unavailable; turn fails closed: {exc}",
-                }
-            )
-            return findings
-        for finding in lean_res.findings:
-            findings.append(dict(finding))
+            for finding in lean_res.findings:
+                findings.append(dict(finding))
+        finally:
+            shutil.rmtree(fresh, ignore_errors=True)
     return findings
 
 

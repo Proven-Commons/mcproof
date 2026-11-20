@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -1777,64 +1778,392 @@ def verify_lean4_source(
     )
 
 
-def finding_blocks_comparator(finding: Mapping[str, Any]) -> bool:
-    """An `#eval` or `run_meta` finding means the comparator must not run.
+class UntrustedProjectPath(Exception):
+    """A copied path is a symlink or a special file. The trusted copy refuses it."""
 
-    Those commands plant files during the build. The comparator elaborates
-    `lakefile.lean`, so it must not start once one of them has been seen.
+    def __init__(self, message: str, *, rule: str = "UNTRUSTED_PROJECT_SYMLINK") -> None:
+        super().__init__(message)
+        self.rule = rule
+
+
+def finding_blocks_comparator(finding: Mapping[str, Any]) -> bool:
+    """An elaboration command means the comparator must not run.
+
+    `#eval`, `run_cmd`, and `run_meta` plant files during the build. The
+    comparator elaborates the project, so it must not start once one of them
+    has been seen. `elab_rules` stays out of this set: the confined build is
+    what contains it.
     """
     rule = str(finding.get("rule", ""))
     message = str(finding.get("message", ""))
-    if rule == "FORBIDDEN_EVAL_COMMAND":
+    if rule in {"FORBIDDEN_EVAL_COMMAND", "FORBIDDEN_ELAB_COMMAND"}:
         return True
-    return rule in {"METAPROGRAM_ESCAPE", "FORBIDDEN_BUILD_SIDE_EFFECT"} and "run_meta" in message
+    tokens = ("run_meta", "run_cmd", "run_elab", "run_tac", "#eval", "#reduce", "#check", "#print", "#synth")
+    return rule in {"METAPROGRAM_ESCAPE", "FORBIDDEN_BUILD_SIDE_EFFECT"} and any(token in message for token in tokens)
 
 
-def _snapshot_project_files(proj: Path) -> dict[str, bytes]:
-    """In-memory copies of the project files a later build is allowed to read."""
-    snap: dict[str, bytes] = {}
-    toml_present = (proj / "lakefile.toml").is_file()
-    for path in sorted(proj.rglob("*")):
-        if any(part in {".lake", ".git"} for part in path.parts):
-            continue
-        if not (path.is_symlink() or path.is_file()):
-            continue
-        # Lake elaborates lakefile.lean in preference to lakefile.toml. The lean
-        # file beside a toml is the candidate's plant, not a trusted input.
-        if toml_present and path.name.startswith("lakefile.") and path.name != "lakefile.toml":
-            continue
-        snap[path.relative_to(proj).as_posix()] = path.read_bytes()
-    return snap
+_LAKE_COMMAND_RE = re.compile(
+    r"(?<![\w.'»«])(?:#(?:eval|reduce|check|print|synth)|run_cmd|run_elab|run_tac)(?![\w.'»«])"
+)
 
 
-def _restore_project_files(proj: Path, snap: dict[str, bytes], *, clear_cache: bool = True) -> None:
-    """Put the snapshot back and drop a candidate lakefile.
+def _raw_string_resume(src: str, i: int) -> tuple[int, int | None]:
+    """End of a terminated raw string, or where a short closer resumes code.
 
-    `.lake` is cleared before the next Lake command so that command elaborates
-    the configuration again. The last restore leaves the cache: the comparator
-    has already run, and its writable directory holds nothing we trust.
+    Zero hashes close at the next `"`. A positive hash count closes only at `"`
+    plus that many hashes. A `"` with fewer hashes is the error Lean recovers
+    from by elaborating the following command, which the comment stripper still
+    hides when the closer is short.
     """
-    for path in list(proj.iterdir()):
-        # A lakefile.lean beside lakefile.toml is the candidate's plant. A manifest
-        # the trusted build just wrote is not: `lake comparator` needs that file,
-        # and one that was in the snapshot is written back below.
-        if path.name.startswith("lakefile.") and path.name not in snap:
-            if path.is_symlink() or path.is_file():
-                path.unlink()
-            elif path.is_dir():
-                shutil.rmtree(path)
-    for rel, data in snap.items():
-        dest = proj / rel
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        if dest.is_symlink() or dest.is_file():
-            dest.unlink()
-        elif dest.is_dir():
-            shutil.rmtree(dest)
-        dest.write_bytes(data)
-    if clear_cache:
-        lake = proj / ".lake"
-        if lake.exists():
-            shutil.rmtree(lake)
+    n = len(src)
+    j = i + 1
+    hashes = 0
+    while j < n and src[j] == "#":
+        hashes += 1
+        j += 1
+    if j >= n or src[j] != '"':
+        return i + 1, None
+    j += 1
+    if hashes == 0:
+        while j < n and src[j] != '"':
+            j += 1
+        return (j + 1, None) if j < n else (n, None)
+    while j < n:
+        if src[j] == '"':
+            k = j + 1
+            seen = 0
+            while seen < hashes and k < n and src[k] == "#":
+                seen += 1
+                k += 1
+            if seen == hashes:
+                return k, None
+            return n, k
+        j += 1
+    return n, None
+
+
+def _lean_commands_that_may_run(src: str) -> list[str]:
+    """Commands Lean can elaborate, including one hidden by a short raw-string closer.
+
+    A command inside a terminated string or comment is not included. The comment
+    stripper is unchanged, so a compile that must still run those payloads is
+    unchanged too.
+    """
+    found: list[str] = []
+    n = len(src)
+    i = 0
+    while i < n:
+        if src.startswith("/-", i):
+            depth = 1
+            i += 2
+            while i < n and depth > 0:
+                if src.startswith("/-", i):
+                    depth += 1
+                    i += 2
+                elif src.startswith("-/", i):
+                    depth -= 1
+                    i += 2
+                else:
+                    i += 1
+            continue
+        if src.startswith("--", i):
+            newline = src.find("\n", i)
+            i = n if newline < 0 else newline
+            continue
+        if _is_raw_str_start(src, i):
+            end, resume = _raw_string_resume(src, i)
+            if resume is not None and resume > i:
+                i = resume
+            else:
+                i = end if end > i else i + 1
+            continue
+        match = _LAKE_COMMAND_RE.match(src, i)
+        if match:
+            cmd = match.group(0)
+            if cmd not in found:
+                found.append(cmd)
+            i += len(cmd)
+            continue
+        if src[i] == '"':
+            i += 1
+            while i < n and src[i] != '"':
+                if src[i] == "\\" and i + 1 < n:
+                    i += 2
+                else:
+                    i += 1
+            if i < n:
+                i += 1
+            continue
+        if src[i] == "'":
+            end = _char_lit_end(src, i)
+            if end is not None:
+                i = end
+                continue
+        if src[i] == "«" or _is_lean_id_first(src[i]):
+            i = _lean_ident_end(src, i)
+            continue
+        i += 1
+    return found
+
+
+def _command_findings(rel: str, text: str) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    for cmd in _lean_commands_that_may_run(text):
+        if cmd.startswith("#"):
+            findings.append({
+                "line": 1,
+                "rule": "FORBIDDEN_EVAL_COMMAND",
+                "message": f"{rel} contains a Lean command that runs during elaboration: {cmd}",
+            })
+        else:
+            findings.append({
+                "line": 1,
+                "rule": "METAPROGRAM_ESCAPE",
+                "message": f"forbidden Lean escape hatch matched {cmd!r}",
+            })
+    return findings
+
+
+def _lake_symlink_finding(proj: Path) -> dict[str, Any] | None:
+    """`.lake` as a symlink is a finding. `rmtree` on that path raises, and following it deletes the target."""
+    try:
+        root_fd = os.open(proj, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError as exc:
+        return {
+            "line": 1,
+            "rule": "UNTRUSTED_PROJECT_SYMLINK",
+            "message": f"project root is not a real directory: {exc}",
+        }
+    try:
+        try:
+            st = os.lstat(".lake", dir_fd=root_fd)
+        except FileNotFoundError:
+            return None
+        if stat.S_ISLNK(st.st_mode):
+            return {
+                "line": 1,
+                "rule": "LAKE_CACHE_SYMLINK",
+                "message": ".lake is a symlink; refusing to follow or delete it",
+            }
+        return None
+    finally:
+        os.close(root_fd)
+
+
+def _read_project_tree(proj: Path) -> dict[str, bytes]:
+    """Regular files only. A symlink or special file in any component refuses the copy.
+
+    `.lake` and `.git` are not copied. Opening each component with `O_NOFOLLOW`
+    does not follow a parent the candidate swapped for a symlink.
+    """
+    root_fd = os.open(proj, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        files: dict[str, bytes] = {}
+        _read_tree_at(root_fd, "", files)
+        return files
+    finally:
+        os.close(root_fd)
+
+
+def _read_tree_at(dir_fd: int, rel: str, files: dict[str, bytes]) -> None:
+    for name in sorted(os.listdir(f"/proc/self/fd/{dir_fd}")):
+        if name in {".lake", ".git"}:
+            continue
+        child = f"{rel}/{name}" if rel else name
+        st = os.lstat(name, dir_fd=dir_fd)
+        if stat.S_ISLNK(st.st_mode):
+            raise UntrustedProjectPath(f"{child} is a symlink")
+        if stat.S_ISDIR(st.st_mode):
+            child_fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dir_fd)
+            try:
+                _read_tree_at(child_fd, child, files)
+            finally:
+                os.close(child_fd)
+            continue
+        if not stat.S_ISREG(st.st_mode):
+            raise UntrustedProjectPath(f"{child} is not a regular file", rule="UNTRUSTED_PROJECT_FILE")
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=dir_fd)
+        try:
+            chunks: list[bytes] = []
+            while True:
+                block = os.read(fd, 1024 * 1024)
+                if not block:
+                    break
+                chunks.append(block)
+            files[child] = b"".join(chunks)
+        finally:
+            os.close(fd)
+
+
+def _trusted_inputs(files: dict[str, bytes]) -> dict[str, bytes]:
+    """Drop a lakefile Lean would prefer over `lakefile.toml`.
+
+    The toml is the trusted configuration. `lakefile.lean` beside it is the candidate's plant.
+    A `lake-manifest.json` that is already here is trusted. One the build creates later is not
+    in this map, so a fresh tree does not receive it.
+    """
+    if "lakefile.toml" not in files:
+        return dict(files)
+    kept: dict[str, bytes] = {}
+    for rel, data in files.items():
+        parent, _, name = rel.rpartition("/")
+        if parent == "" and name.startswith("lakefile.") and name != "lakefile.toml":
+            continue
+        kept[rel] = data
+    return kept
+
+
+def _materialize_trusted_tree(files: dict[str, bytes]) -> Path:
+    """A new directory of regular files. Nothing here is a path the candidate chose."""
+    root = Path(tempfile.mkdtemp(prefix="mcproof_trusted_"))
+    root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for rel in sorted(files):
+            _write_regular_at(root_fd, rel, files[rel])
+    except Exception:
+        os.close(root_fd)
+        shutil.rmtree(root)
+        raise
+    os.close(root_fd)
+    return root
+
+
+def _write_regular_at(root_fd: int, rel: str, data: bytes) -> None:
+    parts = rel.split("/")
+    dir_fd = root_fd
+    opened: list[int] = []
+    try:
+        for part in parts[:-1]:
+            try:
+                os.mkdir(part, dir_fd=dir_fd)
+            except FileExistsError:
+                pass
+            st = os.lstat(part, dir_fd=dir_fd)
+            if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode):
+                raise UntrustedProjectPath(f"{rel} crosses a symlink")
+            next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dir_fd)
+            opened.append(next_fd)
+            dir_fd = next_fd
+        fd = os.open(
+            parts[-1],
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o644,
+            dir_fd=dir_fd,
+        )
+        try:
+            view = memoryview(data)
+            while view:
+                wrote = os.write(fd, view)
+                view = view[wrote:]
+        finally:
+            os.close(fd)
+    finally:
+        for fd in reversed(opened):
+            os.close(fd)
+
+
+def _real_dir(parent: Path, rel: str) -> bool:
+    """True when every component of `parent/rel` is a real directory."""
+    try:
+        dir_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError:
+        return False
+    try:
+        for part in rel.split("/"):
+            try:
+                st = os.lstat(part, dir_fd=dir_fd)
+            except FileNotFoundError:
+                return False
+            if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode):
+                return False
+            next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dir_fd)
+            os.close(dir_fd)
+            dir_fd = next_fd
+        return True
+    finally:
+        os.close(dir_fd)
+
+
+def _audit_solution_axioms(
+    build_dir: Path,
+    *,
+    solution_mod: str,
+    permitted: set[str],
+    lean_bin: str,
+    env: dict[str, str],
+    timeout_sec: int,
+    findings: list[dict[str, Any]],
+) -> tuple[set[str], list[str], list[str], str | None]:
+    """Import `solution_mod` from the build directory. The last item is a sandbox refusal, if any."""
+    measured: set[str] = set()
+    sorry_decls: list[str] = []
+    nonstd: list[str] = []
+    with tempfile.TemporaryDirectory(prefix="mcproof_proj_ax_") as ax_tmp_str:
+        ax_tmp = Path(ax_tmp_str)
+        audit_driver = ax_tmp / "McproofProjectAxiomDriver.lean"
+        audit_driver.write_text(
+            MODULE_AXIOM_AUDIT_TEMPLATE.format(module_name=solution_mod),
+            encoding="utf-8",
+        )
+        ax_env = dict(env)
+        lean_path_parts = [str(ax_tmp)]
+        olean_rel = ".lake/build/lib/lean"
+        if _real_dir(build_dir, olean_rel):
+            lean_path_parts.append(str(build_dir / olean_rel))
+        ax_env["LEAN_PATH"] = os.pathsep.join(lean_path_parts)
+        try:
+            ax_run = run_confined_command(
+                [lean_bin, str(audit_driver)],
+                cwd=ax_tmp,
+                env=ax_env,
+                timeout_sec=timeout_sec,
+                readable_dirs=(build_dir,),
+            )
+        except CandidateSandboxUnavailable as exc:
+            return measured, sorry_decls, nonstd, str(exc)
+        if ax_run.returncode != 0:
+            tail = " | ".join(
+                line.strip()
+                for line in ((ax_run.stdout or "") + "\n" + (ax_run.stderr or "")).splitlines()[-4:]
+                if line.strip()
+            )
+            findings.append({
+                "line": 1,
+                "rule": "AXIOM_WALK_FAILED",
+                "message": f"trusted collectAxioms driver failed on {solution_mod}: {tail}",
+            })
+            return measured, sorry_decls, nonstd, None
+        for line in (ax_run.stdout or "").splitlines():
+            if not line.startswith("MCPROOF_AUDIT\t"):
+                continue
+            parts = line.split("\t")
+            if len(parts) != 5:
+                continue
+            _, kind, _, decl_name, ax_csv = parts
+            axs = {a for a in ax_csv.split(",") if a}
+            measured.update(axs)
+            if kind in ("axiom", "opaque"):
+                findings.append({
+                    "line": 1,
+                    "rule": "KERNEL_EXTRA_AXIOM_OR_OPAQUE",
+                    "message": f"solution module {solution_mod} contains {kind} declaration '{decl_name}'",
+                })
+            if "sorryAx" in axs:
+                sorry_decls.append(decl_name)
+                findings.append({
+                    "line": 1,
+                    "rule": "KERNEL_SORRY_AXIOM",
+                    "message": f"solution declaration '{decl_name}' depends on 'sorryAx'",
+                })
+            extra_axs = axs - (permitted & STANDARD_AXIOMS) - {"sorryAx"}
+            if extra_axs:
+                nonstd.extend(sorted(extra_axs))
+                findings.append({
+                    "line": 1,
+                    "rule": "KERNEL_NONSTANDARD_AXIOM",
+                    "message": f"solution declaration '{decl_name}' uses unpermitted axioms: {sorted(extra_axs)}",
+                })
+    return measured, sorry_decls, nonstd, None
 
 
 def verify_lean4_project_comparator(
@@ -1844,43 +2173,75 @@ def verify_lean4_project_comparator(
     allow_unsandboxed: bool = False,
     timeout_sec: int = 300,
 ) -> LeanVerificationResult:
-    """Run full 6-kernel `lake comparator --paranoid` + `collectAxioms` + source escape-hatch checks on a Lake project."""
+    """Run full 6-kernel `lake comparator --paranoid` + `collectAxioms` + source escape-hatch checks on a Lake project.
+
+    Trusted steps run in a directory built from an in-memory copy. The caller's tree is never
+    written. `allow_unsandboxed` does not run candidate Lean on the host.
+    """
     proj = (project_dir or (repo_root() / "lean")).resolve()
-    toolchain = _read_toolchain(proj)
     findings: list[dict[str, Any]] = []
 
-    cmp_path = proj / "comparator.json"
-    if not cmp_path.is_file():
+    def _stopped(*, sandboxed: bool = False, caveats: tuple[str, ...] = ()) -> LeanVerificationResult:
         return LeanVerificationResult(
             passed=False,
             toolchain=toolchain,
-            theorems_checked=(),
+            theorems_checked=theorem_names,
             axioms_used=(),
             nonstandard_axioms=(),
             sorry_declarations=(),
             paranoid_kernels_run=(),
-            sandboxed=False,
-            findings=({"line": 1, "rule": "MISSING_COMPARATOR_JSON", "message": f"no comparator.json in {proj}"},),
+            sandboxed=sandboxed,
+            findings=tuple(findings),
+            caveats=caveats,
+            challenge_sorry_whitelisted_module=challenge_mod or None,
         )
 
+    lake_hit = _lake_symlink_finding(proj)
+    if lake_hit is not None:
+        toolchain = _read_toolchain(proj) if (proj / "lean-toolchain").is_file() and not (proj / "lean-toolchain").is_symlink() else "leanprover/lean4:v4.35.0"
+        theorem_names = ()
+        challenge_mod = ""
+        findings.append(lake_hit)
+        return _stopped()
+
     try:
-        cmp_cfg = json.loads(cmp_path.read_text(encoding="utf-8"))
+        project_files = _read_project_tree(proj)
+    except UntrustedProjectPath as exc:
+        toolchain = "leanprover/lean4:v4.35.0"
+        theorem_names = ()
+        challenge_mod = ""
+        findings.append({"line": 1, "rule": exc.rule, "message": str(exc)})
+        return _stopped()
+    except OSError as exc:
+        toolchain = "leanprover/lean4:v4.35.0"
+        theorem_names = ()
+        challenge_mod = ""
+        findings.append({
+            "line": 1,
+            "rule": "UNTRUSTED_PROJECT_SYMLINK",
+            "message": f"project root is not a real directory: {exc}",
+        })
+        return _stopped()
+
+    toolchain = project_files.get("lean-toolchain", b"").decode("utf-8", "replace").strip() or "leanprover/lean4:v4.35.0"
+    raw_cmp = project_files.get("comparator.json")
+    if raw_cmp is None:
+        theorem_names = ()
+        challenge_mod = ""
+        findings.append({"line": 1, "rule": "MISSING_COMPARATOR_JSON", "message": f"no comparator.json in {proj}"})
+        return _stopped()
+
+    try:
+        cmp_cfg = json.loads(raw_cmp.decode("utf-8"))
     except json.JSONDecodeError as exc:
-        return LeanVerificationResult(
-            passed=False,
-            toolchain=toolchain,
-            theorems_checked=(),
-            axioms_used=(),
-            nonstandard_axioms=(),
-            sorry_declarations=(),
-            paranoid_kernels_run=(),
-            sandboxed=False,
-            findings=({
-                "line": 1,
-                "rule": "COMPARATOR_JSON_MALFORMED",
-                "message": f"comparator.json is not valid JSON: {exc}",
-            },),
-        )
+        theorem_names = ()
+        challenge_mod = ""
+        findings.append({
+            "line": 1,
+            "rule": "COMPARATOR_JSON_MALFORMED",
+            "message": f"comparator.json is not valid JSON: {exc}",
+        })
+        return _stopped()
     if not isinstance(cmp_cfg, dict):
         return LeanVerificationResult(
             passed=False,
@@ -1922,269 +2283,174 @@ def verify_lean4_project_comparator(
             "message": f"comparator.json permits non-standard axioms: {sorted(extra_permitted)}",
         })
 
-    lean_bin = find_lean_tool("lean")
-    lake_bin = find_lean_tool("lake")
-    env = _lean_env()
-
-    # Fail closed before compiling untrusted Lean code when Linux bubblewrap is unavailable unless explicitly opted in
-    bwrap_available = linux_bwrap_functional()
-    caveats: list[str] = []
-    if not bwrap_available:
-        if not allow_unsandboxed:
-            findings.append({
-                "line": 1,
-                "rule": "SANDBOX_UNAVAILABLE",
-                "message": (
-                    "Linux bubblewrap (`bwrap`) is unavailable on this host; "
-                    "pass allow_unsandboxed=True or `--allow-unsandboxed` to explicitly authorize unsandboxed execution"
-                ),
-            })
-            return LeanVerificationResult(
-                passed=False,
-                toolchain=toolchain,
-                theorems_checked=theorem_names,
-                axioms_used=(),
-                nonstandard_axioms=(),
-                sorry_declarations=(),
-                paranoid_kernels_run=(),
-                sandboxed=False,
-                findings=tuple(findings),
-                caveats=(),
-                challenge_sorry_whitelisted_module=challenge_mod or None,
-            )
-        caveats.append("UNSANDBOXED_EXECUTION")
-
-    # Static source lint on every `.lean` file in the project outside `.lake` and `.git`
-    for lean_file in sorted(proj.rglob("*.lean")):
-        rel = lean_file.relative_to(proj)
-        if any(part in (".lake", ".git") for part in rel.parts):
+    caveats: tuple[str, ...] = ()
+    for rel, data in sorted(project_files.items()):
+        if not rel.endswith(".lean"):
             continue
-        is_challenge = challenge_rel is not None and rel == challenge_rel
-        lint = lint_lean4_source(
-            lean_file.read_text(encoding="utf-8"),
-            label=rel.as_posix(),
-            strict_init_only=strict_init_only,
-            allow_challenge_sorry=is_challenge,
-            check_vacuous=True,
-            require_theorem=False,
-        )
-        findings.extend(lint["findings"])
-
+        findings.extend(_command_findings(rel, data.decode("utf-8")))
     if any(finding_blocks_comparator(item) for item in findings):
-        return LeanVerificationResult(
-            passed=False,
-            toolchain=toolchain,
-            theorems_checked=theorem_names,
-            axioms_used=(),
-            nonstandard_axioms=(),
-            sorry_declarations=(),
-            paranoid_kernels_run=(),
-            sandboxed=False,
-            findings=tuple(findings),
-            caveats=tuple(caveats),
-            challenge_sorry_whitelisted_module=challenge_mod or None,
-        )
+        return _stopped()
 
-    trusted_files = _snapshot_project_files(proj)
-    _restore_project_files(proj, trusted_files)
+    challenge_key = challenge_rel.as_posix() if challenge_rel is not None else None
 
-    # Scrub challenge `.olean`/`.ir` before `lake build` so `Spec` always compiles fresh from disk
-    scrub_challenge_artifacts(proj, challenge_mod)
+    def _lint_project() -> None:
+        for rel, data in sorted(project_files.items()):
+            if not rel.endswith(".lean"):
+                continue
+            lint = lint_lean4_source(
+                data.decode("utf-8"),
+                label=rel,
+                strict_init_only=strict_init_only,
+                allow_challenge_sorry=rel == challenge_key,
+                check_vacuous=True,
+                require_theorem=False,
+            )
+            findings.extend(lint["findings"])
 
-    def refuse_sandbox(message: str) -> LeanVerificationResult:
+    # Candidate Lean never runs on the host. The flag does not open that path.
+    # A missing auditor must not hide this refusal; when the auditor is present its
+    # findings are kept, including a planted axiom.
+    if not linux_bwrap_functional():
+        try:
+            _lint_project()
+        except FileNotFoundError:
+            pass
         findings.append({
             "line": 1,
             "rule": "SANDBOX_UNAVAILABLE",
-            "message": message,
+            "message": (
+                "Linux bubblewrap (`bwrap`) is unavailable; refusing to run candidate Lean on the host"
+                + (" even though unsandboxed execution was requested." if allow_unsandboxed else ".")
+            ),
         })
-        return LeanVerificationResult(
-            passed=False,
-            toolchain=toolchain,
-            theorems_checked=theorem_names,
-            axioms_used=(),
-            nonstandard_axioms=(),
-            sorry_declarations=(),
-            paranoid_kernels_run=(),
-            sandboxed=False,
-            findings=tuple(findings),
-            caveats=tuple(caveats),
-            challenge_sorry_whitelisted_module=challenge_mod or None,
-        )
+        return _stopped()
 
-    # Run `lake build`. Candidate text is compiled here, so a missing sandbox refuses.
+    _lint_project()
+    if any(finding_blocks_comparator(item) for item in findings):
+        return _stopped()
+
+    lean_bin = find_lean_tool("lean")
+    lake_bin = find_lean_tool("lake")
+    env = _lean_env()
+    trusted_files = _trusted_inputs(project_files)
+
+    def refuse_sandbox(message: str) -> LeanVerificationResult:
+        findings.append({"line": 1, "rule": "SANDBOX_UNAVAILABLE", "message": message})
+        return _stopped()
+
+    build_dir = _materialize_trusted_tree(trusted_files)
     try:
-        if bwrap_available:
+        scrub_challenge_artifacts(build_dir, challenge_mod)
+        try:
             build_res = run_confined_command(
                 [lake_bin, "build"],
-                cwd=proj,
+                cwd=build_dir,
                 env=env,
                 timeout_sec=timeout_sec,
             )
-        else:
-            build_res = subprocess.run(
-                [lake_bin, "build"],
-                cwd=proj,
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=timeout_sec,
-                check=False,
-            )
-    except CandidateSandboxUnavailable as exc:
-        return refuse_sandbox(str(exc))
-    if build_res.returncode != 0:
-        tail = " | ".join(line.strip() for line in ((build_res.stdout or "") + "\n" + (build_res.stderr or "")).splitlines()[-6:] if line.strip())
-        findings.append({
-            "line": 1,
-            "rule": "LAKE_BUILD_FAILED",
-            "message": f"`lake build` failed: {tail}",
-        })
-        _restore_project_files(proj, trusted_files)
-        return LeanVerificationResult(
-            passed=False,
-            toolchain=toolchain,
-            theorems_checked=theorem_names,
-            axioms_used=(),
-            nonstandard_axioms=(),
-            sorry_declarations=(),
-            paranoid_kernels_run=(),
-            sandboxed=bwrap_available,
-            findings=tuple(findings),
-            caveats=tuple(caveats),
-            challenge_sorry_whitelisted_module=challenge_mod or None,
-        )
-
-    # Measure actual transitive kernel axioms and sorry dependencies on solution_module via `collectAxioms`
-    measured_axioms: set[str] = set()
-    sorry_decls: list[str] = []
-    nonstd: list[str] = []
-    lib_olean_dir = proj / ".lake" / "build" / "lib" / "lean"
-    with tempfile.TemporaryDirectory(prefix="mcproof_proj_ax_") as ax_tmp_str:
-        ax_tmp = Path(ax_tmp_str)
-        audit_driver = ax_tmp / "McproofProjectAxiomDriver.lean"
-        audit_driver.write_text(
-            MODULE_AXIOM_AUDIT_TEMPLATE.format(module_name=solution_mod),
-            encoding="utf-8",
-        )
-        ax_env = dict(env)
-        lean_path_parts = [str(ax_tmp)]
-        if lib_olean_dir.is_dir():
-            lean_path_parts.append(str(lib_olean_dir))
-        ax_env["LEAN_PATH"] = os.pathsep.join(lean_path_parts)
-        # Import runs `initialize` / `attribute [init]`. The project is readable;
-        # only the driver directory is writable, and it is not a trusted output.
-        try:
-            if bwrap_available:
-                ax_run = run_confined_command(
-                    [lean_bin, str(audit_driver)],
-                    cwd=ax_tmp,
-                    env=ax_env,
-                    timeout_sec=timeout_sec,
-                    readable_dirs=(proj,),
-                )
-            else:
-                ax_run = subprocess.run(
-                    [lean_bin, str(audit_driver)],
-                    cwd=ax_tmp,
-                    env=ax_env,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout_sec,
-                    check=False,
-                )
         except CandidateSandboxUnavailable as exc:
             return refuse_sandbox(str(exc))
-        if ax_run.returncode != 0:
-            tail = " | ".join(line.strip() for line in ((ax_run.stdout or "") + "\n" + (ax_run.stderr or "")).splitlines()[-4:] if line.strip())
+        if build_res.returncode != 0:
+            tail = " | ".join(
+                line.strip()
+                for line in ((build_res.stdout or "") + "\n" + (build_res.stderr or "")).splitlines()[-6:]
+                if line.strip()
+            )
             findings.append({
                 "line": 1,
-                "rule": "AXIOM_WALK_FAILED",
-                "message": f"trusted collectAxioms driver failed on {solution_mod}: {tail}",
+                "rule": "LAKE_BUILD_FAILED",
+                "message": f"`lake build` failed: {tail}",
             })
-        else:
-            for line in (ax_run.stdout or "").splitlines():
-                if not line.startswith("MCPROOF_AUDIT\t"):
-                    continue
-                parts = line.split("\t")
-                if len(parts) != 5:
-                    continue
-                _, kind, _, decl_name, ax_csv = parts
-                axs = {a for a in ax_csv.split(",") if a}
-                measured_axioms.update(axs)
-                if kind in ("axiom", "opaque"):
-                    findings.append({
-                        "line": 1,
-                        "rule": "KERNEL_EXTRA_AXIOM_OR_OPAQUE",
-                        "message": f"solution module {solution_mod} contains {kind} declaration '{decl_name}'",
-                    })
-                if "sorryAx" in axs:
-                    sorry_decls.append(decl_name)
-                    findings.append({
-                        "line": 1,
-                        "rule": "KERNEL_SORRY_AXIOM",
-                        "message": f"solution declaration '{decl_name}' depends on 'sorryAx'",
-                    })
-                extra_axs = axs - (permitted & STANDARD_AXIOMS) - {"sorryAx"}
-                if extra_axs:
-                    nonstd.extend(sorted(extra_axs))
-                    findings.append({
-                        "line": 1,
-                        "rule": "KERNEL_NONSTANDARD_AXIOM",
-                        "message": f"solution declaration '{decl_name}' uses unpermitted axioms: {sorted(extra_axs)}",
-                    })
-
-    # The build may have planted lakefile.lean again. Restore before Lake elaborates it.
-    _restore_project_files(proj, trusted_files)
-
-    # Lake's own sandbox is `--ro-bind / /` and `--share-net`. Run it inside ours.
-    try:
-        cmp_res = run_confined_command(
-            [lake_bin, "comparator", "--paranoid"],
-            cwd=proj,
+            return _stopped(sandboxed=True)
+        measured_axioms, sorry_decls, nonstd, axiom_failed = _audit_solution_axioms(
+            build_dir,
+            solution_mod=solution_mod,
+            permitted=permitted,
+            lean_bin=lean_bin,
             env=env,
             timeout_sec=timeout_sec,
+            findings=findings,
         )
-    except CandidateSandboxUnavailable as exc:
-        return refuse_sandbox(str(exc))
-    kernels_accepted, solution_ok, spoof_findings = parse_comparator_stdout(cmp_res.stdout or "", solution_mod)
-    findings.extend(spoof_findings)
+        if axiom_failed is not None:
+            return refuse_sandbox(axiom_failed)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=True)
 
-    cmp_out = (cmp_res.stdout or "") + "\n" + (cmp_res.stderr or "")
-    if cmp_res.returncode != 0 or not solution_ok:
-        if "sorryAx" in cmp_out and "sorryAx" not in sorry_decls:
-            sorry_decls.append("sorryAx")
-        for ax_m in re.finditer(r"Illegal axiom detected:\s*'([^']+)'", cmp_out):
-            ax_name = ax_m.group(1)
-            if ax_name == "sorryAx":
-                if ax_name not in sorry_decls:
-                    sorry_decls.append(ax_name)
-            else:
-                nonstd.append(ax_name)
-        tail = " | ".join(line.strip() for line in cmp_out.strip().splitlines()[-6:] if line.strip())
-        findings.append({
-            "line": 1,
-            "rule": "COMPARATOR_PARANOID_REJECT",
-            "message": f"`lake comparator --paranoid` rejected project (exit {cmp_res.returncode}): {tail}",
-        })
+    # A second copy. The build directory now holds a manifest and anything the
+    # candidate planted; the comparator must not see either.
+    comp_dir = _materialize_trusted_tree(trusted_files)
+    try:
+        # `lake comparator` will not create a manifest inside its sandbox. Resolve one
+        # from this clean tree. The candidate build's manifest stays in the other directory.
+        try:
+            update_res = run_confined_command(
+                [lake_bin, "update"],
+                cwd=comp_dir,
+                env=env,
+                timeout_sec=timeout_sec,
+            )
+        except CandidateSandboxUnavailable as exc:
+            return refuse_sandbox(str(exc))
+        if update_res.returncode != 0:
+            tail = " | ".join(
+                line.strip()
+                for line in ((update_res.stdout or "") + "\n" + (update_res.stderr or "")).splitlines()[-6:]
+                if line.strip()
+            )
+            findings.append({
+                "line": 1,
+                "rule": "LAKE_BUILD_FAILED",
+                "message": f"`lake update` failed: {tail}",
+            })
+            return _stopped(sandboxed=True)
+        try:
+            cmp_res = run_confined_command(
+                [lake_bin, "comparator", "--paranoid"],
+                cwd=comp_dir,
+                env=env,
+                timeout_sec=timeout_sec,
+            )
+        except CandidateSandboxUnavailable as exc:
+            return refuse_sandbox(str(exc))
+        kernels_accepted, solution_ok, spoof_findings = parse_comparator_stdout(cmp_res.stdout or "", solution_mod)
+        findings.extend(spoof_findings)
 
-    passed = (
-        len(findings) == 0
-        and cmp_res.returncode == 0
-        and solution_ok
-        and len(kernels_accepted) == 6
-    )
-    # The comparator elaborates the project and can rewrite a trusted file after the earlier restore.
-    _restore_project_files(proj, trusted_files, clear_cache=False)
-    return LeanVerificationResult(
-        passed=passed,
-        toolchain=toolchain,
-        theorems_checked=theorem_names,
-        axioms_used=tuple(sorted(measured_axioms - {"sorryAx"})),
-        nonstandard_axioms=tuple(sorted(set(nonstd))),
-        sorry_declarations=tuple(sorted(set(sorry_decls))),
-        paranoid_kernels_run=tuple(kernels_accepted),
-        sandboxed=bwrap_available,
-        findings=tuple(findings),
-        caveats=tuple(caveats),
-        challenge_sorry_whitelisted_module=challenge_mod or None,
-    )
+        cmp_out = (cmp_res.stdout or "") + "\n" + (cmp_res.stderr or "")
+        if cmp_res.returncode != 0 or not solution_ok:
+            if "sorryAx" in cmp_out and "sorryAx" not in sorry_decls:
+                sorry_decls.append("sorryAx")
+            for ax_m in re.finditer(r"Illegal axiom detected:\s*'([^']+)'", cmp_out):
+                ax_name = ax_m.group(1)
+                if ax_name == "sorryAx":
+                    if ax_name not in sorry_decls:
+                        sorry_decls.append(ax_name)
+                else:
+                    nonstd.append(ax_name)
+            tail = " | ".join(line.strip() for line in cmp_out.strip().splitlines()[-6:] if line.strip())
+            findings.append({
+                "line": 1,
+                "rule": "COMPARATOR_PARANOID_REJECT",
+                "message": f"`lake comparator --paranoid` rejected project (exit {cmp_res.returncode}): {tail}",
+            })
+
+        passed = (
+            len(findings) == 0
+            and cmp_res.returncode == 0
+            and solution_ok
+            and len(kernels_accepted) == 6
+        )
+        return LeanVerificationResult(
+            passed=passed,
+            toolchain=toolchain,
+            theorems_checked=theorem_names,
+            axioms_used=tuple(sorted(measured_axioms - {"sorryAx"})),
+            nonstandard_axioms=tuple(sorted(set(nonstd))),
+            sorry_declarations=tuple(sorted(set(sorry_decls))),
+            paranoid_kernels_run=tuple(kernels_accepted),
+            sandboxed=True,
+            findings=tuple(findings),
+            caveats=caveats,
+            challenge_sorry_whitelisted_module=challenge_mod or None,
+        )
+    finally:
+        shutil.rmtree(comp_dir, ignore_errors=True)

@@ -853,8 +853,8 @@ def test_family_c_attribute_init_cannot_write_a_host_marker() -> None:
 def test_family_c_short_raw_string_cannot_write_a_host_marker() -> None:
     """A raw string closed with fewer hashes hides `#eval` from the stripper.
 
-    Lean still runs the command. The marker stays absent only while the lake build
-    is confined. A passthrough sandbox writes it and this test fails.
+    The turn rejects that command before lake, so the marker stays absent.
+    Reaching the build makes the spy in the confinement test fail.
     """
     _skip_without_family_c_sandbox()
     _expect_family_c_marker_absent(
