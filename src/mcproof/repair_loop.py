@@ -920,8 +920,9 @@ _FAMILY_C_ELAB_COMMAND_RE = re.compile(
 )
 # These run during the build or the later import. They are recorded, and the build still
 # runs inside the sandbox. Returning here would hide a sandbox that no longer confines.
+# `attribute [init]` matches mid-line and across a newline, not only at column zero.
 _FAMILY_C_BUILD_SIDE_EFFECT_RE = re.compile(
-    r"(?m)^[ \t]*attribute[ \t]*\[[^\]]*\b(?:builtin_init|init)\b"
+    r"attribute\s*\[[^\]]*\b(?:builtin_init|init)\b"
     r"|\brun_meta\b"
     r"|\belab_rules\b"
 )
@@ -970,6 +971,15 @@ def _family_c_elab_command_findings(candidate_lean: str) -> list[dict[str, Any]]
             ),
         }
     ]
+
+
+def _restore_trusted_text(path: Path, text: str) -> None:
+    """Write `text` back, including when the candidate replaced `path` with a symlink."""
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+    path.write_text(text, encoding="utf-8")
 
 
 def _family_c_build_side_effect_findings(candidate_lean: str) -> list[dict[str, Any]]:
@@ -1287,16 +1297,16 @@ def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: st
         (root / pkg / "Spec.lean").write_text(_family_c_spec_source(pkg, headers), encoding="utf-8")
         # Solution module is the candidate's lean blocks verbatim. Theorems must use
         # the fully-qualified challenge name (for example `theorem CrtPair.Spec.crt_mod_left ...`).
-        (root / pkg / "Proofs.lean").write_text(
-            f"import {pkg}\n\n{candidate_lean}\n",
-            encoding="utf-8",
-        )
+        proofs_path = root / pkg / "Proofs.lean"
+        proofs_text = f"import {pkg}\n\n{candidate_lean}\n"
+        proofs_path.write_text(proofs_text, encoding="utf-8")
         (root / "Main.lean").write_text(
             f'import {pkg}\ndef main : IO Unit := IO.println "ok"\n',
             encoding="utf-8",
         )
         (root / "lakefile.toml").write_text(_family_c_lakefile(pkg), encoding="utf-8")
-        (root / "comparator.json").write_text(
+        comparator_path = root / "comparator.json"
+        comparator_text = (
             json.dumps(
                 {
                     "challenge_module": f"{pkg}.Spec",
@@ -1306,9 +1316,9 @@ def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: st
                 },
                 indent=2,
             )
-            + "\n",
-            encoding="utf-8",
+            + "\n"
         )
+        comparator_path.write_text(comparator_text, encoding="utf-8")
         if mission_bar is not None:
             (root / "bar.toml").write_text(
                 f'[project]\nname = "{pkg.lower()}"\nstatus = "{bar_status}"\npage = "README.md"\n'
@@ -1355,6 +1365,10 @@ def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: st
             for f in findings
         ):
             return findings
+        # The candidate build can rewrite these. The kernel and the next reader
+        # must see the source this turn wrote, not the replacement.
+        _restore_trusted_text(proofs_path, proofs_text)
+        _restore_trusted_text(comparator_path, comparator_text)
         try:
             lean_res = verify_lean4_project_comparator(root, allow_unsandboxed=False)
         except FileNotFoundError as exc:

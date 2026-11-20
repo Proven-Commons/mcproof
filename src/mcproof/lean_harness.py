@@ -13,8 +13,9 @@ import subprocess
 import sys
 import tempfile
 from typing import Any, Mapping, Sequence
+import uuid
 
-from .paths import dep_repo, elan_bin_dir, find_lean_tool, repo_root
+from .paths import dep_repo, deps_dir, elan_bin_dir, find_lean_tool, repo_root
 
 STANDARD_AXIOMS: frozenset[str] = frozenset({"propext", "Classical.choice", "Quot.sound"})
 SORRY_WARNING_RE = re.compile(r"warning:.*declaration uses [`']sorry[`']")
@@ -60,8 +61,9 @@ BAR_FORBIDDEN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ),
     (
         # `attribute [init]` is not `@[init]`. It still runs when the module is imported.
+        # The marker may sit mid-line or be split across a newline (`attribute\n[init]`).
         "FORBIDDEN_INIT_ATTRIBUTE",
-        re.compile(r"(?m)^[ \t]*attribute[ \t]*\[[^\]]*\b(?:builtin_init|init)\b"),
+        re.compile(r"attribute\s*\[[^\]]*\b(?:builtin_init|init)\b"),
     ),
     (
         # Not only at the start of a line. A mid-line `#eval` still runs during elaboration.
@@ -69,6 +71,18 @@ BAR_FORBIDDEN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
         re.compile(r"#(?:eval|reduce|check|print|synth)\b"),
     ),
 )
+
+# A hit here means the candidate would run code during compile or import.
+# Callers return before any Lean process. Sorry, axiom, and vacuous lints still
+# reach the kernel so those checks stay in place.
+COMPILE_BLOCKING_LINT_RULES = frozenset({
+    "FORBIDDEN_INIT_ATTRIBUTE",
+    "FORBIDDEN_EVAL_COMMAND",
+    "METAPROGRAM_ESCAPE",
+    "SYNTAX_OVERRIDE_DECL",
+    "UNSOUND_IMPLEMENTED_BY",
+    "UNVERIFIED_NATIVE_EVAL",
+})
 
 COMPARATOR_ORDERED_KERNELS: tuple[tuple[str, str, str], ...] = (
     ("lean-paranoid", "Running Lean paranoid kernel on solution", "Lean paranoid kernel accepts the solution"),
@@ -89,27 +103,201 @@ class CandidateSandboxUnavailable(RuntimeError):
     """`bwrap` cannot confine a candidate Lean run. Callers must not fall back to the host."""
 
 
-def linux_bwrap_functional(*, timeout_sec: float = 5.0) -> bool:
-    """Return True when `bwrap` can start a network-unshared sandbox over a read-only root.
+# Host trees that must not be visible. `/run` hides ssh-agent and API sockets.
+# `/agent` and `/workspace` hide the checkout, including `.git/config`.
+_SANDBOX_SYS_RO = ("/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc")
+_SANDBOX_TMPFS = ("/tmp", "/run", "/home", "/root", "/agent", "/workspace", "/opt", "/var")
+_SANDBOX_CPU_SEC = 600
+# Lean reserves a large virtual map, and `RLIMIT_NPROC` counts every thread of
+# this uid. These caps still fail closed; they are high enough for `lake build`.
+_SANDBOX_AS_BYTES = 32 * 1024 * 1024 * 1024
+_SANDBOX_NOFILE = 4096
+_SANDBOX_NPROC = 8192
+_SANDBOX_PROBE_SOCKS = ("/run/cursor/api.sock", "/run/host-services/ssh-auth.sock")
+_BWRAP_FUNCTIONAL: bool | None = None
 
-    A writable host `/run/user` is not required. The candidate sandbox covers `/tmp`,
-    `/home`, and `/run/user` with its own `tmpfs` when those paths exist.
-    """
-    if not sys.platform.startswith("linux"):
-        return False
-    bwrap_bin = shutil.which("bwrap")
-    if not bwrap_bin:
-        return False
+_SANDBOX_PROBE = """
+import socket, sys
+from pathlib import Path
+sentinel = sys.argv[1]
+git_config = Path(sys.argv[2])
+blob = Path("/proc/1/environ").read_bytes() + b"\\0" + Path("/proc/self/environ").read_bytes()
+if sentinel.encode() in blob:
+    raise SystemExit(2)
+if git_config.is_file():
+    raise SystemExit(3)
+for sock in sys.argv[3:]:
+    handle = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    handle.settimeout(0.2)
     try:
-        probe = subprocess.run(
-            [bwrap_bin, "--ro-bind", "/", "/", "--unshare-net", "--die-with-parent", "true"],
-            capture_output=True,
-            timeout=timeout_sec,
-            check=False,
+        handle.connect(sock)
+    except OSError:
+        pass
+    else:
+        raise SystemExit(4)
+    finally:
+        handle.close()
+try:
+    Path("/etc/mcproof-sandbox-ro-probe").write_text("x", encoding="utf-8")
+except OSError:
+    pass
+else:
+    raise SystemExit(5)
+raise SystemExit(0)
+"""
+
+
+def _toolchain_elan_home() -> str:
+    root = Path(elan_bin_dir()).resolve().parent
+    return str(root) if (root / "bin").is_dir() else ""
+
+
+def _sandbox_env_pairs(caller_env: Mapping[str, str] | None) -> list[tuple[str, str]]:
+    """Allowlist passed to `env -i` and to `bwrap --setenv`. Nothing else crosses."""
+    elan = _toolchain_elan_home()
+    path_parts = ["/usr/bin", "/bin"]
+    if elan:
+        path_parts.append(str(Path(elan) / "bin"))
+    pairs = [
+        ("PATH", os.pathsep.join(path_parts)),
+        ("HOME", "/tmp/home"),
+        ("TMPDIR", "/tmp"),
+        ("LANG", "C.UTF-8"),
+        ("LC_ALL", "C.UTF-8"),
+    ]
+    if elan:
+        pairs.append(("ELAN_HOME", elan))
+    lean_path = (caller_env or {}).get("LEAN_PATH")
+    if lean_path:
+        pairs.append(("LEAN_PATH", lean_path))
+    return pairs
+
+
+def _confine_argv(
+    cmd: Sequence[str],
+    *,
+    cwd: Path,
+    caller_env: Mapping[str, str] | None,
+    readable_dirs: Sequence[Path],
+) -> list[str]:
+    """`prlimit` + `env -i` + `bwrap` over the toolchain, not the host root."""
+    prlimit_bin = shutil.which("prlimit")
+    env_bin = shutil.which("env")
+    bwrap_bin = shutil.which("bwrap")
+    if not prlimit_bin or not env_bin or not bwrap_bin:
+        raise CandidateSandboxUnavailable(
+            "Linux bubblewrap (`bwrap`), `env`, or `prlimit` is unavailable; "
+            "refusing to run candidate Lean unsandboxed."
         )
-    except (OSError, subprocess.TimeoutExpired):
+    cwd_path = Path(cwd).resolve()
+    cwd_s = str(cwd_path)
+    pairs = _sandbox_env_pairs(caller_env)
+    argv: list[str] = [
+        prlimit_bin,
+        f"--cpu={_SANDBOX_CPU_SEC}",
+        f"--as={_SANDBOX_AS_BYTES}",
+        f"--nofile={_SANDBOX_NOFILE}",
+        f"--nproc={_SANDBOX_NPROC}",
+        "--",
+        env_bin,
+        "-i",
+    ]
+    argv.extend(f"{key}={value}" for key, value in pairs)
+    argv.extend(
+        (
+            bwrap_bin,
+            "--new-session",
+            "--unshare-all",
+            "--die-with-parent",
+            "--dev",
+            "/dev",
+            "--proc",
+            "/proc",
+        )
+    )
+    for directory in _SANDBOX_SYS_RO:
+        if Path(directory).is_dir():
+            argv.extend(("--ro-bind", directory, directory))
+    for directory in _SANDBOX_TMPFS:
+        if Path(directory).is_dir():
+            argv.extend(("--tmpfs", directory))
+    argv.extend(("--dir", "/tmp/home"))
+    elan = _toolchain_elan_home()
+    if elan:
+        argv.extend(("--ro-bind", elan, elan))
+    deps = deps_dir()
+    if deps.is_dir():
+        deps_s = str(deps.resolve())
+        argv.extend(("--ro-bind", deps_s, deps_s))
+    for extra in readable_dirs:
+        extra_path = Path(extra).resolve()
+        extra_s = str(extra_path)
+        if not extra_path.exists():
+            continue
+        if extra_s == cwd_s or extra_path.is_relative_to(cwd_path):
+            continue
+        argv.extend(("--ro-bind", extra_s, extra_s))
+    argv.extend(("--bind", cwd_s, cwd_s, "--clearenv"))
+    for key, value in pairs:
+        argv.extend(("--setenv", key, value))
+    argv.extend(("--chdir", cwd_s, "--", *cmd))
+    return argv
+
+
+def _spawn_confined(
+    cmd: Sequence[str],
+    *,
+    cwd: Path,
+    caller_env: Mapping[str, str] | None,
+    timeout_sec: float,
+    readable_dirs: Sequence[Path] = (),
+) -> subprocess.CompletedProcess[str]:
+    argv = _confine_argv(cmd, cwd=cwd, caller_env=caller_env, readable_dirs=readable_dirs)
+    return subprocess.run(
+        argv,
+        capture_output=True,
+        text=True,
+        timeout=timeout_sec,
+        check=False,
+    )
+
+
+def linux_bwrap_functional(*, timeout_sec: float = 15.0) -> bool:
+    """Return True when the candidate sandbox actually confines a process.
+
+    The probe refuses a parent-env leak in `/proc/1/environ`, a readable
+    `.git/config`, a connected host socket, or a write on the read-only host.
+    A missing `bwrap` or `prlimit` is False. Callers must not fall back.
+    """
+    global _BWRAP_FUNCTIONAL
+    if _BWRAP_FUNCTIONAL is not None:
+        return _BWRAP_FUNCTIONAL
+    if not sys.platform.startswith("linux"):
+        _BWRAP_FUNCTIONAL = False
         return False
-    return probe.returncode == 0
+    if not shutil.which("bwrap") or not shutil.which("prlimit") or not shutil.which("env"):
+        _BWRAP_FUNCTIONAL = False
+        return False
+    sentinel = f"mcproof-sentinel-{uuid.uuid4().hex}"
+    os.environ["MCPROOF_SANDBOX_SENTINEL"] = sentinel
+    try:
+        with tempfile.TemporaryDirectory(prefix="mcproof_bwrap_probe_") as tmp:
+            script = Path(tmp) / "probe.py"
+            script.write_text(_SANDBOX_PROBE, encoding="utf-8")
+            git_config = repo_root() / ".git" / "config"
+            probe = _spawn_confined(
+                ["python3", str(script), sentinel, str(git_config), *_SANDBOX_PROBE_SOCKS],
+                cwd=Path(tmp),
+                caller_env={},
+                timeout_sec=timeout_sec,
+            )
+    except (OSError, subprocess.TimeoutExpired, CandidateSandboxUnavailable):
+        _BWRAP_FUNCTIONAL = False
+        return False
+    finally:
+        os.environ.pop("MCPROOF_SANDBOX_SENTINEL", None)
+    _BWRAP_FUNCTIONAL = probe.returncode == 0
+    return _BWRAP_FUNCTIONAL
 
 
 def run_confined_command(
@@ -120,80 +308,25 @@ def run_confined_command(
     timeout_sec: float = 300,
     readable_dirs: Sequence[Path] = (),
 ) -> subprocess.CompletedProcess[str]:
-    """Run `cmd` in the bubblewrap sandbox Lake's comparator uses.
+    """Run `cmd` where the candidate cannot see the host.
 
-    `/` is read-only. Home directories and `/tmp` are covered, then only `cwd` is
-    bound writable. `readable_dirs` are bound read-only afterwards so a scratch
-    under `/tmp` can still see oleans. There is no network. A missing `bwrap`
+    `prlimit` caps cpu, address space, files, and processes. `env -i` and
+    `--new-session` start `bwrap` with only the toolchain allowlist, so
+    `/proc/1/environ` is not the parent environment. The mount is the toolchain,
+    system libraries, and `deps`, with `tmpfs` over `/run`, `/agent`, and
+    `/workspace`. Only `cwd` is writable. A missing or non-functional sandbox
     raises `CandidateSandboxUnavailable` and never runs `cmd` on the host.
     """
     if not linux_bwrap_functional():
         raise CandidateSandboxUnavailable(
             "Linux bubblewrap (`bwrap`) is unavailable; refusing to run candidate Lean unsandboxed."
         )
-    bwrap_bin = shutil.which("bwrap")
-    if not bwrap_bin:
-        raise CandidateSandboxUnavailable(
-            "Linux bubblewrap (`bwrap`) is unavailable; refusing to run candidate Lean unsandboxed."
-        )
-    cwd_path = Path(cwd).resolve()
-    cwd_s = str(cwd_path)
-    base = dict(env or os.environ)
-    elan_raw = base.get("ELAN_HOME") or str(Path.home() / ".elan")
-    elan_path = str(Path(elan_raw).resolve()) if elan_raw and Path(elan_raw).is_dir() else ""
-    path = base.get("PATH") or "/usr/bin:/bin"
-    if not any(part in {"/usr/bin", "/bin"} for part in path.split(os.pathsep)):
-        path = os.pathsep.join(("/usr/bin", "/bin", path))
-    args: list[str] = [
-        bwrap_bin,
-        "--ro-bind",
-        "/",
-        "/",
-        "--dev",
-        "/dev",
-        "--proc",
-        "/proc",
-    ]
-    for cover in ("/home", "/root", "/tmp"):
-        if Path(cover).is_dir():
-            args.extend(("--tmpfs", cover))
-    if Path("/run/user").is_dir():
-        args.extend(("--tmpfs", "/run/user"))
-    args.extend(("--dir", "/tmp/home"))
-    if elan_path:
-        args.extend(("--ro-bind", elan_path, elan_path))
-    for extra in readable_dirs:
-        extra_path = Path(extra).resolve()
-        extra_s = str(extra_path)
-        if not extra_path.exists():
-            continue
-        if extra_s == cwd_s or extra_path.is_relative_to(cwd_path):
-            continue
-        args.extend(("--ro-bind", extra_s, extra_s))
-    args.extend(("--bind", cwd_s, cwd_s, "--clearenv", "--setenv", "HOME", "/tmp/home", "--setenv", "PATH", path, "--setenv", "TMPDIR", "/tmp"))
-    if elan_path:
-        args.extend(("--setenv", "ELAN_HOME", elan_path))
-    if base.get("LEAN_PATH"):
-        args.extend(("--setenv", "LEAN_PATH", base["LEAN_PATH"]))
-    for key in ("LANG", "LC_ALL"):
-        if base.get(key):
-            args.extend(("--setenv", key, base[key]))
-    args.extend(
-        (
-            "--unshare-all",
-            "--die-with-parent",
-            "--chdir",
-            cwd_s,
-            "--",
-            *cmd,
-        )
-    )
-    return subprocess.run(
-        args,
-        capture_output=True,
-        text=True,
-        timeout=timeout_sec,
-        check=False,
+    return _spawn_confined(
+        cmd,
+        cwd=cwd,
+        caller_env=env,
+        timeout_sec=timeout_sec,
+        readable_dirs=readable_dirs,
     )
 
 
@@ -886,6 +1019,14 @@ def verify_lean4_prompt_obligations(
     if findings or not run_kernel_type_check or not obligations["theorem_specs"]:
         return findings
 
+    for item in lint_lean4_source(
+        candidate_source, require_theorem=False, check_vacuous=False,
+    )["findings"]:
+        if item.get("rule") in COMPILE_BLOCKING_LINT_RULES:
+            findings.append(item)
+    if findings:
+        return findings
+
     proj_dir = (lean_project_dir or (repo_root() / "lean")).resolve()
     lean_bin = find_lean_tool("lean")
     env = _lean_env()
@@ -941,27 +1082,27 @@ def verify_lean4_prompt_obligations(
         run_env = dict(env)
         run_env["LEAN_PATH"] = os.pathsep.join(lean_path_parts)
 
-        c_proc = subprocess.run(
-            [lean_bin, "-j", "1", "-D", "Elab.async=false", str(cand_f), "-o", str(cand_o)],
-            cwd=tdp,
-            env=run_env,
-            capture_output=True,
-            text=True,
-            timeout=timeout_sec,
-            check=False,
-        )
-        if c_proc.returncode != 0:
+        readable = (lib_olean_dir,) if lib_olean_dir.is_dir() else ()
+        try:
+            c_proc = run_confined_command(
+                [lean_bin, "-j", "1", "-D", "Elab.async=false", str(cand_f), "-o", str(cand_o)],
+                cwd=tdp,
+                env=run_env,
+                timeout_sec=timeout_sec,
+                readable_dirs=readable,
+            )
+            if c_proc.returncode != 0:
+                return findings
+            d_proc = run_confined_command(
+                [lean_bin, "-j", "1", "-D", "Elab.async=false", str(drv_f)],
+                cwd=tdp,
+                env=run_env,
+                timeout_sec=timeout_sec,
+                readable_dirs=readable,
+            )
+        except CandidateSandboxUnavailable as exc:
+            findings.append({"line": 1, "rule": "SANDBOX_UNAVAILABLE", "message": str(exc)})
             return findings
-
-        d_proc = subprocess.run(
-            [lean_bin, "-j", "1", "-D", "Elab.async=false", str(drv_f)],
-            cwd=tdp,
-            env=run_env,
-            capture_output=True,
-            text=True,
-            timeout=timeout_sec,
-            check=False,
-        )
         if d_proc.returncode != 0:
             tail = " | ".join(ln.strip() for ln in ((d_proc.stdout or "") + "\n" + (d_proc.stderr or "")).splitlines()[-4:] if ln.strip())
             findings.append({
@@ -991,11 +1132,19 @@ def verify_lean4_against_challenge(
     timeout_sec: float = 60.0,
 ) -> list[dict[str, Any]]:
     """Verify via Lean `Meta.isDefEq` that `candidate_source` implements every def/inductive/theorem in `challenge_lean`."""
+    findings: list[dict[str, Any]] = [
+        item for item in lint_lean4_source(
+            candidate_source, require_theorem=False, check_vacuous=False,
+        )["findings"]
+        if item.get("rule") in COMPILE_BLOCKING_LINT_RULES
+    ]
+    if findings:
+        return findings
+
     proj_dir = (lean_project_dir or (repo_root() / "lean")).resolve()
     lean_bin = find_lean_tool("lean")
     env = _lean_env()
     lib_olean_dir = proj_dir / ".lake" / "build" / "lib" / "lean"
-    findings: list[dict[str, Any]] = []
 
     with tempfile.TemporaryDirectory(prefix="mcproof_chalcmp_") as td:
         tdp = Path(td).resolve()
@@ -1018,41 +1167,39 @@ def verify_lean4_against_challenge(
         run_env = dict(env)
         run_env["LEAN_PATH"] = os.pathsep.join(lean_path_parts)
 
-        s_proc = subprocess.run(
-            [lean_bin, "-j", "1", "-D", "Elab.async=false", str(spec_f), "-o", str(spec_o)],
-            cwd=tdp,
-            env=run_env,
-            capture_output=True,
-            text=True,
-            timeout=timeout_sec,
-            check=False,
-        )
-        c_proc = subprocess.run(
-            [lean_bin, "-j", "1", "-D", "Elab.async=false", str(cand_f), "-o", str(cand_o)],
-            cwd=tdp,
-            env=run_env,
-            capture_output=True,
-            text=True,
-            timeout=timeout_sec,
-            check=False,
-        )
-        if s_proc.returncode != 0 or c_proc.returncode != 0:
-            findings.append({
-                "line": 1,
-                "rule": "CHALLENGE_COMPARE_BUILD_FAILED",
-                "message": "Failed to compile challenge or candidate module for kernel statement comparison.",
-            })
+        readable = (lib_olean_dir,) if lib_olean_dir.is_dir() else ()
+        try:
+            s_proc = run_confined_command(
+                [lean_bin, "-j", "1", "-D", "Elab.async=false", str(spec_f), "-o", str(spec_o)],
+                cwd=tdp,
+                env=run_env,
+                timeout_sec=timeout_sec,
+                readable_dirs=readable,
+            )
+            c_proc = run_confined_command(
+                [lean_bin, "-j", "1", "-D", "Elab.async=false", str(cand_f), "-o", str(cand_o)],
+                cwd=tdp,
+                env=run_env,
+                timeout_sec=timeout_sec,
+                readable_dirs=readable,
+            )
+            if s_proc.returncode != 0 or c_proc.returncode != 0:
+                findings.append({
+                    "line": 1,
+                    "rule": "CHALLENGE_COMPARE_BUILD_FAILED",
+                    "message": "Failed to compile challenge or candidate module for kernel statement comparison.",
+                })
+                return findings
+            cmp_proc = run_confined_command(
+                [lean_bin, "-j", "1", "-D", "Elab.async=false", str(drv_f)],
+                cwd=tdp,
+                env=run_env,
+                timeout_sec=timeout_sec,
+                readable_dirs=readable,
+            )
+        except CandidateSandboxUnavailable as exc:
+            findings.append({"line": 1, "rule": "SANDBOX_UNAVAILABLE", "message": str(exc)})
             return findings
-
-        cmp_proc = subprocess.run(
-            [lean_bin, "-j", "1", "-D", "Elab.async=false", str(drv_f)],
-            cwd=tdp,
-            env=run_env,
-            capture_output=True,
-            text=True,
-            timeout=timeout_sec,
-            check=False,
-        )
         if cmp_proc.returncode != 0:
             tail = " | ".join(ln.strip() for ln in ((cmp_proc.stdout or "") + "\n" + (cmp_proc.stderr or "")).splitlines()[-4:] if ln.strip())
             findings.append({
@@ -1309,23 +1456,71 @@ def verify_lean4_source(
         require_theorem=require_theorem,
     )
     findings: list[dict[str, Any]] = list(lint["findings"])
+    # An execution lint means the source would run during compile or import.
+    # Returning here is what stops the host write. The sandbox is the other half.
+    if any(item.get("rule") in COMPILE_BLOCKING_LINT_RULES for item in findings):
+        return LeanVerificationResult(
+            passed=False,
+            toolchain=toolchain,
+            theorems_checked=(),
+            axioms_used=(),
+            nonstandard_axioms=(),
+            sorry_declarations=(),
+            paranoid_kernels_run=(),
+            sandboxed=False,
+            findings=tuple(findings),
+        )
 
     lean_bin = find_lean_tool("lean")
     lake_bin = find_lean_tool("lake")
     leanchecker_bin = find_lean_tool("leanchecker")
     env = _lean_env()
 
-    # Ensure reference Lean library `.olean` files exist if project not yet built
+    # Ensure reference Lean library `.olean` files exist if project not yet built.
+    # The build is confined too: this function does not run Lean on the host.
     lib_olean_dir = proj_dir / ".lake" / "build" / "lib" / "lean"
-    if not lib_olean_dir.is_dir():
-        subprocess.run(
-            [lake_bin, "build", "Mcproof"],
-            cwd=proj_dir,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=timeout_sec,
-            check=False,
+    try:
+        if not lib_olean_dir.is_dir():
+            run_confined_command(
+                [lake_bin, "build", "Mcproof"],
+                cwd=proj_dir,
+                env=env,
+                timeout_sec=timeout_sec,
+            )
+    except CandidateSandboxUnavailable as exc:
+        findings.append({
+            "line": 1,
+            "rule": "SANDBOX_UNAVAILABLE",
+            "message": str(exc),
+        })
+        return LeanVerificationResult(
+            passed=False,
+            toolchain=toolchain,
+            theorems_checked=(),
+            axioms_used=(),
+            nonstandard_axioms=(),
+            sorry_declarations=(),
+            paranoid_kernels_run=(),
+            sandboxed=False,
+            findings=tuple(findings),
+        )
+    except subprocess.TimeoutExpired as exc:
+        findings.append({
+            "line": 1,
+            "rule": "HOST_RESOURCE_EXHAUSTED",
+            "message": f"Lean elaboration timed out after {timeout_sec}s ({exc})",
+        })
+        return LeanVerificationResult(
+            passed=False,
+            toolchain=toolchain,
+            theorems_checked=(),
+            axioms_used=(),
+            nonstandard_axioms=(),
+            sorry_declarations=(),
+            paranoid_kernels_run=(),
+            sandboxed=False,
+            findings=tuple(findings),
+            host_resource_exhausted=True,
         )
 
     mod_name = "McproofCandidateCheck"
@@ -1354,14 +1549,12 @@ def verify_lean4_source(
             max_memory_mib=max_memory_mib,
         )
         try:
-            comp = subprocess.run(
+            comp = run_confined_command(
                 comp_cmd,
                 cwd=tmp_dir,
                 env=run_env,
-                capture_output=True,
-                text=True,
-                timeout=timeout_sec,
-                check=False,
+                timeout_sec=timeout_sec,
+                readable_dirs=(lib_olean_dir,) if lib_olean_dir.is_dir() else (),
             )
         except subprocess.TimeoutExpired as exc:
             findings.append({
@@ -1380,6 +1573,19 @@ def verify_lean4_source(
                 sandboxed=False,
                 findings=tuple(findings),
                 host_resource_exhausted=True,
+            )
+        except CandidateSandboxUnavailable as exc:
+            findings.append({"line": 1, "rule": "SANDBOX_UNAVAILABLE", "message": str(exc)})
+            return LeanVerificationResult(
+                passed=False,
+                toolchain=toolchain,
+                theorems_checked=(),
+                axioms_used=(),
+                nonstandard_axioms=(),
+                sorry_declarations=(),
+                paranoid_kernels_run=(),
+                sandboxed=False,
+                findings=tuple(findings),
             )
         combined_out = (comp.stdout or "") + "\n" + (comp.stderr or "")
         if comp.returncode != 0:
@@ -1434,15 +1640,27 @@ def verify_lean4_source(
             AXIOM_AUDIT_TEMPLATE.format(module_name=mod_name, root_json=json.dumps(mod_name)),
             encoding="utf-8",
         )
-        ax_run = subprocess.run(
-            [lean_bin, str(audit_driver)],
-            cwd=tmp_dir,
-            env=run_env,
-            capture_output=True,
-            text=True,
-            timeout=timeout_sec,
-            check=False,
-        )
+        try:
+            ax_run = run_confined_command(
+                [lean_bin, str(audit_driver)],
+                cwd=tmp_dir,
+                env=run_env,
+                timeout_sec=timeout_sec,
+                readable_dirs=(lib_olean_dir,) if lib_olean_dir.is_dir() else (),
+            )
+        except CandidateSandboxUnavailable as exc:
+            findings.append({"line": 1, "rule": "SANDBOX_UNAVAILABLE", "message": str(exc)})
+            return LeanVerificationResult(
+                passed=False,
+                toolchain=toolchain,
+                theorems_checked=(),
+                axioms_used=(),
+                nonstandard_axioms=(),
+                sorry_declarations=(),
+                paranoid_kernels_run=tuple(kernels_run),
+                sandboxed=False,
+                findings=tuple(findings),
+            )
         if ax_run.returncode != 0:
             tail = " | ".join(line.strip() for line in ((ax_run.stdout or "") + "\n" + (ax_run.stderr or "")).splitlines()[-4:] if line.strip())
             findings.append({
@@ -1492,15 +1710,27 @@ def verify_lean4_source(
                 })
 
         if run_paranoid_leanchecker and cand_olean.is_file():
-            lc_run = subprocess.run(
-                [leanchecker_bin, mod_name],
-                cwd=tmp_dir,
-                env=run_env,
-                capture_output=True,
-                text=True,
-                timeout=timeout_sec,
-                check=False,
-            )
+            try:
+                lc_run = run_confined_command(
+                    [leanchecker_bin, mod_name],
+                    cwd=tmp_dir,
+                    env=run_env,
+                    timeout_sec=timeout_sec,
+                    readable_dirs=(lib_olean_dir,) if lib_olean_dir.is_dir() else (),
+                )
+            except CandidateSandboxUnavailable as exc:
+                findings.append({"line": 1, "rule": "SANDBOX_UNAVAILABLE", "message": str(exc)})
+                return LeanVerificationResult(
+                    passed=False,
+                    toolchain=toolchain,
+                    theorems_checked=tuple(sorted(theorems_checked)),
+                    axioms_used=tuple(sorted(all_axioms)),
+                    nonstandard_axioms=tuple(sorted(nonstandard)),
+                    sorry_declarations=tuple(sorted(sorry_decls)),
+                    paranoid_kernels_run=tuple(kernels_run),
+                    sandboxed=False,
+                    findings=tuple(findings),
+                )
             if lc_run.returncode != 0:
                 tail = " | ".join(line.strip() for line in ((lc_run.stdout or "") + "\n" + (lc_run.stderr or "")).splitlines()[-4:] if line.strip())
                 findings.append({
@@ -1525,7 +1755,7 @@ def verify_lean4_source(
         nonstandard_axioms=tuple(sorted(nonstandard)),
         sorry_declarations=tuple(sorted(sorry_decls)),
         paranoid_kernels_run=tuple(kernels_run),
-        sandboxed=False,
+        sandboxed=True,
         findings=tuple(findings),
     )
 
@@ -1540,9 +1770,6 @@ def verify_lean4_project_comparator(
     """Run full 6-kernel `lake comparator --paranoid` + `collectAxioms` + source escape-hatch checks on a Lake project."""
     proj = (project_dir or (repo_root() / "lean")).resolve()
     toolchain = _read_toolchain(proj)
-    lean_bin = find_lean_tool("lean")
-    lake_bin = find_lean_tool("lake")
-    env = _lean_env()
     findings: list[dict[str, Any]] = []
 
     cmp_path = proj / "comparator.json"
@@ -1559,7 +1786,40 @@ def verify_lean4_project_comparator(
             findings=({"line": 1, "rule": "MISSING_COMPARATOR_JSON", "message": f"no comparator.json in {proj}"},),
         )
 
-    cmp_cfg = json.loads(cmp_path.read_text(encoding="utf-8"))
+    try:
+        cmp_cfg = json.loads(cmp_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return LeanVerificationResult(
+            passed=False,
+            toolchain=toolchain,
+            theorems_checked=(),
+            axioms_used=(),
+            nonstandard_axioms=(),
+            sorry_declarations=(),
+            paranoid_kernels_run=(),
+            sandboxed=False,
+            findings=({
+                "line": 1,
+                "rule": "COMPARATOR_JSON_MALFORMED",
+                "message": f"comparator.json is not valid JSON: {exc}",
+            },),
+        )
+    if not isinstance(cmp_cfg, dict):
+        return LeanVerificationResult(
+            passed=False,
+            toolchain=toolchain,
+            theorems_checked=(),
+            axioms_used=(),
+            nonstandard_axioms=(),
+            sorry_declarations=(),
+            paranoid_kernels_run=(),
+            sandboxed=False,
+            findings=({
+                "line": 1,
+                "rule": "COMPARATOR_JSON_MALFORMED",
+                "message": "comparator.json must be a JSON object",
+            },),
+        )
     challenge_mod = str(cmp_cfg.get("challenge_module", ""))
     solution_mod = str(cmp_cfg.get("solution_module", "Mcproof.Proofs"))
     if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*", solution_mod):
@@ -1584,6 +1844,10 @@ def verify_lean4_project_comparator(
             "rule": "NONSTANDARD_PERMITTED_AXIOMS",
             "message": f"comparator.json permits non-standard axioms: {sorted(extra_permitted)}",
         })
+
+    lean_bin = find_lean_tool("lean")
+    lake_bin = find_lean_tool("lake")
+    env = _lean_env()
 
     # Fail closed before compiling untrusted Lean code when Linux bubblewrap is unavailable unless explicitly opted in
     bwrap_available = linux_bwrap_functional()
