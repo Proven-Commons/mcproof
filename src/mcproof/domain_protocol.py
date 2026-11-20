@@ -51,6 +51,9 @@ NON_VERIFIED_SUBTIERS: frozenset[str] = frozenset(
         "UNVERIFIED_CALLER_BOUNDS",
     }
 )
+RECOGNIZED_CERT_STATUSES: frozenset[str] = NON_VERIFIED_SUBTIERS | frozenset(
+    {"VERIFIED", "PROVEN", "REJECTED"}
+)
 
 ALLOWLISTED_SANDBOX_MODULES: frozenset[str] = frozenset(
     {
@@ -643,6 +646,22 @@ def audit_transition_certificate(
     findings: list[dict[str, str]] = []
     status = str(cert.get("epistemic_status", "")).strip().upper()
     proof_mode = str(cert.get("proof_mode", "")).strip().lower()
+
+    # An omitted or invented status has no checks to fail, so it must not pass.
+    if not status:
+        findings.append(
+            {
+                "rule": "CERT_STATUS_ABSENT",
+                "message": "Certificate omits epistemic_status.",
+            }
+        )
+    elif status not in RECOGNIZED_CERT_STATUSES:
+        findings.append(
+            {
+                "rule": "CERT_STATUS_UNKNOWN",
+                "message": f"epistemic_status {status!r} is not a recognized certificate status.",
+            }
+        )
     prior_status = str(cert.get("prior_status", "")).strip().upper()
     evidence_kind = str(cert.get("evidence_kind", "")).strip().lower()
 
@@ -732,7 +751,7 @@ def audit_transition_certificate(
             )
         else:
             chk_sha = str(pins.get("checker_sha256") or pins.get("checker_auditor_py_sha256") or "")
-            if not pins.get("tcb_manifest_verified", False) or not SHA256_64_RE.match(chk_sha):
+            if not pins.get("tcb_manifest_verified", False) or not SHA256_64_RE.fullmatch(chk_sha):
                 findings.append(
                     {
                         "rule": "CERT_TCB_MANIFEST_UNLOCKED",
@@ -845,7 +864,7 @@ def audit_transition_certificate(
     # F-08: Missing, malformed non-64-hex, or unregistered witness_or_proof_sha256 (fail closed, NEON-D5)
     if status in ("VERIFIED", "PROVEN"):
         w_sha = str(cert.get("witness_or_proof_sha256", ""))
-        if not SHA256_64_RE.match(w_sha):
+        if not SHA256_64_RE.fullmatch(w_sha):
             findings.append(
                 {
                     "rule": "CERT_INVALID_WITNESS_SHA256",
@@ -861,9 +880,16 @@ def audit_transition_certificate(
             )
 
     passed = len(findings) == 0
+    # Do not relabel a lower bound, a conjecture, or a rejection as VERIFIED.
+    if not passed:
+        out_status = "REJECTED"
+    elif status in ("VERIFIED", "PROVEN"):
+        out_status = "VERIFIED"
+    else:
+        out_status = status
     return {
         "passed": passed,
-        "epistemic_status": "VERIFIED" if passed else "REJECTED",
+        "epistemic_status": out_status,
         "finding_count": len(findings),
         "findings": findings,
     }
@@ -909,7 +935,7 @@ def _parse_exact_rational(val: Any, *, max_abs_int: int = MAX_CERT_ABS_INT) -> F
         if abs(val) > max_abs_int:
             raise ValueError("integer exceeds cap")
         return Fraction(val, 1)
-    if isinstance(val, str) and STRICT_RATIONAL_RE.match(val):
+    if isinstance(val, str) and STRICT_RATIONAL_RE.fullmatch(val):
         if "/" in val:
             n_str, d_str = val.split("/", 1)
             num, den = int(n_str), int(d_str)
