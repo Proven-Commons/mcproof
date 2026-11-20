@@ -1,0 +1,488 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    n, edges = inst['n'], inst['edges']\n    uf = list(range(n))\n    def find(x):\n        while uf[x] != x:\n            x = uf[x]\n        return x\n    chosen = []\n    for idx in sorted(range(len(edges)), key=lambda i: edges[i][2]):\n        u, v, _ = edges[idx]\n        ru, rv = find(u), find(v)\n        if ru != rv:\n            uf[ru] = rv\n            chosen.append(idx)\n    adj = [[] for _ in range(n)]\n    for idx in chosen:\n        u, v, _ = edges[idx]\n        adj[u].append(v)\n        adj[v].append(u)\n    par, dep, q = [-1] * n, [-1] * n, [0]\n    dep[0] = 0\n    for u in q:\n        for v in adj[u]:\n            if dep[v] == -1:\n                par[v] = u\n                dep[v] = dep[u] + 1\n                q.append(v)\n    return {'tree_edges': chosen, 'parent': par, 'depth': dep, 'total_weight': sum(edges[i][2] for i in chosen)}\n",
+  "id": "PUB-B-C08",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              2,
+              3,
+              1
+            ],
+            [
+              0,
+              3,
+              5
+            ],
+            [
+              0,
+              2,
+              2
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "depth": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "parent": [
+            -1,
+            0,
+            1,
+            2
+          ],
+          "total_weight": 7,
+          "tree_edges": [
+            0,
+            1,
+            4
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c08_mut_1"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              2,
+              3,
+              1
+            ],
+            [
+              0,
+              3,
+              5
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "depth": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "parent": [
+            -1,
+            0,
+            1,
+            2
+          ],
+          "total_weight": 99,
+          "tree_edges": [
+            2,
+            0,
+            1
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c08_mut_2"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              2,
+              3,
+              1
+            ],
+            [
+              0,
+              3,
+              5
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "depth": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "parent": [
+            -1,
+            0,
+            1,
+            2
+          ],
+          "total_weight": 3,
+          "tree_edges": [
+            2,
+            0
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c08_mut_3"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              2,
+              3,
+              1
+            ],
+            [
+              0,
+              3,
+              5
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "depth": [
+            0,
+            1,
+            2,
+            2
+          ],
+          "parent": [
+            -1,
+            0,
+            3,
+            2
+          ],
+          "total_weight": 6,
+          "tree_edges": [
+            2,
+            0,
+            1
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c08_mut_4"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              2,
+              3,
+              1
+            ],
+            [
+              0,
+              3,
+              5
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "depth": [
+            0,
+            1,
+            2,
+            1
+          ],
+          "parent": [
+            -1,
+            0,
+            3,
+            0
+          ],
+          "total_weight": 4,
+          "tree_edges": [
+            2,
+            2,
+            0
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c08_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1,
+              2
+            ],
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              2,
+              3,
+              1
+            ],
+            [
+              0,
+              3,
+              5
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "depth": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "parent": [
+            -1,
+            0,
+            1,
+            2
+          ],
+          "total_weight": 6,
+          "tree_edges": [
+            2,
+            0,
+            1
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1,
+              4
+            ],
+            [
+              1,
+              2,
+              6
+            ],
+            [
+              0,
+              2,
+              5
+            ]
+          ],
+          "n": 3
+        },
+        {
+          "depth": [
+            0,
+            1,
+            1
+          ],
+          "parent": [
+            -1,
+            0,
+            0
+          ],
+          "total_weight": 9,
+          "tree_edges": [
+            0,
+            2
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1,
+              1
+            ],
+            [
+              1,
+              2,
+              2
+            ],
+            [
+              2,
+              3,
+              3
+            ],
+            [
+              3,
+              4,
+              4
+            ],
+            [
+              0,
+              4,
+              10
+            ]
+          ],
+          "n": 5
+        },
+        {
+          "depth": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "parent": [
+            -1,
+            0,
+            1,
+            2,
+            3
+          ],
+          "total_weight": 10,
+          "tree_edges": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [],
+          "n": 1
+        },
+        {
+          "depth": [
+            0
+          ],
+          "parent": [
+            -1
+          ],
+          "total_weight": 0,
+          "tree_edges": []
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1,
+              7
+            ],
+            [
+              0,
+              2,
+              2
+            ],
+            [
+              0,
+              3,
+              4
+            ],
+            [
+              2,
+              3,
+              1
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "depth": [
+            0,
+            1,
+            1,
+            2
+          ],
+          "parent": [
+            -1,
+            0,
+            0,
+            2
+          ],
+          "total_weight": 10,
+          "tree_edges": [
+            3,
+            1,
+            0
+          ]
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

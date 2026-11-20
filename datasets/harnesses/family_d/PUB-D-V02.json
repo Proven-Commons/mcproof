@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-V02",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDV02\ntheorem mod_idem_nat (n m : Nat) : (n % m) % m = n % m := by sorry\nend PubDV02\n",
+    "module_title": "ModIdem",
+    "positive_lean": "namespace PubDV02\n\ntheorem mod_idem_nat (n m : Nat) : (n % m) % m = n % m := by\n  exact Nat.mod_mod n m\n\nend PubDV02\n",
+    "theorem_names": [
+      "PubDV02.mod_idem_nat"
+    ],
+    "verdict_sha": "ff0395e5d39d8230936868ee1bb112e8d16617bb"
+  }
+}

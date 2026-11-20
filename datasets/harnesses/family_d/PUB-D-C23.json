@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C23",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC23\ndef stepWatermark (wm reqId : Nat) : Nat := if reqId == wm + 1 then wm + 1 else wm\ntheorem dedup_monotonic_watermark (wm reqId : Nat) : wm \u2264 stepWatermark wm reqId \u2227 stepWatermark wm reqId \u2264 wm + 1 := by sorry\nend PubDC23\n",
+    "module_title": "IdemDedup",
+    "positive_lean": "namespace PubDC23\n\ndef stepWatermark (wm reqId : Nat) : Nat := if reqId == wm + 1 then wm + 1 else wm\n\ntheorem dedup_monotonic_watermark (wm reqId : Nat) :\n    wm \u2264 stepWatermark wm reqId \u2227 stepWatermark wm reqId \u2264 wm + 1 := by\n  unfold stepWatermark\n  split <;> omega\n\nend PubDC23\n",
+    "theorem_names": [
+      "PubDC23.dedup_monotonic_watermark"
+    ],
+    "verdict_sha": "3d7ac19b63e0809c7c48cc95d9d31c30902e4356"
+  }
+}

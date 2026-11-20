@@ -1,0 +1,15 @@
+{
+  "expected_tier": "CONJECTURE",
+  "family": "C",
+  "id": "PUB-C-V05",
+  "oracle_type": "verdict_audit",
+  "spec_meta": {
+    "expected_axioms": [
+      "propext",
+      "TreeEdges.acyclic_leaf_ax"
+    ],
+    "expected_verdict": "does not build",
+    "source_commit": "56d46b6edf78fa1bbd3cb7152000db49a76a4baa",
+    "verdict_id": "audit-comb-tree-custom-axiom"
+  }
+}

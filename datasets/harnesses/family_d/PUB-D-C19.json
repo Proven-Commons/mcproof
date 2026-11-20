@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C19",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC19\nstructure Sem where\n  cap : Nat\n  avail : Nat\n  held : Nat\ndef semInv (s : Sem) : Prop := s.avail + s.held = s.cap\ndef acqSem (s : Sem) : Sem := if s.avail > 0 then \u27e8s.cap, s.avail - 1, s.held + 1\u27e9 else s\ndef relSem (s : Sem) : Sem := if s.held > 0 then \u27e8s.cap, s.avail + 1, s.held - 1\u27e9 else s\ntheorem sem_step_bounds (s : Sem) (h : semInv s) : semInv (acqSem s) \u2227 semInv (relSem s) := by sorry\nend PubDC19\n",
+    "module_title": "SemaphoreBound",
+    "positive_lean": "namespace PubDC19\n\nstructure Sem where\n  cap : Nat\n  avail : Nat\n  held : Nat\n\ndef semInv (s : Sem) : Prop := s.avail + s.held = s.cap\ndef acqSem (s : Sem) : Sem := if s.avail > 0 then \u27e8s.cap, s.avail - 1, s.held + 1\u27e9 else s\ndef relSem (s : Sem) : Sem := if s.held > 0 then \u27e8s.cap, s.avail + 1, s.held - 1\u27e9 else s\n\ntheorem sem_step_bounds (s : Sem) (h : semInv s) : semInv (acqSem s) \u2227 semInv (relSem s) := by\n  constructor\n  \u00b7 unfold acqSem; split <;> (simp only [semInv] at *; omega)\n  \u00b7 unfold relSem; split <;> (simp only [semInv] at *; omega)\n\nend PubDC19\n",
+    "theorem_names": [
+      "PubDC19.sem_step_bounds"
+    ],
+    "verdict_sha": "4db5d0dc1f428d28b4bd07ef3f6dd131ea0afdf7"
+  }
+}

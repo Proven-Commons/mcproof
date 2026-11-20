@@ -1,0 +1,343 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    adj = [[] for _ in range(inst['num_states'])]\n    for u, v in inst['transitions']:\n        adj[u].append(v)\n    vis, q = set(inst['init']), list(inst['init'])\n    for u in q:\n        for v in adj[u]:\n            if v not in vis:\n                vis.add(v)\n                q.append(v)\n    return {'inductive_set': sorted(vis)}\n",
+  "id": "PUB-B-V12",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "bad": [
+            4
+          ],
+          "init": [
+            0
+          ],
+          "num_states": 5,
+          "transitions": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              4
+            ]
+          ]
+        },
+        {
+          "inductive_set": [
+            0,
+            1
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v12_mut_1"
+    },
+    {
+      "args": [
+        {
+          "bad": [
+            4
+          ],
+          "init": [
+            0
+          ],
+          "num_states": 5,
+          "transitions": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              3,
+              4
+            ]
+          ]
+        },
+        {
+          "inductive_set": [
+            1,
+            2
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v12_mut_2"
+    },
+    {
+      "args": [
+        {
+          "bad": [
+            4
+          ],
+          "init": [
+            0
+          ],
+          "num_states": 5,
+          "transitions": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              4
+            ]
+          ]
+        },
+        {
+          "inductive_set": [
+            0,
+            1,
+            4
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v12_mut_3"
+    },
+    {
+      "args": [
+        {
+          "bad": [
+            4
+          ],
+          "init": [
+            0
+          ],
+          "num_states": 5,
+          "transitions": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              3,
+              4
+            ]
+          ]
+        },
+        {
+          "inductive_set": [
+            2,
+            1,
+            0
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v12_mut_4"
+    },
+    {
+      "args": [
+        {
+          "bad": [
+            4
+          ],
+          "init": [
+            0
+          ],
+          "num_states": 5,
+          "transitions": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              3,
+              4
+            ]
+          ]
+        },
+        {
+          "inductive_set": [
+            0,
+            0,
+            1,
+            2
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v12_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "bad": [
+            4
+          ],
+          "init": [
+            0
+          ],
+          "num_states": 5,
+          "transitions": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              3,
+              4
+            ]
+          ]
+        },
+        {
+          "inductive_set": [
+            0,
+            1,
+            2
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "bad": [
+            2,
+            3
+          ],
+          "init": [
+            0,
+            1
+          ],
+          "num_states": 4,
+          "transitions": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "inductive_set": [
+            0,
+            1
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "bad": [
+            1,
+            2
+          ],
+          "init": [
+            0
+          ],
+          "num_states": 3,
+          "transitions": [
+            [
+              0,
+              0
+            ]
+          ]
+        },
+        {
+          "inductive_set": [
+            0
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "bad": [
+            0,
+            5
+          ],
+          "init": [
+            1
+          ],
+          "num_states": 6,
+          "transitions": [
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        },
+        {
+          "inductive_set": [
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "bad": [
+            3
+          ],
+          "init": [],
+          "num_states": 4,
+          "transitions": [
+            [
+              0,
+              1
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        {
+          "inductive_set": []
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

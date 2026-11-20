@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC19\nstructure TicketLock where\n  serving : Nat\n  nextTicket : Nat\ndef inv (s : TicketLock) : Prop := s.serving \u2264 s.nextTicket\ndef issueTicket (s : TicketLock) : TicketLock := \u27e8s.serving, s.nextTicket + 1\u27e9\ndef releaseLock (s : TicketLock) : TicketLock := if s.serving < s.nextTicket then \u27e8s.serving + 1, s.nextTicket\u27e9 else s\ndef holdsLock (s : TicketLock) (t : Nat) : Prop := t = s.serving \u2227 t < s.nextTicket\ntheorem issue_preserves_inv (s : TicketLock) (h : inv s) : inv (issueTicket s) := by sorry\ntheorem release_preserves_inv (s : TicketLock) (h : inv s) : inv (releaseLock s) := by sorry\ntheorem ticket_mutex (s : TicketLock) (t1 t2 : Nat) (h1 : holdsLock s t1) (h2 : holdsLock s t2) : t1 = t2 := by sorry\nend PubAC19\n",
+  "family": "A",
+  "id": "PUB-A-C19",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC19.ticket_mutex",
+  "trap_kind": "anti_bypass_invariant"
+}

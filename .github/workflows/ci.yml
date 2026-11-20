@@ -1,0 +1,110 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+      - "feat/**"
+      - "fix/**"
+  pull_request:
+  pull_request_review:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  standalone:
+    name: standalone (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    steps:
+      - name: Checkout repository with LF line endings
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install standalone test dependencies
+        run: python -m pip install --upgrade pip pytest numpy
+
+      - name: Verify Plane 1 SHA-256 lineage and LF control-byte gate
+        run: python ./bin/mcproof --json lineage --verify
+
+      - name: Verify datasets/SHA256SUMS manifest (294 files)
+        run: |
+          python - <<'PY'
+          import hashlib
+          import pathlib
+
+          ds = pathlib.Path("datasets")
+          lines = [
+              ln.strip()
+              for ln in (ds / "SHA256SUMS").read_text(encoding="utf-8").splitlines()
+              if ln.strip()
+          ]
+          if len(lines) != 294:
+              raise SystemExit(f"expected 294 SHA256SUMS lines, got {len(lines)}")
+          listed: set[str] = set()
+          for ln in lines:
+              sha, rel = ln.split("  ", 1)
+              digest = hashlib.sha256((ds / rel).read_bytes()).hexdigest()
+              if digest != sha:
+                  raise SystemExit(f"digest mismatch on {rel}: {digest} != {sha}")
+              listed.add(rel)
+          actual = {
+              p.relative_to(ds).as_posix()
+              for p in ds.rglob("*")
+              if p.is_file() and p.name != "SHA256SUMS" and ".mde" not in p.parts
+          }
+          if listed != actual:
+              raise SystemExit(f"manifest set mismatch: {sorted(listed ^ actual)}")
+          print("SHA256SUMS OK:", len(listed))
+          PY
+
+      - name: Run vendored prose, duplicate-reference, leak, and receipt gates
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import subprocess
+          import sys
+
+          docs = [
+              str(p)
+              for p in sorted(pathlib.Path(".").rglob("*.md"))
+              if not any(
+                  part in p.parts
+                  for part in (".git", ".lake", ".venv", ".pytest_cache", "targets")
+              )
+          ]
+          run_env = {**os.environ, "PYTHONPATH": "src"}
+          r1 = subprocess.run([sys.executable, "-m", "mcproof.prose_gate", *docs], env=run_env, check=False)
+          r2 = subprocess.run([sys.executable, "-m", "mcproof.prose_gate", "--dupes", *docs], env=run_env, check=False)
+          sys.exit(r1.returncode or r2.returncode)
+          PY
+          python verification/leak_audit.py
+          python verification/build_final_receipt.py
+          git diff --exit-code verification/VERIFICATION_RECEIPT.json
+
+      - name: Run standalone pytest suite under strict Python flags
+        run: python -O -B -W error -m pytest -v
+
+  bar:
+    uses: Proven-Commons/mission/.github/workflows/verified-bar.yml@7b22e542f0db0f3013ab1439cf5d1947676a5083 # pinned mission commit
+    with:
+      project-dir: lean
+      bar-ref: 7b22e542f0db0f3013ab1439cf5d1947676a5083
+    permissions:
+      contents: read
+      pull-requests: read

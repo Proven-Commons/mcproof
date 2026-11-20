@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC21\nstructure FifoCounters where\n  cap : Nat\n  used : Nat\n  enq : Nat\n  deq : Nat\ndef fifoInv (s : FifoCounters) : Prop := s.used \u2264 s.cap \u2227 s.enq = s.deq + s.used\ninductive FifoOp | push | pop\ndef stepFifo (s : FifoCounters) : FifoOp \u2192 FifoCounters\n  | .push => if s.used < s.cap then \u27e8s.cap, s.used + 1, s.enq + 1, s.deq\u27e9 else s\n  | .pop => if s.used > 0 then \u27e8s.cap, s.used - 1, s.enq, s.deq + 1\u27e9 else s\ndef runFifo : FifoCounters \u2192 List FifoOp \u2192 FifoCounters\n  | s, [] => s\n  | s, op :: ops => runFifo (stepFifo s op) ops\ntheorem fifo_trace_conserves (s : FifoCounters) (ops : List FifoOp) (h : fifoInv s) : fifoInv (runFifo s ops) := by sorry\nend PubAC21\n",
+  "family": "A",
+  "id": "PUB-A-C21",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC21.fifo_trace_conserves",
+  "trap_kind": "anti_bypass_invariant"
+}

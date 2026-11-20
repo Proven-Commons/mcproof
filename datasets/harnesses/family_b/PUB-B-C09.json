@@ -1,0 +1,319 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    nl, nr, adj = inst['n_left'], inst['n_right'], inst['adj']\n    mr = [-1] * nr\n    ml = [-1] * nl\n    def dfs(u, vis):\n        for v in adj[u]:\n            if not vis[v]:\n                vis[v] = True\n                if mr[v] == -1 or dfs(mr[v], vis):\n                    mr[v] = u\n                    ml[u] = v\n                    return True\n        return False\n    for u in range(nl):\n        dfs(u, [False] * nr)\n    if all(v != -1 for v in ml):\n        return {'has_left_perfect': True, 'match_right_of_left': ml, 'hall_subset': []}\n    u0 = next(i for i, v in enumerate(ml) if v == -1)\n    sl, sr, q = {u0}, set(), [u0]\n    for u in q:\n        for v in adj[u]:\n            if v not in sr:\n                sr.add(v)\n                if mr[v] != -1 and mr[v] not in sl:\n                    sl.add(mr[v])\n                    q.append(mr[v])\n    return {'has_left_perfect': False, 'match_right_of_left': [], 'hall_subset': sorted(sl)}\n",
+  "id": "PUB-B-C09",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "adj": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              0,
+              2
+            ]
+          ],
+          "n_left": 3,
+          "n_right": 3
+        },
+        {
+          "hall_subset": [],
+          "has_left_perfect": true,
+          "match_right_of_left": [
+            0,
+            1,
+            1
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c09_mut_1"
+    },
+    {
+      "args": [
+        {
+          "adj": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              0,
+              2
+            ]
+          ],
+          "n_left": 3,
+          "n_right": 3
+        },
+        {
+          "hall_subset": [],
+          "has_left_perfect": true,
+          "match_right_of_left": [
+            2,
+            1,
+            0
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c09_mut_2"
+    },
+    {
+      "args": [
+        {
+          "adj": [
+            [
+              0
+            ],
+            [
+              0
+            ],
+            [
+              1,
+              2
+            ]
+          ],
+          "n_left": 3,
+          "n_right": 3
+        },
+        {
+          "hall_subset": [
+            0,
+            2
+          ],
+          "has_left_perfect": false,
+          "match_right_of_left": []
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c09_mut_3"
+    },
+    {
+      "args": [
+        {
+          "adj": [
+            [
+              0
+            ],
+            [
+              0
+            ],
+            [
+              1,
+              2
+            ]
+          ],
+          "n_left": 3,
+          "n_right": 3
+        },
+        {
+          "hall_subset": [
+            1,
+            0
+          ],
+          "has_left_perfect": false,
+          "match_right_of_left": []
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c09_mut_4"
+    },
+    {
+      "args": [
+        {
+          "adj": [
+            [
+              0
+            ],
+            [
+              0
+            ],
+            [
+              1,
+              2
+            ]
+          ],
+          "n_left": 3,
+          "n_right": 3
+        },
+        {
+          "hall_subset": [],
+          "has_left_perfect": false,
+          "match_right_of_left": []
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c09_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "adj": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              0,
+              2
+            ]
+          ],
+          "n_left": 3,
+          "n_right": 3
+        },
+        {
+          "hall_subset": [],
+          "has_left_perfect": true,
+          "match_right_of_left": [
+            1,
+            2,
+            0
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "adj": [
+            [
+              0
+            ],
+            [
+              0
+            ],
+            [
+              1,
+              2
+            ]
+          ],
+          "n_left": 3,
+          "n_right": 3
+        },
+        {
+          "hall_subset": [
+            0,
+            1
+          ],
+          "has_left_perfect": false,
+          "match_right_of_left": []
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "adj": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              2,
+              3
+            ]
+          ],
+          "n_left": 4,
+          "n_right": 4
+        },
+        {
+          "hall_subset": [
+            0,
+            1,
+            2
+          ],
+          "has_left_perfect": false,
+          "match_right_of_left": []
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "adj": [
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              2
+            ]
+          ],
+          "n_left": 2,
+          "n_right": 3
+        },
+        {
+          "hall_subset": [],
+          "has_left_perfect": true,
+          "match_right_of_left": [
+            0,
+            1
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "adj": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ],
+          "n_left": 3,
+          "n_right": 2
+        },
+        {
+          "hall_subset": [
+            0,
+            1,
+            2
+          ],
+          "has_left_perfect": false,
+          "match_right_of_left": []
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

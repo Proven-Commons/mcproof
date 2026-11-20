@@ -1,0 +1,24 @@
+[project]
+name = "mcproof"
+status = "in-progress"
+page = "README.md"
+spec_authors = ["proven-commons-author"]
+entry_points = ["Main.lean"]
+
+[spec]
+files = ["SPEC.md", "Mcproof/Spec.lean"]
+code = [
+  "Mcproof.clampNat",
+  "Mcproof.bezoutCheck",
+  "Mcproof.ratLeCross",
+  "Mcproof.isSafeSegment",
+  "Mcproof.cleanSegments"
+]
+
+[tests]
+results = "tests/TEST-RESULTS.md"
+command = "python3 tests/run_tests.py"
+files = ["tests/run_tests.py"]
+
+[ci]
+required_check = "ci / bar"

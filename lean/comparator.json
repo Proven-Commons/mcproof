@@ -1,0 +1,19 @@
+{
+  "challenge_module": "Mcproof.Spec",
+  "solution_module": "Mcproof.Proofs",
+  "theorem_names": [
+    "Mcproof.Spec.clampNat_in_range",
+    "Mcproof.Spec.clampNat_of_mem",
+    "Mcproof.Spec.bezoutCheck_sound",
+    "Mcproof.Spec.bezoutCheck_complete",
+    "Mcproof.Spec.ratLeCross_sound",
+    "Mcproof.Spec.ratLeCross_refl_pos",
+    "Mcproof.Spec.cleanSegments_safe",
+    "Mcproof.Spec.cleanSegments_singleton"
+  ],
+  "permitted_axioms": [
+    "propext",
+    "Quot.sound",
+    "Classical.choice"
+  ]
+}

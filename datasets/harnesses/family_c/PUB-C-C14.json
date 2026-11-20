@@ -1,0 +1,15 @@
+{
+  "expected_tier": "VERIFIED",
+  "family": "C",
+  "id": "PUB-C-C14",
+  "oracle_type": "bar_check",
+  "spec_meta": {
+    "bar_status": "in-progress",
+    "pkg": "Farkas",
+    "test_cmd": "python3 tests/run_tests.py",
+    "theorem_names": [
+      "Farkas.Spec.dual_infeasible",
+      "Farkas.Spec.nonneg_cone"
+    ]
+  }
+}

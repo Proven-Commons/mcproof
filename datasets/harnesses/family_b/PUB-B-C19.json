@@ -1,0 +1,281 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    serving, nxt, active, waiting = 0, 0, None, set()\n    peak = 0\n    for ev in inst['events']:\n        op = ev['op']\n        if op == 'ISSUE':\n            waiting.add((ev['client'], nxt))\n            nxt += 1\n        elif op == 'ENTER':\n            pair = (ev['client'], ev['ticket'])\n            if active is not None or ev['ticket'] != serving or pair not in waiting:\n                return {'valid_trace': False, 'final_serving': -1, 'final_next_ticket': -1, 'max_concurrent': -1}\n            waiting.remove(pair)\n            active = pair\n            peak = 1\n        elif op == 'EXIT':\n            pair = (ev['client'], ev['ticket'])\n            if active != pair:\n                return {'valid_trace': False, 'final_serving': -1, 'final_next_ticket': -1, 'max_concurrent': -1}\n            active = None\n            serving += 1\n    return {'valid_trace': True, 'final_serving': serving, 'final_next_ticket': nxt, 'max_concurrent': peak}\n",
+  "id": "PUB-B-C19",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "client": 2,
+              "op": "ISSUE"
+            },
+            {
+              "client": 5,
+              "op": "ISSUE"
+            },
+            {
+              "client": 5,
+              "op": "ENTER",
+              "ticket": 1
+            }
+          ]
+        },
+        {
+          "final_next_ticket": 2,
+          "final_serving": 0,
+          "max_concurrent": 1,
+          "valid_trace": true
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c19_mut_1"
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "client": 1,
+              "op": "ISSUE"
+            },
+            {
+              "client": 1,
+              "op": "ENTER",
+              "ticket": 0
+            },
+            {
+              "client": 1,
+              "op": "EXIT",
+              "ticket": 0
+            }
+          ]
+        },
+        {
+          "final_next_ticket": 1,
+          "final_serving": 2,
+          "max_concurrent": 1,
+          "valid_trace": true
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c19_mut_2"
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "client": 1,
+              "op": "ISSUE"
+            },
+            {
+              "client": 1,
+              "op": "ENTER",
+              "ticket": 0
+            },
+            {
+              "client": 1,
+              "op": "EXIT",
+              "ticket": 0
+            }
+          ]
+        },
+        {
+          "final_next_ticket": -1,
+          "final_serving": -1,
+          "max_concurrent": -1,
+          "valid_trace": false
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c19_mut_3"
+    },
+    {
+      "args": [
+        {
+          "events": []
+        },
+        {
+          "final_next_ticket": 0,
+          "final_serving": 0,
+          "max_concurrent": 1,
+          "valid_trace": true
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c19_mut_4"
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "client": 2,
+              "op": "ISSUE"
+            },
+            {
+              "client": 5,
+              "op": "ISSUE"
+            },
+            {
+              "client": 5,
+              "op": "ENTER",
+              "ticket": 1
+            }
+          ]
+        },
+        {
+          "final_next_ticket": 2,
+          "final_serving": 0,
+          "max_concurrent": 0,
+          "valid_trace": false
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c19_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "client": 1,
+              "op": "ISSUE"
+            },
+            {
+              "client": 1,
+              "op": "ENTER",
+              "ticket": 0
+            },
+            {
+              "client": 1,
+              "op": "EXIT",
+              "ticket": 0
+            }
+          ]
+        },
+        {
+          "final_next_ticket": 1,
+          "final_serving": 1,
+          "max_concurrent": 1,
+          "valid_trace": true
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "client": 2,
+              "op": "ISSUE"
+            },
+            {
+              "client": 5,
+              "op": "ISSUE"
+            },
+            {
+              "client": 5,
+              "op": "ENTER",
+              "ticket": 1
+            }
+          ]
+        },
+        {
+          "final_next_ticket": -1,
+          "final_serving": -1,
+          "max_concurrent": -1,
+          "valid_trace": false
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "client": 0,
+              "op": "ISSUE"
+            },
+            {
+              "client": 1,
+              "op": "ISSUE"
+            },
+            {
+              "client": 0,
+              "op": "ENTER",
+              "ticket": 0
+            },
+            {
+              "client": 0,
+              "op": "EXIT",
+              "ticket": 0
+            },
+            {
+              "client": 1,
+              "op": "ENTER",
+              "ticket": 1
+            }
+          ]
+        },
+        {
+          "final_next_ticket": 2,
+          "final_serving": 1,
+          "max_concurrent": 1,
+          "valid_trace": true
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "events": []
+        },
+        {
+          "final_next_ticket": 0,
+          "final_serving": 0,
+          "max_concurrent": 0,
+          "valid_trace": true
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "client": 3,
+              "op": "ISSUE"
+            },
+            {
+              "client": 3,
+              "op": "ENTER",
+              "ticket": 0
+            },
+            {
+              "client": 3,
+              "op": "ENTER",
+              "ticket": 0
+            }
+          ]
+        },
+        {
+          "final_next_ticket": -1,
+          "final_serving": -1,
+          "max_concurrent": -1,
+          "valid_trace": false
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

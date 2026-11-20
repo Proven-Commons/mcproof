@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C13",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC13\nstructure M2 where\n  a11 : Int\n  a12 : Int\n  a21 : Int\n  a22 : Int\ndef tr2 (M : M2) : Int := M.a11 + M.a22\ndef addM2 (A B : M2) : M2 := \u27e8A.a11 + B.a11, A.a12 + B.a12, A.a21 + B.a21, A.a22 + B.a22\u27e9\ntheorem trace2_additive (A B : M2) : tr2 (addM2 A B) = tr2 A + tr2 B := by sorry\nend PubDC13\n",
+    "module_title": "TraceAdd",
+    "positive_lean": "namespace PubDC13\n\nstructure M2 where\n  a11 : Int\n  a12 : Int\n  a21 : Int\n  a22 : Int\n\ndef tr2 (M : M2) : Int := M.a11 + M.a22\ndef addM2 (A B : M2) : M2 := \u27e8A.a11 + B.a11, A.a12 + B.a12, A.a21 + B.a21, A.a22 + B.a22\u27e9\n\ntheorem trace2_additive (A B : M2) : tr2 (addM2 A B) = tr2 A + tr2 B := by\n  simp only [tr2, addM2]\n  omega\n\nend PubDC13\n",
+    "theorem_names": [
+      "PubDC13.trace2_additive"
+    ],
+    "verdict_sha": "d6b3f2d5061fb24bec8c65b39845b98e1bc70ca7"
+  }
+}

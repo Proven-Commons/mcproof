@@ -1,0 +1,15 @@
+{
+  "expected_tier": "VERIFIED",
+  "family": "C",
+  "id": "PUB-C-C01",
+  "oracle_type": "bar_check",
+  "spec_meta": {
+    "bar_status": "in-progress",
+    "pkg": "ModInv",
+    "test_cmd": "python3 tests/run_tests.py",
+    "theorem_names": [
+      "ModInv.Spec.modInv_correct",
+      "ModInv.Spec.modInv_unique"
+    ]
+  }
+}

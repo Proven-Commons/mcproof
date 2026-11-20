@@ -1,0 +1,165 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    a, p = inst['a'] % inst['p'], inst['p']\n    found = [r for r in range(1, p) if (r * r) % p == a]\n    return {'is_qr': len(found) > 0, 'roots': found}\n",
+  "id": "PUB-B-C06",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "a": 2,
+          "p": 7
+        },
+        {
+          "is_qr": false,
+          "roots": []
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c06_mut_1"
+    },
+    {
+      "args": [
+        {
+          "a": 2,
+          "p": 7
+        },
+        {
+          "is_qr": true,
+          "roots": [
+            3
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c06_mut_2"
+    },
+    {
+      "args": [
+        {
+          "a": 2,
+          "p": 7
+        },
+        {
+          "is_qr": true,
+          "roots": [
+            4,
+            3
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c06_mut_3"
+    },
+    {
+      "args": [
+        {
+          "a": 3,
+          "p": 7
+        },
+        {
+          "is_qr": true,
+          "roots": [
+            2,
+            5
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c06_mut_4"
+    },
+    {
+      "args": [
+        {
+          "a": 2,
+          "p": 9
+        },
+        {
+          "is_qr": true,
+          "roots": [
+            4,
+            5
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c06_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "a": 2,
+          "p": 7
+        },
+        {
+          "is_qr": true,
+          "roots": [
+            3,
+            4
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 3,
+          "p": 7
+        },
+        {
+          "is_qr": false,
+          "roots": []
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 4,
+          "p": 11
+        },
+        {
+          "is_qr": true,
+          "roots": [
+            2,
+            9
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 5,
+          "p": 13
+        },
+        {
+          "is_qr": false,
+          "roots": []
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 10,
+          "p": 13
+        },
+        {
+          "is_qr": true,
+          "roots": [
+            6,
+            7
+          ]
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

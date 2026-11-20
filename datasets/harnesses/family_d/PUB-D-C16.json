@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C16",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC16\ndef det2 (a b c d : Int) : Int := a * d - b * c\ntheorem det2_transpose_eq (a b c d : Int) : det2 a c b d = det2 a b c d := by sorry\nend PubDC16\n",
+    "module_title": "TransposeDet",
+    "positive_lean": "namespace PubDC16\n\ndef det2 (a b c d : Int) : Int := a * d - b * c\n\ntheorem det2_transpose_eq (a b c d : Int) : det2 a c b d = det2 a b c d := by\n  unfold det2\n  rw [Int.mul_comm c b]\n\nend PubDC16\n",
+    "theorem_names": [
+      "PubDC16.det2_transpose_eq"
+    ],
+    "verdict_sha": "04a942c6e1a44d4a5b92e94d053fd74c28447271"
+  }
+}

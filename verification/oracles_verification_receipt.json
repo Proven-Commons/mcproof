@@ -1,0 +1,384 @@
+{
+  "checks": {
+    "checker_adversarial_matrix": {
+      "assert_only_stripped_under_dash_O": {
+        "actual_pass": false,
+        "expected_pass": false,
+        "kill_fraction": "0/5",
+        "kill_rate_bps": 0,
+        "matched_expectation": true,
+        "rules": [
+          "bare_assert",
+          "MUTATION_KILL_FLOOR_BREACH"
+        ]
+      },
+      "float_true_division_cheat": {
+        "actual_pass": false,
+        "expected_pass": false,
+        "kill_fraction": "5/5",
+        "kill_rate_bps": 10000,
+        "matched_expectation": true,
+        "rules": [
+          "FLOAT_DIVISION_IN_EXACT_CHECKER",
+          "FLOAT_LITERAL_IN_EXACT_CHECKER"
+        ]
+      },
+      "good_exact_checker": {
+        "actual_pass": true,
+        "expected_pass": true,
+        "kill_fraction": "5/5",
+        "kill_rate_bps": 10000,
+        "matched_expectation": true,
+        "rules": []
+      },
+      "trivial_return_true": {
+        "actual_pass": false,
+        "expected_pass": false,
+        "kill_fraction": "0/5",
+        "kill_rate_bps": 0,
+        "matched_expectation": true,
+        "rules": [
+          "VACUOUS_CONSTANT_TRUE_RETURN",
+          "MUTATION_KILL_FLOOR_BREACH"
+        ]
+      },
+      "weak_60pct_kill_3of5": {
+        "actual_pass": false,
+        "expected_pass": false,
+        "kill_fraction": "3/5",
+        "kill_rate_bps": 6000,
+        "matched_expectation": true,
+        "rules": [
+          "MUTATION_KILL_FLOOR_BREACH"
+        ]
+      }
+    },
+    "checker_matrix_summary": {
+      "matched": 5,
+      "total": 5
+    },
+    "deps_shas": {
+      "Foundation-0/.github": {
+        "actual": "81f83c38918382b4ca142b81debd3cc5ccf61d3a",
+        "expected": "81f83c38918382b4ca142b81debd3cc5ccf61d3a",
+        "match": true
+      },
+      "Foundation-0/f0": {
+        "actual": "9a37134750174339c53121939838ce62ab8af630",
+        "expected": "9a37134750174339c53121939838ce62ab8af630",
+        "match": true
+      },
+      "Foundation-0/finite-state-proofs": {
+        "actual": "9eeb3da2cdd6ba6b100ac24d23b32c369c0db8ec",
+        "expected": "9eeb3da2cdd6ba6b100ac24d23b32c369c0db8ec",
+        "match": true
+      },
+      "Foundation-0/formal-claims-audit": {
+        "actual": "bacf05953c10bf5105fa1209a127392d395e2f92",
+        "expected": "bacf05953c10bf5105fa1209a127392d395e2f92",
+        "match": true
+      },
+      "Foundation-0/incentre-lattices": {
+        "actual": "2d374fff2a59cc9331566733043a4bb25c1040bf",
+        "expected": "2d374fff2a59cc9331566733043a4bb25c1040bf",
+        "match": true
+      },
+      "Foundation-0/proven-commons": {
+        "actual": "903c1858be856776de21675cf5c4e26fb9eebcdf",
+        "expected": "903c1858be856776de21675cf5c4e26fb9eebcdf",
+        "match": true
+      },
+      "Moissanite-Labs/siliquant": {
+        "actual": "67b29a4e18cd5d93e1f3701a34030f2e089e7312",
+        "expected": "67b29a4e18cd5d93e1f3701a34030f2e089e7312",
+        "match": true
+      },
+      "Moissanite-Labs/weft-eido": {
+        "actual": "be27665255d9aa2553060d275f7d1b1b3306c703",
+        "expected": "be27665255d9aa2553060d275f7d1b1b3306c703",
+        "match": true
+      },
+      "Proven-Commons/mission": {
+        "actual": "7b22e542f0db0f3013ab1439cf5d1947676a5083",
+        "expected": "7b22e542f0db0f3013ab1439cf5d1947676a5083",
+        "match": true
+      },
+      "ahrazzle/soko": {
+        "actual": "3165e20e7a16c0035cab2fd01231e78e4e1d7f86",
+        "expected": "3165e20e7a16c0035cab2fd01231e78e4e1d7f86",
+        "match": true
+      }
+    },
+    "f0_gate_corruptions": {
+      "findings": [],
+      "good_cases_passed": 1,
+      "good_cases_total": 1,
+      "kill_floor_bps": 8000,
+      "kill_fraction": "4/4",
+      "kill_rate_bps": 10000,
+      "mutations_killed": 4,
+      "mutations_total": 4,
+      "passed": true,
+      "python_sandboxed": false,
+      "survived_mutations": []
+    },
+    "lean_adversarial_cheats": {
+      "admit_tactic": {
+        "caught": true,
+        "nonstandard_axioms": [],
+        "rules": [
+          "UNPROVED_ADMIT",
+          "LEAN_SORRY_WARNING",
+          "KERNEL_SORRY_AXIOM"
+        ],
+        "sorry_declarations": [
+          "t_admit"
+        ]
+      },
+      "custom_axiom": {
+        "caught": true,
+        "nonstandard_axioms": [
+          "magic_false"
+        ],
+        "rules": [
+          "EXTRA_AXIOM_DECL",
+          "KERNEL_NONSTANDARD_AXIOM",
+          "KERNEL_EXTRA_AXIOM_OR_OPAQUE",
+          "KERNEL_NONSTANDARD_AXIOM"
+        ],
+        "sorry_declarations": []
+      },
+      "eval_spoof_cheat": {
+        "caught": true,
+        "nonstandard_axioms": [],
+        "rules": [
+          "FORBIDDEN_EVAL_COMMAND"
+        ],
+        "sorry_declarations": []
+      },
+      "implemented_by_cheat": {
+        "caught": true,
+        "nonstandard_axioms": [],
+        "rules": [
+          "UNSOUND_ATTRIBUTE",
+          "UNSOUND_IMPLEMENTED_BY"
+        ],
+        "sorry_declarations": []
+      },
+      "inline_semicolon_axiom": {
+        "caught": true,
+        "nonstandard_axioms": [],
+        "rules": [
+          "EXTRA_AXIOM_DECL",
+          "LEAN_COMPILE_ERROR"
+        ],
+        "sorry_declarations": []
+      },
+      "native_decide_cheat": {
+        "caught": true,
+        "nonstandard_axioms": [
+          "t_native._native.native_decide.ax_1_1"
+        ],
+        "rules": [
+          "UNVERIFIED_NATIVE_DECIDE",
+          "UNVERIFIED_NATIVE_EVAL",
+          "KERNEL_EXTRA_AXIOM_OR_OPAQUE",
+          "KERNEL_NONSTANDARD_AXIOM",
+          "KERNEL_NONSTANDARD_AXIOM"
+        ],
+        "sorry_declarations": []
+      },
+      "opaque_cheat": {
+        "caught": true,
+        "nonstandard_axioms": [],
+        "rules": [
+          "OPAQUE_CONST_DECL",
+          "KERNEL_EXTRA_AXIOM_OR_OPAQUE"
+        ],
+        "sorry_declarations": []
+      },
+      "sorry_tactic": {
+        "caught": true,
+        "nonstandard_axioms": [],
+        "rules": [
+          "UNPROVED_SORRY",
+          "LEAN_SORRY_WARNING",
+          "KERNEL_SORRY_AXIOM"
+        ],
+        "sorry_declarations": [
+          "t_sorry"
+        ]
+      },
+      "unsafe_cheat": {
+        "caught": true,
+        "nonstandard_axioms": [],
+        "rules": [
+          "UNSOUND_UNSAFE"
+        ],
+        "sorry_declarations": []
+      },
+      "vacuous_contradictory_hyps": {
+        "caught": true,
+        "nonstandard_axioms": [],
+        "rules": [
+          "VACUOUS_CONTRADICTORY_HYPOTHESES"
+        ],
+        "sorry_declarations": []
+      },
+      "vacuous_false_hyp": {
+        "caught": true,
+        "nonstandard_axioms": [],
+        "rules": [
+          "VACUOUS_FALSE_HYPOTHESIS"
+        ],
+        "sorry_declarations": []
+      },
+      "vacuous_nat_lt_zero": {
+        "caught": true,
+        "nonstandard_axioms": [],
+        "rules": [
+          "VACUOUS_NAT_LT_ZERO"
+        ],
+        "sorry_declarations": []
+      },
+      "vacuous_true_conc": {
+        "caught": true,
+        "nonstandard_axioms": [],
+        "rules": [
+          "VACUOUS_TRUE_CONCLUSION"
+        ],
+        "sorry_declarations": []
+      }
+    },
+    "lean_cheats_summary": {
+      "caught": 15,
+      "total": 15
+    },
+    "lean_clean_project": {
+      "axioms_used": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "caveats": [
+        "UNSANDBOXED_EXECUTION"
+      ],
+      "challenge_sorry_whitelisted_module": "Mcproof.Spec",
+      "findings": [],
+      "nonstandard_axioms": [],
+      "paranoid_kernels_run": [
+        "lean-paranoid",
+        "lean4lean",
+        "nanoda",
+        "con-leche",
+        "con-ron",
+        "lean-default"
+      ],
+      "passed": true,
+      "sandboxed": false,
+      "sorry_declarations": [],
+      "theorems_checked": [
+        "Mcproof.Spec.clampNat_in_range",
+        "Mcproof.Spec.clampNat_of_mem",
+        "Mcproof.Spec.bezoutCheck_sound",
+        "Mcproof.Spec.bezoutCheck_complete",
+        "Mcproof.Spec.ratLeCross_sound",
+        "Mcproof.Spec.ratLeCross_refl_pos",
+        "Mcproof.Spec.cleanSegments_safe",
+        "Mcproof.Spec.cleanSegments_singleton"
+      ],
+      "toolchain": "leanprover/lean4:v4.35.0"
+    },
+    "lean_project_cheats": {
+      "project_custom_axiom": {
+        "caught": true,
+        "nonstandard_axioms": [],
+        "rules": [
+          "EXTRA_AXIOM_DECL",
+          "LAKE_BUILD_FAILED"
+        ]
+      },
+      "project_sorry": {
+        "caught": true,
+        "rules": [
+          "UNPROVED_SORRY",
+          "KERNEL_SORRY_AXIOM",
+          "COMPARATOR_PARANOID_REJECT"
+        ],
+        "sorry_declarations": [
+          "Mcproof.Spec.bezoutCheck_sound",
+          "sorryAx"
+        ]
+      }
+    },
+    "lean_unsandboxed_fails_closed_by_default": true,
+    "lineage_1byte_tamper_rejected": true,
+    "plane1_spec": {
+      "bytes": 106763,
+      "control_bytes": [],
+      "lineage_details": {
+        "corpus_tree_sha256": "5bdb7f30363b956e82947f668f98c48f99876e87fb5ed4f785b873e4f4f98305",
+        "deps_checkouts_verified": true,
+        "deps_manifest_verified": true,
+        "findings": [],
+        "passed": true,
+        "plane1_spec_sha256": "49beff2a0185cfa4032170b614a543c0d67541494e858803d21cfb837111b230",
+        "stale_lineage": false,
+        "zone_manifest_drift": false,
+        "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
+      },
+      "lineage_passed": true,
+      "lines": 1840,
+      "nul_byte_count": 0,
+      "sha256": "49beff2a0185cfa4032170b614a543c0d67541494e858803d21cfb837111b230"
+    },
+    "prose_gate": {
+      "check_dupes_out": "check-prose --dupes: clean (11 file(s))",
+      "check_dupes_rc": 0,
+      "check_prose_out": "check-prose: clean (11 file(s), 2422 lines)",
+      "check_prose_rc": 0,
+      "files": [
+        "README.md",
+        "compile/README.md",
+        "datasets/README.md",
+        "docs/CONTINUITY.md",
+        "lean/README.md",
+        "lean/SPEC.md",
+        "lean/tests/TEST-RESULTS.md",
+        "spec/plane1_formal_spec.md",
+        "stack/README.md",
+        "stack/STACK_REPORT.md",
+        "verification/VERIFICATION_REPORT.md"
+      ]
+    },
+    "pytest_strict": {
+      "counts": {
+        "executed_total": 34,
+        "failed": 0,
+        "passed": 34,
+        "skipped": 0
+      },
+      "returncode": 0,
+      "summary_tail": [
+        "../../../Work/mcproof-lab/repo/tests/test_lean_harness.py ...........    [ 73%]",
+        "../../../Work/mcproof-lab/repo/tests/test_lineage_prose_and_cli.py ..... [ 88%]",
+        "....                                                                     [100%]",
+        "",
+        "======================== 34 passed in 137.54s (0:02:17) ========================"
+      ]
+    },
+    "readme_top_lines": [
+      "# mcproof",
+      "`mcproof` is the verification harness, Plane 1 rulebook, dataset suite, weight compiler, and serving benchmark for the Siliconcordat Formal Verification MDE. It checks Lean 4.35.0 proofs across six kernels, grades exact-math checkers against planted bugs, compiles `weft` adapters, and audits live `warp-modeld` mounts. Proof authors, verifiers, and researchers use it to test formal reasoning without weakening deterministic gates.",
+      "Blueprint and gates live in [siliconcordat/mde issue 4](https://github.com/siliconcordat/mde/issues/4) under the [Master Plan](https://github.com/siliconcordat/.github/blob/main/MASTER-PLAN.md). Companion serving changes live in [siliconcordat/exo](https://github.com/siliconcordat/exo/tree/feat/mde4-phase4-phase6-stack) and [siliconcordat/warp PR 5](https://github.com/siliconcordat/warp/pull/5)."
+    ],
+    "siliconcordat_clean": {
+      "exo": "",
+      "mde": "",
+      "warp": "",
+      "weft": ""
+    }
+  },
+  "defects": [],
+  "overall_passed": true
+}

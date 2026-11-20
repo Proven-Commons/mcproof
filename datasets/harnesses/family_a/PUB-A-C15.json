@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC15\ntheorem interval_add_enclosure (a1 b1 a2 b2 x y : Int) (hx : a1 \u2264 x \u2227 x \u2264 b1) (hy : a2 \u2264 y \u2227 y \u2264 b2) : (a1 + a2 \u2264 x + y \u2227 x + y \u2264 b1 + b2) \u2227 ((b1 + b2) - (a1 + a2) = (b1 - a1) + (b2 - a2)) := by sorry\nend PubAC15\n",
+  "family": "A",
+  "id": "PUB-A-C15",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC15.interval_add_enclosure",
+  "trap_kind": "anti_bypass_algebra"
+}

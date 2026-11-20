@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC18\ndef ratEq (n1 d1 n2 d2 : Int) : Prop := n1 * d2 = n2 * d1\ndef ratAddNum (n1 d1 n2 d2 : Int) : Int := n1 * d2 + n2 * d1\ndef ratAddDen (d1 d2 : Int) : Int := d1 * d2\ntheorem ratEq_symm (n1 d1 n2 d2 : Int) (h : ratEq n1 d1 n2 d2) : ratEq n2 d2 n1 d1 := by sorry\ntheorem ratAdd_comm_eq (n1 d1 n2 d2 : Int) : ratEq (ratAddNum n1 d1 n2 d2) (ratAddDen d1 d2) (ratAddNum n2 d2 n1 d1) (ratAddDen d2 d1) := by sorry\nend PubAC18\n",
+  "family": "A",
+  "id": "PUB-A-C18",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC18.ratCrossEq_symm_refl",
+  "trap_kind": "anti_bypass_algebra"
+}

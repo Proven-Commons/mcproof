@@ -1,0 +1,247 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    rem = inst['n']\n    out = []\n    d = 2\n    while d * d <= rem:\n        if rem % d == 0:\n            cnt = 0\n            while rem % d == 0:\n                rem //= d\n                cnt += 1\n            out.append([d, cnt])\n        d += 1\n    if rem > 1:\n        out.append([rem, 1])\n    return {'factors': out}\n",
+  "id": "PUB-B-C03",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "n": 60
+        },
+        {
+          "factors": [
+            [
+              4,
+              1
+            ],
+            [
+              15,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c03_mut_1"
+    },
+    {
+      "args": [
+        {
+          "n": 60
+        },
+        {
+          "factors": [
+            [
+              5,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              2,
+              2
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c03_mut_2"
+    },
+    {
+      "args": [
+        {
+          "n": 60
+        },
+        {
+          "factors": [
+            [
+              2,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              5,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c03_mut_3"
+    },
+    {
+      "args": [
+        {
+          "n": 360
+        },
+        {
+          "factors": [
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              2
+            ],
+            [
+              5,
+              0
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c03_mut_4"
+    },
+    {
+      "args": [
+        {
+          "n": 360
+        },
+        {
+          "factors": [
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              5,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c03_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "n": 60
+        },
+        {
+          "factors": [
+            [
+              2,
+              2
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              5,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "n": 97
+        },
+        {
+          "factors": [
+            [
+              97,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "n": 360
+        },
+        {
+          "factors": [
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              2
+            ],
+            [
+              5,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "n": 2310
+        },
+        {
+          "factors": [
+            [
+              2,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              5,
+              1
+            ],
+            [
+              7,
+              1
+            ],
+            [
+              11,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "n": 4096
+        },
+        {
+          "factors": [
+            [
+              2,
+              12
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

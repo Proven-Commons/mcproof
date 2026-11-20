@@ -1,0 +1,253 @@
+From e68c40686f7c89aa3a4b220cdd2946b72e281567 Mon Sep 17 00:00:00 2001
+From: ahraz <38987266+ahrazzle@users.noreply.github.com>
+Date: Thu, 19 Nov 2026 05:29:40 -0600
+Subject: [PATCH] exo: forward zone_manifest_id across bridge/client and forbid
+ float in research_page
+
+---
+ src/exo/bridge.py           |  9 ++++++-
+ src/exo/client.py           | 53 +++++++++++++++++++++++++++++++++++++
+ src/exo/router.py           | 22 +++++++++------
+ tests/test_router_policy.py | 15 +++++++++++
+ 4 files changed, 90 insertions(+), 9 deletions(-)
+
+diff --git a/src/exo/bridge.py b/src/exo/bridge.py
+index 988bb0c..4eccc76 100644
+--- a/src/exo/bridge.py
++++ b/src/exo/bridge.py
+@@ -147,6 +147,7 @@ def build_warp_adapter_bundle(
+     scale: float = 1.0,
+     scale_denominator: int = 1000,
+     adapter_path: Optional[str] = None,
++    zone_manifest_id: Optional[str] = None,
+ ) -> dict[str, Any]:
+     """Construct a complete L3 warp-modeld AdapterBundle dict from L2 weft + L4 exo outputs."""
+     manifest = _as_mapping(weft_manifest)
+@@ -161,7 +162,7 @@ def build_warp_adapter_bundle(
+     scale_num, scale_den = scale_to_rational(scale, denominator=scale_denominator)
+     derivation_digest = _sha256_canonical(manifest)
+ 
+-    return {
++    out: dict[str, Any] = {
+         "adapter_id": str(adapter_id),
+         "domain": str(domain),
+         "llama_adapter_id": llama_id,
+@@ -181,6 +182,9 @@ def build_warp_adapter_bundle(
+         "derivation_digest": derivation_digest,
+         "certificate": cert_dict,
+     }
++    if zone_manifest_id is not None:
++        out["zone_manifest_id"] = str(zone_manifest_id)
++    return out
+ 
+ 
+ def build_warp_bundles_for_route(
+@@ -191,6 +195,7 @@ def build_warp_bundles_for_route(
+     source_lineage: Mapping[str, Any],
+     runtime_flags_sha256: str,
+     scale_denominator: int = 1000,
++    zone_manifest_id: Optional[str] = None,
+ ) -> list[dict[str, Any]]:
+     """Build warp-modeld AdapterBundle dicts for every non-zero domain in an exo RouteDecision.
+ 
+@@ -203,6 +208,7 @@ def build_warp_bundles_for_route(
+       - `gguf_sha256`: 64-hex SHA-256 of the compiled GGUF file
+       - `adapter_path`: optional path string to the GGUF file on disk
+     """
++    effective_zm = zone_manifest_id if zone_manifest_id is not None else decision.manifest_id
+     bundles: list[dict[str, Any]] = []
+     for entry in decision.lora_scales:
+         domain = str(entry["id"])
+@@ -226,6 +232,7 @@ def build_warp_bundles_for_route(
+                 scale=scale,
+                 scale_denominator=scale_denominator,
+                 adapter_path=spec.get("adapter_path"),
++                zone_manifest_id=effective_zm,
+             )
+         )
+     return bundles
+diff --git a/src/exo/client.py b/src/exo/client.py
+index 8d3a1fb..abfb809 100644
+--- a/src/exo/client.py
++++ b/src/exo/client.py
+@@ -558,10 +558,13 @@ class WarpUnixBridge:
+         bundles: Sequence[Mapping[str, Any]],
+         *,
+         composed_certificate: Optional[Mapping[str, Any]] = None,
++        zone_manifest_id: Optional[str] = None,
+     ) -> dict[str, Any]:
+         params: dict[str, Any] = {"bundles": [dict(b) for b in bundles]}
+         if composed_certificate is not None:
+             params["composed_certificate"] = dict(composed_certificate)
++        if zone_manifest_id is not None:
++            params["zone_manifest_id"] = str(zone_manifest_id)
+         result = self._rpc("wmcp_slot_mount", params)
+         if self.ledger is not None:
+             self.ledger.append(
+@@ -572,7 +575,9 @@ class WarpUnixBridge:
+                     "active_adapters": result.get("active_adapters"),
+                     "slots_flushed": result.get("slots_flushed"),
+                     "stage2_elapsed_ns": result.get("stage2_elapsed_ns"),
++                    "stage3_elapsed_ms": result.get("stage3_elapsed_ms"),
+                     "canaries_passed": result.get("canaries_passed"),
++                    "zone_manifest_id": result.get("zone_manifest_id"),
+                 },
+             )
+         return result
+@@ -614,21 +619,69 @@ class WarpUnixBridge:
+             self.ledger.append("warp_unix_lineage_update", self.actor_id, {"status": result.get("status")})
+         return result
+ 
++    def update_zone_manifest(self, manifest_or_id: str | Mapping[str, Any]) -> dict[str, Any]:
++        if isinstance(manifest_or_id, Mapping):
++            params: dict[str, Any] = {"zone_manifest": dict(manifest_or_id)}
++        else:
++            params = {"zone_manifest_id": str(manifest_or_id)}
++        result = self._rpc("warp_update_zone_manifest", params)
++        if self.ledger is not None:
++            self.ledger.append(
++                "warp_unix_zone_manifest_update",
++                self.actor_id,
++                {
++                    "status": result.get("status"),
++                    "rollback_receipt": result.get("rollback_receipt"),
++                },
++            )
++        return result
++
+     def infer(
+         self,
+         messages: Sequence[Mapping[str, Any]],
+         *,
+         temperature: float = 0.0,
++        top_p: float = 1.0,
+         seed: int = 42,
+         max_tokens: int = 256,
++        zone_manifest_id: Optional[str] = None,
+         extra_params: Optional[Mapping[str, Any]] = None,
+     ) -> dict[str, Any]:
+         params: dict[str, Any] = {
+             "messages": [dict(m) for m in messages],
+             "temperature": float(temperature),
++            "top_p": float(top_p),
+             "seed": int(seed),
+             "max_tokens": int(max_tokens),
+         }
++        if zone_manifest_id is not None:
++            params["zone_manifest_id"] = str(zone_manifest_id)
+         if extra_params:
+             params.update(extra_params)
+         return self._rpc("warp_infer", params)
++
++    def complete(
++        self,
++        prompt: str,
++        *,
++        temperature: float = 0.0,
++        top_p: float = 1.0,
++        seed: int = 42,
++        n_predict: int = 64,
++        n_probs: int = 0,
++        zone_manifest_id: Optional[str] = None,
++        extra_params: Optional[Mapping[str, Any]] = None,
++    ) -> dict[str, Any]:
++        params: dict[str, Any] = {
++            "prompt": str(prompt),
++            "temperature": float(temperature),
++            "top_p": float(top_p),
++            "seed": int(seed),
++            "n_predict": int(n_predict),
++            "n_probs": int(n_probs),
++        }
++        if zone_manifest_id is not None:
++            params["zone_manifest_id"] = str(zone_manifest_id)
++        if extra_params:
++            params.update(extra_params)
++        return self._rpc("warp_complete", params)
+diff --git a/src/exo/router.py b/src/exo/router.py
+index 03dd92b..a6ebb97 100644
+--- a/src/exo/router.py
++++ b/src/exo/router.py
+@@ -496,6 +496,7 @@ class ZoneRouter:
+                 scales["corpus"] = 0.0  # specialist prose + UI govern; claim vocab stays locked
+                 allow_negative_disclaimers = True
+                 allow_exact_formal_notation = True
++                forbid_float_in_exact_math = True
+                 enforce_data_eido_skip = True
+                 require_certificate_binding = req.contains_certified_plot
+                 require_illustrative_tag = req.contains_illustrative_toy
+@@ -507,6 +508,7 @@ class ZoneRouter:
+                 scales["formal-verification"] = 1.0
+                 allow_negative_disclaimers = True
+                 allow_exact_formal_notation = True
++                forbid_float_in_exact_math = True
+                 require_certificate_binding = req.contains_certified_plot
+                 rationale = "research_page zone: formal-verification active"
+             elif "weft-eido" in active:
+@@ -537,18 +539,22 @@ class ZoneRouter:
+             lora_scales=ordered_scales,
+             constraints=constraints,
+             rationale=rationale,
++            manifest_id=self.manifest_id,
+         )
+         if self.ledger is not None:
++            ledger_payload: dict[str, Any] = {
++                "zone": req.zone,
++                "repo_id": req.repo_policy.repo_id,
++                "file_path": req.file_path,
++                "lora_scales": list(ordered_scales),
++                "enforce_data_eido_skip": constraints.enforce_data_eido_skip,
++                "claim_vocabulary": constraints.claim_vocabulary,
++            }
++            if self.manifest_id is not None:
++                ledger_payload["manifest_id"] = self.manifest_id
+             self.ledger.append(
+                 "mde_route_selected",
+                 "exo-router",
+-                {
+-                    "zone": req.zone,
+-                    "repo_id": req.repo_policy.repo_id,
+-                    "file_path": req.file_path,
+-                    "lora_scales": list(ordered_scales),
+-                    "enforce_data_eido_skip": constraints.enforce_data_eido_skip,
+-                    "claim_vocabulary": constraints.claim_vocabulary,
+-                },
++                ledger_payload,
+             )
+         return decision
+diff --git a/tests/test_router_policy.py b/tests/test_router_policy.py
+index 18d98b3..79b80e8 100644
+--- a/tests/test_router_policy.py
++++ b/tests/test_router_policy.py
+@@ -149,6 +149,7 @@ class TestZoneRouterAndPolicy(unittest.TestCase):
+             )
+         )
+         self.assertEqual(research.scale_map(), {"corpus": 0.0, "weft-eido": 1.0, "formal-verification": 1.0})
++        self.assertTrue(research.constraints.forbid_float_in_exact_math)
+         self.assertTrue(research.constraints.enforce_data_eido_skip)
+         self.assertTrue(research.constraints.require_certificate_binding)
+         self.assertTrue(research.constraints.require_illustrative_tag)
+@@ -330,6 +331,20 @@ class TestZoneRouterAndPolicy(unittest.TestCase):
+         self.assertTrue(fp_dec.constraints.enforce_data_eido_skip)
+         self.assertTrue(fp_dec.constraints.forbid_float_in_exact_math)
+ 
++        # Fallback zones (research_page) still preserve manifest_id and forbid_float_in_exact_math
++        rp_dec = router.route(
++            RouteRequest(
++                zone="research_page",
++                active_domains=("corpus", "weft-eido", "formal-verification"),
++                repo_policy=foundation0_repo_policy(),
++                contains_formal_claims=True,
++                contains_certified_plot=True,
++                contains_illustrative_toy=True,
++            )
++        )
++        self.assertEqual(rp_dec.manifest_id, manifest["manifest_id"])
++        self.assertTrue(rp_dec.constraints.forbid_float_in_exact_math)
++
+         # Hard Veto 2 still escalates on generic code with dual specialists
+         with self.assertRaises(ContestedPreferenceError):
+             router.route(
+-- 
+2.54.0 (Apple Git-157)
+

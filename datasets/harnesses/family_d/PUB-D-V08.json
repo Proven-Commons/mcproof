@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-V08",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDV08\ndef detShear (k : Int) : Int := 1 * 1 - k * 0\ntheorem shear2_det_one (k : Int) : detShear k = 1 := by sorry\nend PubDV08\n",
+    "module_title": "ShearDetOne",
+    "positive_lean": "namespace PubDV08\n\ndef detShear (k : Int) : Int := 1 * 1 - k * 0\n\ntheorem shear2_det_one (k : Int) : detShear k = 1 := by\n  unfold detShear\n  omega\n\nend PubDV08\n",
+    "theorem_names": [
+      "PubDV08.shear2_det_one"
+    ],
+    "verdict_sha": "6450afa0d1357c6594c60b8abbfa223907ca4f56"
+  }
+}

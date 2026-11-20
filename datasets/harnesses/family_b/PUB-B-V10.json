@@ -1,0 +1,243 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    readers, writer = set(), -1\n    for ev in inst['events']:\n        t, op = ev['tid'], ev['op']\n        if op == 'ACQ_R':\n            if writer != -1 or t in readers:\n                return {'safe': False, 'final_readers': [], 'final_writer': -1}\n            readers.add(t)\n        elif op == 'REL_R':\n            if t not in readers:\n                return {'safe': False, 'final_readers': [], 'final_writer': -1}\n            readers.remove(t)\n        elif op == 'ACQ_W':\n            if writer != -1 or readers:\n                return {'safe': False, 'final_readers': [], 'final_writer': -1}\n            writer = t\n        elif op == 'REL_W':\n            if writer != t:\n                return {'safe': False, 'final_readers': [], 'final_writer': -1}\n            writer = -1\n    return {'safe': True, 'final_readers': sorted(readers), 'final_writer': writer}\n",
+  "id": "PUB-B-V10",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "op": "ACQ_R",
+              "tid": 1
+            },
+            {
+              "op": "ACQ_W",
+              "tid": 2
+            },
+            {
+              "op": "REL_W",
+              "tid": 2
+            }
+          ]
+        },
+        {
+          "final_readers": [
+            1
+          ],
+          "final_writer": -1,
+          "safe": true
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v10_mut_1"
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "op": "ACQ_R",
+              "tid": 1
+            },
+            {
+              "op": "ACQ_R",
+              "tid": 2
+            }
+          ]
+        },
+        {
+          "final_readers": [
+            2,
+            1
+          ],
+          "final_writer": -1,
+          "safe": true
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v10_mut_2"
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "op": "ACQ_W",
+              "tid": 3
+            },
+            {
+              "op": "REL_W",
+              "tid": 3
+            }
+          ]
+        },
+        {
+          "final_readers": [],
+          "final_writer": -1,
+          "safe": false
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v10_mut_3"
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "op": "ACQ_R",
+              "tid": 1
+            },
+            {
+              "op": "ACQ_R",
+              "tid": 1
+            }
+          ]
+        },
+        {
+          "final_readers": [
+            1
+          ],
+          "final_writer": -1,
+          "safe": true
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v10_mut_4"
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "op": "ACQ_W",
+              "tid": 3
+            },
+            {
+              "op": "REL_W",
+              "tid": 4
+            }
+          ]
+        },
+        {
+          "final_readers": [],
+          "final_writer": -1,
+          "safe": true
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v10_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "op": "ACQ_R",
+              "tid": 1
+            },
+            {
+              "op": "ACQ_R",
+              "tid": 2
+            },
+            {
+              "op": "REL_R",
+              "tid": 1
+            }
+          ]
+        },
+        {
+          "final_readers": [
+            2
+          ],
+          "final_writer": -1,
+          "safe": true
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "op": "ACQ_R",
+              "tid": 1
+            },
+            {
+              "op": "ACQ_W",
+              "tid": 2
+            }
+          ]
+        },
+        {
+          "final_readers": [],
+          "final_writer": -1,
+          "safe": false
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "op": "ACQ_W",
+              "tid": 3
+            },
+            {
+              "op": "REL_W",
+              "tid": 3
+            },
+            {
+              "op": "ACQ_W",
+              "tid": 4
+            }
+          ]
+        },
+        {
+          "final_readers": [],
+          "final_writer": 4,
+          "safe": true
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "op": "REL_R",
+              "tid": 0
+            }
+          ]
+        },
+        {
+          "final_readers": [],
+          "final_writer": -1,
+          "safe": false
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "events": []
+        },
+        {
+          "final_readers": [],
+          "final_writer": -1,
+          "safe": true
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "expected_tier": "VERIFIED",
+  "family": "C",
+  "id": "PUB-C-C07",
+  "oracle_type": "bar_check",
+  "spec_meta": {
+    "bar_status": "in-progress",
+    "pkg": "Pigeon",
+    "test_cmd": "python3 tests/run_tests.py",
+    "theorem_names": [
+      "Pigeon.Spec.collision_valid",
+      "Pigeon.Spec.collision_minimal"
+    ]
+  }
+}

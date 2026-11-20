@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcproof-compile"
+version = "0.1.0"
+description = "Deterministic CPU float64 weft compiler, ablation, and evaluation suite for the Formal Verification MDE"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.0",
+    "safetensors>=0.4",
+    "tokenizers>=0.20",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

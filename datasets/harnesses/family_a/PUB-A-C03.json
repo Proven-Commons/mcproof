@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC03\ndef dvdInt (a b : Int) : Prop := \u2203 k : Int, b = a * k\ntheorem dvdInt_refl (a : Int) : dvdInt a a := by sorry\ntheorem dvdInt_trans (a b c : Int) (hab : dvdInt a b) (hbc : dvdInt b c) : dvdInt a c := by sorry\nend PubAC03\n",
+  "family": "A",
+  "id": "PUB-A-C03",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC03.dvdInt_trans",
+  "trap_kind": "anti_bypass_algebra"
+}

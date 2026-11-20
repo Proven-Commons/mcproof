@@ -1,0 +1,14 @@
+{
+  "expected_tier": "VERIFIED",
+  "family": "C",
+  "id": "PUB-C-V08",
+  "oracle_type": "verdict_audit",
+  "spec_meta": {
+    "expected_axioms": [
+      "propext"
+    ],
+    "expected_verdict": "weaker",
+    "source_commit": "d1c5d8db778c01fea5afc4979852c664e98d659a",
+    "verdict_id": "audit-linalg-ivmul-pos-only"
+  }
+}

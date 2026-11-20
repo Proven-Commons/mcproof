@@ -1,0 +1,56 @@
+{
+  "goodhart_patch": {
+    "certificate": {
+      "factor_digest": "6eda78a7fb39e47e327f58bdd7fcd91439dd55615cf4666745731fbd15027f74",
+      "frobenius_sq_scaled": 218196657,
+      "leakage_energy_scaled": 421535270,
+      "max_safety_dot_sq_scaled": 84,
+      "projector_epoch": 1,
+      "quant_dtype": "f16",
+      "radix_scale_exp2": 24,
+      "spectral_norm_sq_scaled": 82990372
+    },
+    "expected_rejection_stage": "stage3_domain_canaries_and_phase5_holdout_not_stage2",
+    "frobenius_norm": 3.606319,
+    "gguf_disk_path": "formal-verification.goodhart.f16.gguf",
+    "gguf_path": "compile/artifacts/controls/formal-verification.goodhart.f16.gguf",
+    "gguf_sha256": "4be01c8f2264ca4454ca03f1fa272b65f3278c612c9fd8155c66057318d7d310",
+    "in_nullspace_stage2_admissible": true,
+    "slab_sha256": "00e039df878c3e201c74eab1c078fa9a835b6c7770a00220848585b2b8c1b8e7",
+    "stage2_admissibility_note": "Solved inside Null(K0) via BetaEditNullspaceProjector; Stage-2-admissible by design, caught by Stage-3 verifier domain canaries and Phase-5 holdout (not Stage 2).",
+    "stage2_certificate_passes": true,
+    "stage2_rejection_reasons": []
+  },
+  "sabotage_patch": {
+    "certificate": {
+      "factor_digest": "8229a079d4fb6532570216290eeee3379e45ca444ef21175ebbf7a01790cfcf8",
+      "frobenius_sq_scaled": 255461535,
+      "leakage_energy_scaled": 48788316252242,
+      "max_safety_dot_sq_scaled": 12909982,
+      "projector_epoch": 1,
+      "quant_dtype": "f16",
+      "radix_scale_exp2": 24,
+      "spectral_norm_sq_scaled": 153526728
+    },
+    "frobenius_norm": 3.90214,
+    "gguf_disk_path": "formal-verification.sabotage.f16.gguf",
+    "gguf_path": "compile/artifacts/controls/formal-verification.sabotage.f16.gguf",
+    "gguf_sha256": "c78da8945546ec394300b08fb60d6f9588190cca1c1ebbb3fbd9a9318181aca4",
+    "norm_only_gate_passes": true,
+    "slab_sha256": "8958302aec8e57b1e24781eea3b244492e2c5550163e6d5eca7fbdde2136dce3",
+    "stage2_certificate_passes": false,
+    "stage2_rejection_reasons": [
+      "leakage_energy_exceeds_cap",
+      "safety_direction_overlap_exceeds_cap"
+    ]
+  },
+  "schema": "mcproof-negative-controls/v0.2",
+  "warp_adversarial_bundles": {
+    "drifted_zone_manifest_warp_bundle": "compile/artifacts/controls/drifted_zone_manifest.warp_bundle.json",
+    "forged_canary_warp_bundle": "compile/artifacts/controls/forged_canary.warp_bundle.json",
+    "forged_cert_warp_bundle": "compile/artifacts/controls/forged_cert.warp_bundle.json",
+    "goodhart_warp_bundle": "compile/artifacts/controls/goodhart.warp_bundle.json",
+    "sabotage_warp_bundle": "compile/artifacts/controls/sabotage.warp_bundle.json",
+    "stale_lineage_warp_bundle": "compile/artifacts/controls/stale_lineage.warp_bundle.json"
+  }
+}

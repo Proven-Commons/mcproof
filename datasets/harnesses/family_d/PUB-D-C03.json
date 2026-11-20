@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C03",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC03\ndef isOddInt (z : Int) : Prop := \u2203 k : Int, z = 2 * k + 1\ndef isEvenInt (z : Int) : Prop := \u2203 k : Int, z = 2 * k\ntheorem odd_add_odd_even (a b : Int) (ha : isOddInt a) (hb : isOddInt b) : isEvenInt (a + b) := by sorry\nend PubDC03\n",
+    "module_title": "OddSumEven",
+    "positive_lean": "namespace PubDC03\n\ndef isOddInt (z : Int) : Prop := \u2203 k : Int, z = 2 * k + 1\ndef isEvenInt (z : Int) : Prop := \u2203 k : Int, z = 2 * k\n\ntheorem odd_add_odd_even (a b : Int) (ha : isOddInt a) (hb : isOddInt b) : isEvenInt (a + b) := by\n  cases ha with\n  | intro u hu =>\n    cases hb with\n    | intro v hv =>\n      exact \u27e8u + v + 1, by omega\u27e9\n\nend PubDC03\n",
+    "theorem_names": [
+      "PubDC03.odd_add_odd_even"
+    ],
+    "verdict_sha": "f802dc537947843f4a62d581004bf64b8eddb9ad"
+  }
+}

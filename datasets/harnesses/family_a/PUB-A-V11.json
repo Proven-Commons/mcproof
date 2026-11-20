@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAV11\nstructure RWLock where\n  readers : Nat\n  writers : Nat\ndef WeakRWSafe (s : RWLock) : Prop := s.writers \u2264 1\ndef RWSafe (s : RWLock) : Prop := s.writers = 0 \u2228 (s.writers = 1 \u2227 s.readers = 0)\ninductive RWOp | acqR | relR | acqW | relW\ndef stepRW (s : RWLock) : RWOp \u2192 RWLock\n  | .acqR => if s.writers == 0 then \u27e8s.readers + 1, 0\u27e9 else s\n  | .relR => if s.readers > 0 then \u27e8s.readers - 1, s.writers\u27e9 else s\n  | .acqW => if s.writers == 0 && s.readers == 0 then \u27e80, 1\u27e9 else s\n  | .relW => if s.writers == 1 then \u27e8s.readers, 0\u27e9 else s\ntheorem dataRace_meets_weak : WeakRWSafe \u27e83, 1\u27e9 := by sorry\ntheorem rwLock_step_safe (s : RWLock) (op : RWOp) (h : RWSafe s) : RWSafe (stepRW s op) := by sorry\nend PubAV11\n",
+  "family": "A",
+  "id": "PUB-A-V11",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAV11.rwLock_step_safe",
+  "trap_kind": "weak_statement_vacuous_trap"
+}

@@ -1,0 +1,455 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "from fractions import Fraction\ndef propose_cert(inst: dict) -> dict:\n    ls = inst['leases']\n    disj = all(Fraction(*ls[i]['expiry']) <= Fraction(*ls[i + 1]['start']) for i in range(len(ls) - 1))\n    if not disj:\n        return {'disjoint_leases': False, 'accepted_writes': []}\n    lmap = {x['token']: (x['leader'], Fraction(*x['start']), Fraction(*x['expiry'])) for x in ls}\n    hi, acc = 0, []\n    for w in inst['writes']:\n        t, ts = w['token'], Fraction(*w['ts'])\n        info = lmap.get(t)\n        good = info is not None and info[0] == w['leader'] and t >= hi and info[1] <= ts < info[2]\n        if good:\n            hi = t\n        acc.append(good)\n    return {'disjoint_leases': True, 'accepted_writes': acc}\n",
+  "id": "PUB-B-C23",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "leases": [
+            {
+              "expiry": [
+                5,
+                2
+              ],
+              "leader": 10,
+              "start": [
+                0,
+                1
+              ],
+              "token": 1
+            },
+            {
+              "expiry": [
+                5,
+                1
+              ],
+              "leader": 20,
+              "start": [
+                5,
+                2
+              ],
+              "token": 2
+            }
+          ],
+          "writes": [
+            {
+              "leader": 20,
+              "token": 2,
+              "ts": [
+                3,
+                1
+              ]
+            },
+            {
+              "leader": 10,
+              "token": 1,
+              "ts": [
+                2,
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "accepted_writes": [
+            true,
+            true
+          ],
+          "disjoint_leases": true
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c23_mut_1"
+    },
+    {
+      "args": [
+        {
+          "leases": [
+            {
+              "expiry": [
+                2,
+                3
+              ],
+              "leader": 7,
+              "start": [
+                1,
+                3
+              ],
+              "token": 3
+            }
+          ],
+          "writes": [
+            {
+              "leader": 7,
+              "token": 3,
+              "ts": [
+                2,
+                3
+              ]
+            }
+          ]
+        },
+        {
+          "accepted_writes": [
+            true
+          ],
+          "disjoint_leases": true
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c23_mut_2"
+    },
+    {
+      "args": [
+        {
+          "leases": [
+            {
+              "expiry": [
+                3,
+                1
+              ],
+              "leader": 10,
+              "start": [
+                0,
+                1
+              ],
+              "token": 1
+            },
+            {
+              "expiry": [
+                5,
+                1
+              ],
+              "leader": 20,
+              "start": [
+                5,
+                2
+              ],
+              "token": 2
+            }
+          ],
+          "writes": [
+            {
+              "leader": 10,
+              "token": 1,
+              "ts": [
+                1,
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "accepted_writes": [
+            true
+          ],
+          "disjoint_leases": true
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c23_mut_3"
+    },
+    {
+      "args": [
+        {
+          "leases": [
+            {
+              "expiry": [
+                1,
+                1
+              ],
+              "leader": 10,
+              "start": [
+                0,
+                1
+              ],
+              "token": 2
+            },
+            {
+              "expiry": [
+                3,
+                1
+              ],
+              "leader": 20,
+              "start": [
+                2,
+                1
+              ],
+              "token": 1
+            }
+          ],
+          "writes": []
+        },
+        {
+          "accepted_writes": [],
+          "disjoint_leases": true
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c23_mut_4"
+    },
+    {
+      "args": [
+        {
+          "leases": [
+            {
+              "expiry": [
+                10,
+                3
+              ],
+              "leader": 1,
+              "start": [
+                0,
+                1
+              ],
+              "token": 5
+            }
+          ],
+          "writes": [
+            {
+              "leader": 2,
+              "token": 5,
+              "ts": [
+                1,
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "accepted_writes": [
+            true
+          ],
+          "disjoint_leases": true
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c23_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "leases": [
+            {
+              "expiry": [
+                5,
+                2
+              ],
+              "leader": 10,
+              "start": [
+                0,
+                1
+              ],
+              "token": 1
+            },
+            {
+              "expiry": [
+                5,
+                1
+              ],
+              "leader": 20,
+              "start": [
+                5,
+                2
+              ],
+              "token": 2
+            }
+          ],
+          "writes": [
+            {
+              "leader": 10,
+              "token": 1,
+              "ts": [
+                2,
+                1
+              ]
+            },
+            {
+              "leader": 20,
+              "token": 2,
+              "ts": [
+                3,
+                1
+              ]
+            },
+            {
+              "leader": 10,
+              "token": 1,
+              "ts": [
+                2,
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "accepted_writes": [
+            true,
+            true,
+            false
+          ],
+          "disjoint_leases": true
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "leases": [
+            {
+              "expiry": [
+                3,
+                1
+              ],
+              "leader": 10,
+              "start": [
+                0,
+                1
+              ],
+              "token": 1
+            },
+            {
+              "expiry": [
+                5,
+                1
+              ],
+              "leader": 20,
+              "start": [
+                5,
+                2
+              ],
+              "token": 2
+            }
+          ],
+          "writes": [
+            {
+              "leader": 10,
+              "token": 1,
+              "ts": [
+                1,
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "accepted_writes": [],
+          "disjoint_leases": false
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "leases": [
+            {
+              "expiry": [
+                2,
+                3
+              ],
+              "leader": 7,
+              "start": [
+                1,
+                3
+              ],
+              "token": 3
+            }
+          ],
+          "writes": [
+            {
+              "leader": 7,
+              "token": 3,
+              "ts": [
+                2,
+                3
+              ]
+            }
+          ]
+        },
+        {
+          "accepted_writes": [
+            false
+          ],
+          "disjoint_leases": true
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "leases": [],
+          "writes": [
+            {
+              "leader": 0,
+              "token": 1,
+              "ts": [
+                0,
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "accepted_writes": [
+            false
+          ],
+          "disjoint_leases": true
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "leases": [
+            {
+              "expiry": [
+                10,
+                3
+              ],
+              "leader": 1,
+              "start": [
+                0,
+                1
+              ],
+              "token": 5
+            }
+          ],
+          "writes": [
+            {
+              "leader": 2,
+              "token": 5,
+              "ts": [
+                1,
+                1
+              ]
+            },
+            {
+              "leader": 1,
+              "token": 5,
+              "ts": [
+                7,
+                3
+              ]
+            }
+          ]
+        },
+        {
+          "accepted_writes": [
+            false,
+            true
+          ],
+          "disjoint_leases": true
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

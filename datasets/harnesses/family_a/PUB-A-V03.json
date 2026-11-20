@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAV03\ntheorem diff_sq_factor (a b : Int) : a * a - b * b = (a - b) * (a + b) := by sorry\ntheorem diff_sq_composite (a b : Int) (hb : b \u2265 0) (hgap : a > b + 1) : \u2203 u v : Int, u > 1 \u2227 v > 1 \u2227 a * a - b * b = u * v := by sorry\nend PubAV03\n",
+  "family": "A",
+  "id": "PUB-A-V03",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAV03.diff_sq_composite",
+  "trap_kind": "anti_bypass_algebra"
+}

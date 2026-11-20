@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C14",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC14\ntheorem interval_neg_enclosure (lo hi x : Int) (hx : lo \u2264 x \u2227 x \u2264 hi) : (-hi \u2264 -x \u2227 -x \u2264 -lo) \u2227 ((-lo) - (-hi) = hi - lo) := by sorry\nend PubDC14\n",
+    "module_title": "IvNeg",
+    "positive_lean": "namespace PubDC14\n\ntheorem interval_neg_enclosure (lo hi x : Int) (hx : lo \u2264 x \u2227 x \u2264 hi) :\n    (-hi \u2264 -x \u2227 -x \u2264 -lo) \u2227 ((-lo) - (-hi) = hi - lo) := by\n  omega\n\nend PubDC14\n",
+    "theorem_names": [
+      "PubDC14.interval_neg_enclosure"
+    ],
+    "verdict_sha": "80cc1cee1d3afd0ca20de6dcb89e7eb377698ed6"
+  }
+}

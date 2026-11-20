@@ -1,0 +1,344 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    used, m_ids = set(), []\n    for idx, (u, v) in enumerate(inst['edges']):\n        if u not in used and v not in used:\n            used.add(u)\n            used.add(v)\n            m_ids.append(idx)\n    return {'matching_edge_ids': m_ids, 'vertex_cover': sorted(used)}\n",
+  "id": "PUB-B-V04",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              4
+            ]
+          ],
+          "n": 5
+        },
+        {
+          "matching_edge_ids": [
+            0
+          ],
+          "vertex_cover": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v04_mut_1"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "matching_edge_ids": [
+            0,
+            1
+          ],
+          "vertex_cover": [
+            0,
+            1,
+            2
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v04_mut_2"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "matching_edge_ids": [
+            0
+          ],
+          "vertex_cover": [
+            0,
+            1
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v04_mut_3"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "matching_edge_ids": [
+            0,
+            2
+          ],
+          "vertex_cover": [
+            3,
+            2,
+            1,
+            0
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v04_mut_4"
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "matching_edge_ids": [
+            0,
+            0
+          ],
+          "vertex_cover": [
+            0,
+            1
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v04_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "matching_edge_ids": [
+            0,
+            2
+          ],
+          "vertex_cover": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              4
+            ]
+          ],
+          "n": 5
+        },
+        {
+          "matching_edge_ids": [
+            0
+          ],
+          "vertex_cover": [
+            0,
+            1
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [],
+          "n": 3
+        },
+        {
+          "matching_edge_ids": [],
+          "vertex_cover": []
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              4,
+              5
+            ],
+            [
+              1,
+              2
+            ]
+          ],
+          "n": 6
+        },
+        {
+          "matching_edge_ids": [
+            0,
+            1,
+            2
+          ],
+          "vertex_cover": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "edges": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              2,
+              3
+            ]
+          ],
+          "n": 4
+        },
+        {
+          "matching_edge_ids": [
+            0,
+            3
+          ],
+          "vertex_cover": [
+            0,
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

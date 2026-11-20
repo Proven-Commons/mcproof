@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-V06",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDV06\ndef offDiag : Nat \u2192 Nat\n  | 0 => 0\n  | n + 1 => offDiag n + n\ntheorem ordered_pairs_diag_split (n : Nat) : n + 2 * offDiag n = n * n := by sorry\nend PubDV06\n",
+    "module_title": "PairCount",
+    "positive_lean": "namespace PubDV06\n\ndef offDiag : Nat \u2192 Nat\n  | 0 => 0\n  | n + 1 => offDiag n + n\n\ntheorem ordered_pairs_diag_split (n : Nat) : n + 2 * offDiag n = n * n := by\n  induction n with\n  | zero => rfl\n  | succ m ih =>\n    simp only [offDiag, Nat.mul_add]\n    rw [Nat.add_mul m 1 m, Nat.one_mul, Nat.mul_one]\n    omega\n\nend PubDV06\n",
+    "theorem_names": [
+      "PubDV06.ordered_pairs_diag_split"
+    ],
+    "verdict_sha": "b93e3378c535b7831056a4864d52731e1fddcacc"
+  }
+}

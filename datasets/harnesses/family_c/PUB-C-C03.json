@@ -1,0 +1,14 @@
+{
+  "expected_tier": "CONJECTURE",
+  "family": "C",
+  "id": "PUB-C-C03",
+  "oracle_type": "verdict_audit",
+  "spec_meta": {
+    "expected_axioms": [
+      "propext"
+    ],
+    "expected_verdict": "weaker",
+    "source_commit": "732b2e2ec845fc025ac3369d86c0118553e241c8",
+    "verdict_id": "audit-nt-bezout-nat-trap"
+  }
+}

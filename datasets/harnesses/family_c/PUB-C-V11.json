@@ -1,0 +1,14 @@
+{
+  "expected_tier": "VERIFIED",
+  "family": "C",
+  "id": "PUB-C-V11",
+  "oracle_type": "verdict_audit",
+  "spec_meta": {
+    "expected_axioms": [
+      "propext"
+    ],
+    "expected_verdict": "weaker",
+    "source_commit": "17e8cc48753b33f872a273bb9543ce15c1e787f6",
+    "verdict_id": "audit-proto-2pc-liveness-gap"
+  }
+}

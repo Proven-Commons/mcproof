@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "C",
+  "id": "PUB-C-V02",
+  "oracle_type": "verdict_audit",
+  "spec_meta": {
+    "expected_axioms": [
+      "propext"
+    ],
+    "expected_verdict": "faithful",
+    "source_commit": "aed5f8fcba7711f53f86cf5fa3cfb7be41dca4bb",
+    "verdict_id": "audit-nt-euclid-unique-faithful"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-V03",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDV03\ntheorem bezout_scale_rhs (a b g x y c : Int) (h : a * x + b * y = g) : a * (x * c) + b * (y * c) = g * c := by sorry\nend PubDV03\n",
+    "module_title": "BezoutScale",
+    "positive_lean": "namespace PubDV03\n\ntheorem bezout_scale_rhs (a b g x y c : Int) (h : a * x + b * y = g) :\n    a * (x * c) + b * (y * c) = g * c := by\n  rw [\u2190 Int.mul_assoc a x c, \u2190 Int.mul_assoc b y c, \u2190 Int.add_mul, h]\n\nend PubDV03\n",
+    "theorem_names": [
+      "PubDV03.bezout_scale_rhs"
+    ],
+    "verdict_sha": "019f86a5da87b7e852a8b36afe8f1b3ce142cce7"
+  }
+}
