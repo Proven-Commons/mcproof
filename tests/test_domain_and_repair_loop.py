@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import importlib.util
 import io
 import json
 from pathlib import Path
+import re
+import subprocess
 import sys
 from typing import Any, Mapping, Sequence
+import uuid
+
+import pytest
 
 from mcproof.cli import main as cli_main
 from mcproof.domain_protocol import (
@@ -23,9 +29,17 @@ from mcproof.domain_protocol import (
     verify_minimal_goal_stopping,
     verify_rational_lp_certificate,
 )
+from mcproof.lean_harness import (
+    _NOFOLLOW_OPEN_RULE,
+    _nofollow_dir_ops_available,
+    linux_bwrap_functional,
+    strip_lean_comments_and_strings,
+)
 from mcproof.paths import repo_root
 from mcproof.repair_loop import (
     MAX_RETRIEVAL_TOKENS_HARD_CAP,
+    _family_c_direct_lake_build,
+    _run_family_c_real_lean_turn,
     compute_candidate_state_hash,
     compute_failure_signature,
     default_inference_oracle,
@@ -36,7 +50,7 @@ from mcproof.repair_loop import (
     sanitize_oracle_diagnostics,
 )
 
-from helpers import expect_eq, expect_false, expect_in, expect_true, requires_dep, requires_mde
+from helpers import expect_eq, expect_false, expect_in, expect_true, has_dep, has_lean_toolchain, requires_dep, requires_mde
 
 
 def test_targeted_plane1_retrieval_stays_under_1500_tokens_across_validation_split() -> None:
@@ -457,3 +471,548 @@ def test_audit_transition_certificate_catches_f01_to_f08_and_a6_a7(tmp_path: Pat
 
     lp_farkas_ok = verify_rational_lp_certificate({"mode": "infeasible", "A": [[-1, -1]], "b": [1], "y": [1]})
     expect_true(lp_farkas_ok["passed"])
+
+
+# Coprime two-modulus residue claims. These are the target statements the guard hashes.
+# They are not `op x = x`.
+_CRT_LEFT = (
+    "(m1 m2 x y : Nat) (hcop : Nat.gcd m1 m2 = 1) "
+    "(h1 : Dvd.dvd m1 (x - y)) (h2 : Dvd.dvd m2 (x - y)) : Dvd.dvd (m1 * m2) (x - y)"
+)
+_CRT_RIGHT = (
+    "(m1 m2 x : Nat) (hcop : Nat.gcd m1 m2 = 1) (hx : Dvd.dvd (m1 * m2) x) : Dvd.dvd m1 x"
+)
+
+
+def _family_c_spoof_harness() -> dict[str, Any]:
+    return {
+        "oracle_type": "bar_check",
+        "spec_meta": {
+            "pkg": "CrtPair",
+            "bar_status": "in-progress",
+            "test_cmd": "python3 tests/run_tests.py",
+            "theorem_names": ["CrtPair.Spec.crt_mod_left", "CrtPair.Spec.crt_mod_right"],
+            "statements": {
+                "CrtPair.Spec.crt_mod_left": _CRT_LEFT,
+                "CrtPair.Spec.crt_mod_right": _CRT_RIGHT,
+            },
+        },
+    }
+
+
+def test_family_c_real_lean_turn_rejects_says_verified_spoof() -> None:
+    comp = "Claim-Tier: PROVEN\n\nStatus: verified. All checks passed.\n"
+    findings = _run_family_c_real_lean_turn(_family_c_spoof_harness(), comp)
+    expect_true(bool(findings), "spoofed verified claim must fail the turn")
+    expect_in("FAMILY_C_STATUS_SELF_ATTESTATION", {f["rule"] for f in findings})
+
+
+def test_family_c_identity_plus_rfl_scaffold_no_longer_passes() -> None:
+    comp = (
+        "Claim-Tier: PROVEN\n\nStatus: verified.\n\n"
+        "```lean\ntheorem crt_mod_left (x : Nat) : CrtPair.op x = x := rfl\n```\n"
+    )
+    findings = _run_family_c_real_lean_turn(_family_c_spoof_harness(), comp)
+    expect_true(bool(findings), "identity scaffold with rfl must fail the turn")
+    expect_in("FAMILY_C_THEOREM_NAME_MISMATCH", {f["rule"] for f in findings})
+
+
+def test_family_c_lean_error_text_reaches_next_turn_prompt() -> None:
+    """Formats a hand-written diagnostic. This test does not run `lake`."""
+    findings = [
+        {
+            "line": 1,
+            "rule": "LAKE_BUILD_FAILED",
+            "message": "`lake build` failed: error: CrtPair/Proofs.lean:2:59: Unknown constant `Nat.noSuchLemma` | error: build failed",
+        }
+    ]
+    text = format_diagnostics(findings, family="C")
+    expect_in("LAKE_BUILD_FAILED", text)
+    expect_in("Proofs.lean:2:59", text)
+
+
+def test_family_c_fully_qualified_identity_rfl_fails_statement_hash() -> None:
+    """Fully-qualified `rfl` of `op x = x` must fail the pinned-statement hash.
+
+    The names match the challenge, so a disabled hash compare
+    (`if False and cand[name] != exp[name]`) lets this candidate through the guard
+    and this test fails.
+    """
+    comp = (
+        "Status: in progress.\n\n"
+        "```lean\n"
+        "theorem CrtPair.Spec.crt_mod_left (x : Nat) : CrtPair.op x = x := rfl\n"
+        "theorem CrtPair.Spec.crt_mod_right (x : Nat) : CrtPair.op x = x := rfl\n"
+        "```\n"
+    )
+    findings = _run_family_c_real_lean_turn(_family_c_spoof_harness(), comp)
+    rules = {f["rule"] for f in findings}
+    expect_in("FAMILY_C_STATEMENT_MISMATCH", rules)
+    expect_false("LAKE_BUILD_FAILED" in rules, "a statement mismatch must return before lake")
+    expect_false("FAMILY_C_THEOREM_NAME_MISMATCH" in rules, rules)
+
+
+def test_family_c_missing_statement_pin_does_not_fall_back_to_identity() -> None:
+    harness = _family_c_spoof_harness()
+    del harness["spec_meta"]["statements"]
+    comp = (
+        "```lean\n"
+        "theorem CrtPair.Spec.crt_mod_left (x : Nat) : CrtPair.op x = x := rfl\n"
+        "theorem CrtPair.Spec.crt_mod_right (x : Nat) : CrtPair.op x = x := rfl\n"
+        "```\n"
+    )
+    findings = _run_family_c_real_lean_turn(harness, comp)
+    expect_in("FAMILY_C_TARGET_STATEMENT_ABSENT", {f["rule"] for f in findings})
+
+
+def test_family_c_known_bad_proof_reaches_lake_build() -> None:
+    """Run `lake build` on a statement-exact candidate whose proof does not elaborate.
+
+    Skips only when `lean` and `lake` are absent. The skip reason says the lake path was not exercised.
+    """
+    if not has_lean_toolchain():
+        pytest.skip(
+            "Lean 4.35.0 (`lean` and `lake`) is absent, so the Family C lake path was not exercised"
+        )
+    comp = (
+        "Status: in progress.\n\n"
+        "```lean\n"
+        f"theorem CrtPair.Spec.crt_mod_left {_CRT_LEFT} := by\n  exact Nat.noSuchLemma x\n"
+        f"theorem CrtPair.Spec.crt_mod_right {_CRT_RIGHT} := by\n  exact Nat.noSuchLemma x\n"
+        "```\n"
+    )
+    findings = _run_family_c_real_lean_turn(_family_c_spoof_harness(), comp)
+    rules = {f["rule"] for f in findings}
+    expect_in("LAKE_BUILD_FAILED", rules)
+    blob = "\n".join(str(f.get("message", "")) for f in findings)
+    expect_in("noSuchLemma", blob)
+    expect_true(bool(re.search(r"\.lean:\d+:\d+", blob)), blob)
+
+
+_REFL_HEADER = "(n : Nat) : n = n"
+
+
+def _family_c_refl_harness() -> dict[str, Any]:
+    return {
+        "oracle_type": "bar_check",
+        "spec_meta": {
+            "pkg": "CrtPair",
+            "bar_status": "in-progress",
+            "test_cmd": "python3 tests/run_tests.py",
+            "theorem_names": ["CrtPair.Spec.crt_mod_left", "CrtPair.Spec.crt_mod_right"],
+            "statements": {
+                "CrtPair.Spec.crt_mod_left": _REFL_HEADER,
+                "CrtPair.Spec.crt_mod_right": _REFL_HEADER,
+            },
+        },
+    }
+
+
+def _family_c_refl_completion() -> str:
+    readme = (repo_root() / "datasets" / "targets" / "family_c" / "PUB-C-V01.md").read_text(encoding="utf-8")
+    return (
+        readme
+        + "\n```lean\n"
+        + "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
+        + "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
+        + "```\n"
+    )
+
+
+def test_family_c_correct_proof_passes_when_manifest_is_kept() -> None:
+    """A correct `rfl` proof yields no findings when the template manifest is kept.
+
+    `bar/check.py` item 3 fails closed without `lake-manifest.json`, including under
+    `--no-lean`. Deleting that file makes this test fail with `BAR_CHECK_FAILED`.
+    The test skips only when `lean` or the pinned `mission` checkout is absent.
+    """
+    if not has_lean_toolchain():
+        pytest.skip(
+            "Lean 4.35.0 (`lean` and `lake`) is absent, so the Family C correct-proof path was not exercised"
+        )
+    if not has_dep("mission"):
+        pytest.skip(
+            "pinned dependency 'mission' is absent, so the Family C bar path was not exercised"
+        )
+    findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), _family_c_refl_completion())
+    expect_eq(findings, [], "a correct proof must not be rejected when lake-manifest.json is kept")
+
+
+def test_family_c_midline_theorem_counts_as_an_extra_name() -> None:
+    """A theorem that does not start a line is still part of the name set."""
+    comp = (
+        "```lean\n"
+        "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
+        "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
+        "def pad := 0 theorem Extra : True := trivial\n"
+        "```\n"
+    )
+    findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), comp)
+    rules = {f["rule"] for f in findings}
+    expect_in("FAMILY_C_THEOREM_NAME_MISMATCH", rules)
+    expect_true(any("Extra" in str(f.get("message", "")) for f in findings), findings)
+    expect_false("LAKE_BUILD_FAILED" in rules, findings)
+    expect_false("BAR_CHECK_FAILED" in rules, findings)
+
+
+def _family_c_block_lake(monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
+    """Record a lake or comparator call and return no findings from either."""
+    called = {"lake": False}
+
+    def _no_lake(*_args: object, **_kwargs: object) -> list[dict[str, Any]]:
+        called["lake"] = True
+        return []
+
+    def _no_cmp(*_args: object, **_kwargs: object) -> Any:
+        called["lake"] = True
+        return type("Cmp", (), {"findings": ()})()
+
+    monkeypatch.setattr("mcproof.repair_loop._family_c_direct_lake_build", _no_lake)
+    monkeypatch.setattr("mcproof.repair_loop.verify_lean4_project_comparator", _no_cmp)
+    return called
+
+
+def test_family_c_midline_eval_commands_rejected_before_lake(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every command in the eval lint is rejected before `lake`, including mid-line.
+
+    The turn reads `FORBIDDEN_EVAL_COMMAND` itself. Putting the start-of-line
+    anchor back on that pattern lets these completions reach lake and this test fails.
+    A `#eval` or `#reduce` that sits in a comment or a string does not.
+    """
+    called = _family_c_block_lake(monkeypatch)
+    for command in ("#eval", "#reduce", "#check", "#print", "#synth"):
+        called["lake"] = False
+        comp = (
+            "```lean\n"
+            "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
+            "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
+            f"def pad := 0 {command} (1 : Nat)\n"
+            "```\n"
+        )
+        findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), comp)
+        rules = {f["rule"] for f in findings}
+        expect_false(called["lake"], f"lake ran for {command}: {findings}")
+        expect_in("FORBIDDEN_EVAL_COMMAND", rules, command)
+        expect_true(any(command in str(f.get("message", "")) for f in findings), findings)
+        expect_false("LAKE_BUILD_FAILED" in rules, findings)
+    decoy = (
+        "```lean\n"
+        "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
+        "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
+        "-- #eval IO.println \"x\"\n"
+        "def note := \"#reduce\"\n"
+        "```\n"
+    )
+    called["lake"] = False
+    decoy_findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), decoy)
+    decoy_rules = {f["rule"] for f in decoy_findings}
+    expect_false("FORBIDDEN_EVAL_COMMAND" in decoy_rules, decoy_findings)
+    if not _nofollow_dir_ops_available():
+        expect_in(_NOFOLLOW_OPEN_RULE, decoy_rules)
+        expect_false(called["lake"], decoy_findings)
+
+
+def test_family_c_raw_string_and_char_literal_do_not_hide_eval(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A real `#eval` after a raw string or a character literal is rejected before lake.
+
+    `r"\\"`, `r#"\\"#, `r###"\\"###`, `'"'`, and `'\\"'` used to desync the stripper,
+    so the command vanished from the pre-lake check and from the comparator lint.
+    Reverting the lexer makes `stripped` lose `#eval` and lets lake run.
+    """
+    called = _family_c_block_lake(monkeypatch)
+    snippets = (
+        'def s := r"\\"\n#eval (1 : Nat)\n',
+        'def s := r#"\\"#\n#eval (1 : Nat)\n',
+        'def s := r###"\\"###\n#eval (1 : Nat)\n',
+        "def c := '\"'\n#eval (1 : Nat)\n",
+        "def c := '\\\"'\n#eval (1 : Nat)\n",
+    )
+    for snippet in snippets:
+        called["lake"] = False
+        stripped = strip_lean_comments_and_strings(snippet)
+        expect_in("#eval", stripped, snippet)
+        findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), _family_c_with_theorems(snippet))
+        rules = {f["rule"] for f in findings}
+        expect_false(called["lake"], f"lake ran for {snippet!r}: {findings}")
+        expect_in("FORBIDDEN_EVAL_COMMAND", rules, snippet)
+        expect_true(any("#eval" in str(f.get("message", "")) for f in findings), findings)
+        expect_false("LAKE_BUILD_FAILED" in rules, findings)
+
+
+def test_family_c_initializers_rejected_before_lake(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`initialize`, `@[init]`, `builtin_initialize`, and `@[builtin_init]` never reach lake."""
+    called = _family_c_block_lake(monkeypatch)
+    cases = (
+        ("initialize do pure ()\n", "initialize"),
+        ("@[init] def pwnInit : IO Unit := pure ()\n", "@[init"),
+        ("builtin_initialize do pure ()\n", "builtin_initialize"),
+        ("@[builtin_init] def pwnBuilt : IO Unit := pure ()\n", "@[builtin_init"),
+        ("@[inline, init] def pwnInline : IO Unit := pure ()\n", "init"),
+    )
+    for snippet, needle in cases:
+        called["lake"] = False
+        findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), _family_c_with_theorems(snippet))
+        rules = {f["rule"] for f in findings}
+        expect_false(called["lake"], f"lake ran for {needle}: {findings}")
+        expect_in("FORBIDDEN_INITIALIZER", rules, needle)
+        expect_true(any(needle in str(f.get("message", "")) for f in findings), findings)
+        expect_false("LAKE_BUILD_FAILED" in rules, findings)
+
+
+def test_family_c_elab_commands_rejected_before_lake(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`run_cmd`, `run_elab`, `run_tac`, and `elab` are rejected before the first lake build."""
+    called = _family_c_block_lake(monkeypatch)
+    cases = (
+        ("run_cmd pure ()\n", "run_cmd"),
+        ("run_elab pure ()\n", "run_elab"),
+        ("run_tac pure ()\n", "run_tac"),
+        ('elab "pwn" : command => pure ()\n', "elab"),
+        ("def pad := 0\nrun_cmd pure ()\n", "run_cmd"),
+    )
+    for snippet, needle in cases:
+        called["lake"] = False
+        findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), _family_c_with_theorems(snippet))
+        rules = {f["rule"] for f in findings}
+        expect_false(called["lake"], f"lake ran for {needle}: {findings}")
+        expect_in("FORBIDDEN_ELAB_COMMAND", rules, needle)
+        expect_true(any(needle in str(f.get("message", "")) for f in findings), findings)
+        expect_false("LAKE_BUILD_FAILED" in rules, findings)
+
+
+def test_family_c_banned_commands_inside_text_are_not_findings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Comments, docstrings, strings, and README prose are not elaboration commands."""
+    called = _family_c_block_lake(monkeypatch)
+    comp = (
+        "The README mentions #eval, initialize, @[init], builtin_initialize, "
+        "run_cmd, run_elab, run_tac, and elab.\n\n"
+        "```lean\n"
+        "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
+        "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
+        "-- #eval initialize @[init] builtin_initialize run_cmd run_elab run_tac elab\n"
+        "/-- #eval initialize @[init] builtin_initialize run_cmd run_elab run_tac elab -/\n"
+        'def note := "#eval initialize @[init] builtin_initialize run_cmd run_elab run_tac elab"\n'
+        'def raw := r"#eval initialize @[init] run_cmd run_elab run_tac elab"\n'
+        "def ch := '\"'\n"
+        "```\n"
+    )
+    findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), comp)
+    rules = {f["rule"] for f in findings}
+    expect_false("FORBIDDEN_EVAL_COMMAND" in rules, findings)
+    expect_false("FORBIDDEN_INITIALIZER" in rules, findings)
+    expect_false("FORBIDDEN_ELAB_COMMAND" in rules, findings)
+    if not _nofollow_dir_ops_available():
+        expect_in(_NOFOLLOW_OPEN_RULE, rules)
+        expect_false(called["lake"], findings)
+
+
+def _family_c_with_theorems(snippet: str, *, prelude: str = "") -> str:
+    return (
+        "```lean\n"
+        + prelude
+        + "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
+        + "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
+        + snippet
+        + "```\n"
+    )
+
+
+def _skip_without_family_c_sandbox() -> None:
+    if not has_lean_toolchain():
+        pytest.skip(
+            "Lean 4.35.0 (`lean` and `lake`) is absent, so the Family C sandbox path was not exercised"
+        )
+    if not linux_bwrap_functional():
+        pytest.skip(
+            "Linux bwrap is missing or non-functional, so the Family C sandbox path was not exercised"
+        )
+
+
+def _expect_family_c_marker_absent(snippet: str, *, prelude: str = "") -> None:
+    """The host marker must stay absent. A passthrough sandbox writes it and this fails."""
+    marker = Path("/tmp") / f"mcproof-sandbox-marker-{uuid.uuid4().hex}"
+    marker.unlink(missing_ok=True)
+    body = snippet.replace("MARKER", str(marker))
+    try:
+        _run_family_c_real_lean_turn(
+            _family_c_refl_harness(),
+            _family_c_with_theorems(body, prelude=prelude),
+        )
+        expect_false(
+            marker.is_file(),
+            f"candidate wrote {marker}; the sandbox did not confine the build",
+        )
+    finally:
+        marker.unlink(missing_ok=True)
+
+
+def test_family_c_attribute_init_cannot_write_a_host_marker() -> None:
+    """`attribute [init]` runs when the axiom driver imports the built module.
+
+    The pre-lake regex only matches `@[`, so it does not keep this marker absent.
+    Disabling the sandbox lets the import write the host file and this test fails.
+    """
+    _skip_without_family_c_sandbox()
+    _expect_family_c_marker_absent(
+        'def pwnInit : IO Unit := IO.FS.writeFile "MARKER" "p"\nattribute [init] pwnInit\n'
+    )
+
+
+def test_family_c_short_raw_string_cannot_write_a_host_marker() -> None:
+    """A raw string closed with fewer hashes hides `#eval` from the stripper.
+
+    The turn rejects that command before lake, so the marker stays absent.
+    Reaching the build makes the spy in the confinement test fail.
+    """
+    _skip_without_family_c_sandbox()
+    _expect_family_c_marker_absent(
+        'def s := r##"foo"#\n#eval IO.FS.writeFile "MARKER" "p"\n'
+    )
+
+
+def test_family_c_lambda_and_sigma_raw_string_cannot_write_a_host_marker() -> None:
+    """`λ` and `Σ` hide a raw string from the stripper. Lean still runs the `#eval`."""
+    _skip_without_family_c_sandbox()
+    for snippet in (
+        'def s := λr"\\"\n#eval IO.FS.writeFile "MARKER" "p"\n',
+        'def s := Σr"\\"\n#eval IO.FS.writeFile "MARKER" "p"\n',
+    ):
+        _expect_family_c_marker_absent(snippet)
+
+
+def test_family_c_unclosed_char_literal_cannot_write_a_host_marker() -> None:
+    """An unclosed `'\"` hides the next `#eval`. Lean reports the error and still runs it."""
+    _skip_without_family_c_sandbox()
+    _expect_family_c_marker_absent(
+        'def c := \'"\n#eval IO.FS.writeFile "MARKER" "p"\n'
+    )
+
+
+def test_family_c_interpolation_cannot_write_a_host_marker() -> None:
+    """`s!\"{\"}\"` hides the next `#eval`. Lean still runs it during the lake build."""
+    _skip_without_family_c_sandbox()
+    _expect_family_c_marker_absent(
+        'def s := s!"{"}"\n#eval IO.FS.writeFile "MARKER" "p"\n'
+    )
+
+
+def test_family_c_run_meta_cannot_write_a_host_marker() -> None:
+    """`run_meta` runs in the first lake build, before the comparator flags it."""
+    _skip_without_family_c_sandbox()
+    _expect_family_c_marker_absent(
+        'run_meta do IO.FS.writeFile "MARKER" "p"\n',
+        prelude="import Lean\n",
+    )
+
+
+def test_family_c_elab_rules_cannot_write_a_host_marker() -> None:
+    """`elab_rules` runs in the first lake build, before the comparator flags it."""
+    _skip_without_family_c_sandbox()
+    _expect_family_c_marker_absent(
+        'syntax "pwn" : command\n'
+        "elab_rules : command\n"
+        '  | `(command| pwn) => do IO.FS.writeFile "MARKER" "p"\n'
+        "pwn\n",
+        prelude="import Lean\n",
+    )
+
+
+def test_family_c_refuses_candidate_build_when_sandbox_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A candidate build is refused when `bwrap` is unavailable. This needs neither Lean nor bwrap."""
+    monkeypatch.setattr("mcproof.repair_loop.linux_bwrap_functional", lambda **_kwargs: False)
+    monkeypatch.setattr("mcproof.lean_harness.linux_bwrap_functional", lambda **_kwargs: False)
+
+    def _refuse(cmd: object, *_args: object, **_kwargs: object) -> None:
+        raise AssertionError(f"candidate command ran without a sandbox: {cmd}")
+
+    monkeypatch.setattr(subprocess, "run", _refuse)
+    findings = _family_c_direct_lake_build(tmp_path)
+    rules = {f["rule"] for f in findings}
+    if _nofollow_dir_ops_available():
+        expect_eq(rules, {"SANDBOX_UNAVAILABLE"}, str(findings))
+        expect_true(any("unsandboxed" in str(f.get("message", "")) for f in findings), findings)
+    else:
+        expect_eq(rules, {_NOFOLLOW_OPEN_RULE}, str(findings))
+
+
+def test_family_c_compilable_elab_names_are_not_commands(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`elab'`, `x.elab`, and `«elab»` compile. The bare-word ban must not reject them."""
+    called = _family_c_block_lake(monkeypatch)
+    for snippet in ("def elab' := 1\n", "def x.elab := 1\n", "def «elab» := 1\n", "def elab.foo := 1\n"):
+        called["lake"] = False
+        findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), _family_c_with_theorems(snippet))
+        rules = {f["rule"] for f in findings}
+        expect_false("FORBIDDEN_ELAB_COMMAND" in rules, f"{snippet!r}: {findings}")
+        if _nofollow_dir_ops_available():
+            expect_true(called["lake"], f"{snippet!r} never reached the build: {findings}")
+        else:
+            expect_in(_NOFOLLOW_OPEN_RULE, rules)
+            expect_false(called["lake"], findings)
+
+
+def test_family_c_non_ascii_and_other_decls_count_as_extra_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`«Extra»`, `α`, `café`, `instance`, `example`, and `abbrev` are extra names."""
+    called = _family_c_block_lake(monkeypatch)
+    cases = (
+        ("theorem «Extra» : True := trivial\n", "«Extra»"),
+        ("def pad := 0 theorem «Extra» : True := trivial\n", "«Extra»"),
+        ("theorem α : True := trivial\n", "α"),
+        ("def pad := 0 theorem α : True := trivial\n", "α"),
+        ("theorem café : True := trivial\n", "café"),
+        ("instance extraInst : Inhabited Unit := ⟨()⟩\n", "extraInst"),
+        ("def pad := 0 instance extraInst : Inhabited Unit := ⟨()⟩\n", "extraInst"),
+        ("example : True := trivial\n", "example"),
+        ("abbrev FooN := Nat\n", "FooN"),
+    )
+    for snippet, needle in cases:
+        called["lake"] = False
+        comp = (
+            "```lean\n"
+            "theorem CrtPair.Spec.crt_mod_left (n : Nat) : n = n := rfl\n"
+            "theorem CrtPair.Spec.crt_mod_right (n : Nat) : n = n := rfl\n"
+            + snippet
+            + "```\n"
+        )
+        findings = _run_family_c_real_lean_turn(_family_c_refl_harness(), comp)
+        rules = {f["rule"] for f in findings}
+        expect_false(called["lake"], f"lake ran for {needle}: {findings}")
+        expect_in("FAMILY_C_THEOREM_NAME_MISMATCH", rules, needle)
+        expect_true(any(needle in str(f.get("message", "")) for f in findings), findings)
+        expect_false("LAKE_BUILD_FAILED" in rules, findings)
+
+
+def test_grade_item_pins_statements_and_refuses_identity_scaffold() -> None:
+    script = repo_root() / "datasets" / "scripts" / "grade_item.py"
+    spec = importlib.util.spec_from_file_location("grade_item_under_test", script)
+    expect_true(spec is not None and spec.loader is not None, "grade_item.py failed to load")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    harness = _family_c_spoof_harness()
+    bare = json.loads(json.dumps(harness))
+    del bare["spec_meta"]["statements"]
+    ok, errs = mod._run_family_c_structural_replay(bare, "Status: in progress.\n")
+    expect_false(ok, errs)
+    expect_true(any("target_statements_absent" in err for err in errs), errs)
+    readme = (repo_root() / "datasets" / "targets" / "family_c" / "PUB-C-V01.md").read_text(encoding="utf-8")
+    ok_pinned, pinned_errs = mod._run_family_c_structural_replay(harness, readme)
+    mission_check = mod.DEPS_ROOT / "mission" / "bar" / "check.py"
+    if not mission_check.is_file():
+        expect_false(ok_pinned, pinned_errs)
+        expect_true(any("missing_mission_dep" in err for err in pinned_errs), pinned_errs)
+        return
+    expect_true(ok_pinned, pinned_errs)
+    spec_src = mod._family_c_spec_source("CrtPair", harness["spec_meta"]["statements"])
+    expect_in("Dvd.dvd (m1 * m2) (x - y)", spec_src)
+    expect_false("op x = x" in spec_src, spec_src)
+    lake = mod._family_c_lakefile("CrtPair")
+    expect_in('"CrtPair.Spec"', lake)
+    expect_in('"CrtPair.Proofs"', lake)
+    expect_false(lake.split("defaultTargets = ", 1)[1].startswith('["CrtPair"]\n'), lake)

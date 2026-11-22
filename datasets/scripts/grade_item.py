@@ -4,9 +4,11 @@
 Delegates primary Family A/B/C/D checks to `bin/mcproof` and runs structural
 claim/metadata replay (`mission/bar/check.py` README/bar.toml consistency,
 verdict JSON field checks, and `f0/scripts/gate.py` feed schema checks) for
-Family C items when `--id` is supplied. Note: Family C audits prose/metadata
-alignment and claim-tier honesty, whereas Lean 4 theorem proving is tested in
-Family A and Family D.
+Family C items when `--id` is supplied. A `bar_check` replay pins
+`spec_meta.statements` and does not emit an identity scaffold. It does not
+compile Lean. A `verdict_audit` item, including `PUB-C-V02`, checks a verdict
+JSON block and does not build a Lean project. Lean 4 theorem proving is tested
+in Family A and Family D.
 """
 from __future__ import annotations
 
@@ -51,6 +53,17 @@ def _resolve_deps_root() -> Path:
 MCPROOF_BIN = _resolve_mcproof_bin()
 DEPS_ROOT = _resolve_deps_root()
 
+if str(REPO_ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / "src"))
+
+from mcproof.repair_loop import (  # noqa: E402
+    _family_c_lakefile,
+    _family_c_root_source,
+    _family_c_spec_source,
+    _family_c_statement_headers,
+    _family_c_code_under_proof,
+)
+
 
 def _load_item(item_id: str) -> dict[str, Any]:
     for name in ("compile.jsonl", "validation.jsonl"):
@@ -83,41 +96,35 @@ def _run_family_c_structural_replay(harness: dict[str, Any], completion_text: st
     errs: list[str] = []
 
     if otype == "bar_check":
+        pkg = str(meta["pkg"])
+        thms = list(meta["theorem_names"])
+        headers = _family_c_statement_headers(meta, thms)
+        if headers is None:
+            return False, [
+                "target_statements_absent: spec_meta.statements must pin the header of every theorem_names entry"
+            ]
         bar_tpl = DEPS_ROOT / "mission" / "bar" / "template"
         bar_chk = DEPS_ROOT / "mission" / "bar" / "check.py"
         if not bar_tpl.is_dir() or not bar_chk.is_file():
             return False, [f"missing_mission_dep_under_{DEPS_ROOT.name}__run_bin_bootstrap_deps"]
-        pkg = str(meta["pkg"])
-        thms = list(meta["theorem_names"])
         readme_body = re.sub(r"(?im)^Claim-Tier:[^\n]*\n+", "", completion_text, count=1)
         # Take bar_status strictly from harness metadata; candidate prose cannot self-promote status.
         bar_status = str(meta["bar_status"])
+        code_toml = ", ".join(json.dumps(name) for name in _family_c_code_under_proof(pkg, meta))
         with tempfile.TemporaryDirectory(prefix="mcproof_ds_bar_") as td:
             root = Path(td)
             shutil.copytree(bar_tpl, root, dirs_exist_ok=True)
             (root / "Clamp.lean").unlink(missing_ok=True)
             shutil.rmtree(root / "Clamp", ignore_errors=True)
-            (root / f"{pkg}.lean").write_text(f"namespace {pkg}\ndef op (x : Nat) : Nat := x\nend {pkg}\n", encoding="utf-8")
+            (root / f"{pkg}.lean").write_text(_family_c_root_source(pkg, meta), encoding="utf-8")
             (root / pkg).mkdir(exist_ok=True)
-            spec_lines = [f"import {pkg}", f"namespace {pkg}.Spec"]
-            proof_lines = [f"import {pkg}", f"namespace {pkg}.Spec"]
-            for tfull in thms:
-                tshort = tfull.split(".")[-1]
-                spec_lines.append(f"theorem {tshort} (x : Nat) : {pkg}.op x = x := by sorry")
-                proof_lines.append(f"theorem {tshort} (x : Nat) : {pkg}.op x = x := rfl")
-            spec_lines.append(f"end {pkg}.Spec\n")
-            proof_lines.append(f"end {pkg}.Spec\n")
-            (root / pkg / "Spec.lean").write_text("\n".join(spec_lines), encoding="utf-8")
-            (root / pkg / "Proofs.lean").write_text("\n".join(proof_lines), encoding="utf-8")
-            (root / "Main.lean").write_text(f'import {pkg}\ndef main : IO Unit := IO.println s!"{{{pkg}.op 1}}"\n', encoding="utf-8")
-            (root / "lakefile.toml").write_text(
-                f'name = "{pkg.lower()}"\nversion = "0.1.0"\ndefaultTargets = ["{pkg}"]\n\n'
-                f'[[lean_lib]]\nname = "{pkg}"\n\n'
-                f'[[lean_lib]]\nname = "{pkg}.Spec"\n\n'
-                f'[[lean_lib]]\nname = "{pkg}.Proofs"\n\n'
-                f'[[lean_exe]]\nname = "{pkg.lower()}"\nroot = "Main"\n',
+            (root / pkg / "Spec.lean").write_text(_family_c_spec_source(pkg, headers), encoding="utf-8")
+            (root / pkg / "Proofs.lean").write_text(f"import {pkg}\n", encoding="utf-8")
+            (root / "Main.lean").write_text(
+                f'import {pkg}\ndef main : IO Unit := IO.println "ok"\n',
                 encoding="utf-8",
             )
+            (root / "lakefile.toml").write_text(_family_c_lakefile(pkg), encoding="utf-8")
             (root / "comparator.json").write_text(
                 json.dumps(
                     {
@@ -134,7 +141,7 @@ def _run_family_c_structural_replay(harness: dict[str, Any], completion_text: st
             (root / "bar.toml").write_text(
                 f'[project]\nname = "{pkg.lower()}"\nstatus = "{bar_status}"\npage = "README.md"\n'
                 f'spec_authors = ["example-author"]\nentry_points = ["Main.lean"]\n\n'
-                f'[spec]\nfiles = ["SPEC.md", "{pkg}/Spec.lean"]\ncode = ["{pkg}.op"]\n\n'
+                f'[spec]\nfiles = ["SPEC.md", "{pkg}/Spec.lean"]\ncode = [{code_toml}]\n\n'
                 f'[tests]\nresults = "tests/TEST-RESULTS.md"\ncommand = "{meta["test_cmd"]}"\nfiles = ["tests/run_tests.py"]\n',
                 encoding="utf-8",
             )

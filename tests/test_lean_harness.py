@@ -129,7 +129,7 @@ def test_reference_lean_project_passes_six_kernel_comparator() -> None:
     if not linux_bwrap_functional():
         pytest.skip(
             "Linux bwrap is missing or non-functional on this host "
-            "(minimal `bwrap --ro-bind / / true` or lake `/run/user` session probe failed)"
+            "(the confinement probe rejected the sandbox)"
         )
     res = verify_lean4_project_comparator(repo_root() / "lean", allow_unsandboxed=False)
     expect_true(res.passed, f"reference lean project failed: {res.findings}")

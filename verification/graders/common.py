@@ -15,6 +15,13 @@ import sys
 import tempfile
 from typing import Any, Mapping, Sequence
 
+from mcproof.lean_harness import (
+    COMPILE_BLOCKING_LINT_RULES,
+    CandidateSandboxUnavailable,
+    lint_lean4_source,
+    run_confined_command,
+)
+
 getcontext().prec = 100
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -274,6 +281,21 @@ def run_lean4_verification(
             "leanchecker_ran": False,
         }
 
+    # The soko auditor does not treat `attribute [init]` as a reason to stop.
+    # This lint does. The compile below is confined either way.
+    lint = lint_lean4_source(lean_source, require_theorem=False, check_vacuous=False)
+    for item in lint["findings"]:
+        if item.get("rule") in COMPILE_BLOCKING_LINT_RULES:
+            errors.append(f"lint:{item.get('rule')}:{item.get('message')}")
+    if errors:
+        return {
+            "ok": False,
+            "errors": errors,
+            "auditor": audit_rep,
+            "axioms": {},
+            "leanchecker_ran": False,
+        }
+
     tc_bin = find_lean_toolchain_bin()
     lean_exe = str(tc_bin / "lean")
     checker_exe = str(tc_bin / "leanchecker")
@@ -300,14 +322,22 @@ def run_lean4_verification(
         olean_path = Path(td) / "CandidateMod.olean"
         mod_path.write_text(combined_source, encoding="utf-8")
 
-        comp = subprocess.run(
-            [lean_exe, "-o", str(olean_path), str(mod_path)],
-            cwd=td,
-            capture_output=True,
-            text=True,
-            env=env,
-            timeout=timeout_sec,
-        )
+        try:
+            comp = run_confined_command(
+                [lean_exe, "-o", str(olean_path), str(mod_path)],
+                cwd=Path(td),
+                env=env,
+                timeout_sec=timeout_sec,
+            )
+        except CandidateSandboxUnavailable as exc:
+            errors.append(f"sandbox_unavailable:{exc}")
+            return {
+                "ok": False,
+                "errors": errors,
+                "auditor": audit_rep,
+                "axioms": axioms_by_thm,
+                "leanchecker_ran": False,
+            }
         if comp.returncode != 0:
             msg = (comp.stdout + "\n" + comp.stderr).strip()
             errors.append(f"lean_compile_failed:{msg[:400]}")
@@ -343,14 +373,22 @@ def run_lean4_verification(
         if not errors and run_leanchecker and Path(checker_exe).is_file():
             env_chk = dict(env)
             env_chk["LEAN_PATH"] = f"{td}{os.pathsep}{libdir}"
-            chk_run = subprocess.run(
-                [checker_exe, "CandidateMod"],
-                cwd=td,
-                capture_output=True,
-                text=True,
-                env=env_chk,
-                timeout=timeout_sec,
-            )
+            try:
+                chk_run = run_confined_command(
+                    [checker_exe, "CandidateMod"],
+                    cwd=Path(td),
+                    env=env_chk,
+                    timeout_sec=timeout_sec,
+                )
+            except CandidateSandboxUnavailable as exc:
+                errors.append(f"sandbox_unavailable:{exc}")
+                return {
+                    "ok": False,
+                    "errors": errors,
+                    "auditor": audit_rep,
+                    "axioms": axioms_by_thm,
+                    "leanchecker_ran": False,
+                }
             if chk_run.returncode != 0:
                 msg = (chk_run.stdout + "\n" + chk_run.stderr).strip()
                 errors.append(f"leanchecker_failed:{msg[:300]}")
