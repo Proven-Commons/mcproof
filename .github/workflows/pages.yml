@@ -1,0 +1,70 @@
+name: Pages (no proof, no publish)
+
+# The verify job is the proof checker for the site itself. The deploy job
+# needs it, so a broken claim graph cannot reach GitHub Pages: tier
+# inflation, a cycle, a JS/Python disagreement, a surviving planted bug,
+# or a non-reproducible build all stop publication.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Python checker, three modes
+        run: |
+          python3 -I -B tools/verify.py --write-certificate
+          python3 -I -O -B tools/verify.py
+          python3 -I -B -W error tools/verify.py
+      - name: Certificate on disk matches a fresh one
+        run: git diff --exit-code -- docs/data/certificate.json
+      - name: Planted-bug suite (12 corruptions, all must be rejected)
+        run: python3 -I -B tools/run_mutations.py
+      - name: JavaScript checker agrees with the Python certificate
+        run: node --test "test/*.test.mjs"
+      - name: Deterministic build, twice, byte-identical
+        run: |
+          python3 -I -B tools/build.py --verify
+          cp docs/index.html /tmp/index.first.html
+          cp docs/data/certificate.json /tmp/certificate.first.json
+          python3 -I -B tools/build.py --verify
+          cmp /tmp/index.first.html docs/index.html
+          cmp /tmp/certificate.first.json docs/data/certificate.json
+          git diff --exit-code -- docs/index.html docs/data/certificate.json
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: docs
+
+  deploy:
+    needs: verify
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
