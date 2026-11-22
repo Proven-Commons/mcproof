@@ -33,9 +33,21 @@ from typing import Any, Callable, Mapping, Sequence
 import urllib.request
 
 from .lean_harness import (
+    BAR_FORBIDDEN_RULES,
     THEOREM_DECL_RE,
+    CandidateSandboxUnavailable,
+    UntrustedProjectPath,
+    _lake_symlink_finding,
+    _lean_commands_that_may_run,
+    _lean_env,
+    _materialize_trusted_tree,
+    _read_project_tree,
+    _trusted_inputs,
+    linux_bwrap_functional,
+    run_confined_command,
     strip_lean_comments_and_strings,
     verify_lean4_against_challenge,
+    verify_lean4_project_comparator,
     verify_lean4_prompt_obligations,
     verify_pinned_lean_defs,
 )
@@ -52,7 +64,7 @@ from .oracles import (
     run_verdicts_oracle,
     sanitize_verdict_id,
 )
-from .paths import dep_repo, repo_root
+from .paths import dep_repo, find_lean_tool, repo_root
 
 MAX_RETRIEVAL_TOKENS_HARD_CAP = 1500
 QWEN35_STOP_TOKENS: tuple[str, ...] = ("<|im_end|>", "<|endoftext|>")
@@ -819,77 +831,531 @@ def _extract_first_json_block(text: str) -> str | None:
     return blocks[0].strip() if blocks else None
 
 
-def _run_public_family_c_harness(harness: Mapping[str, Any], completion_text: str) -> list[dict[str, Any]]:
-    """Post-hoc Family C ground-truth scorer matching `datasets/scripts/grade_item.py`."""
-    otype = harness.get("oracle_type")
-    meta = harness.get("spec_meta") or {}
-    findings: list[dict[str, Any]] = []
+_FAMILY_C_STATUS_VERIFIED_RE = re.compile(r"(?im)^status\s*:\s*verified\b")
+_FAMILY_C_STATUS_NOT_VERIFIED_RE = re.compile(r"(?im)^status\s*:.*not verified")
+_FAMILY_C_SORRY_OR_ADMIT_RE = re.compile(r"\b(sorry|admit)\b")
+# Lean atomic names include `«quoted»` forms and non-ASCII letters such as `α` and `café`.
+_LEAN_NAME_ATOM = r"(?:«[^»]*»|_*(?:[^\W\d_])[\w!?']*)"
+_LEAN_NAME = rf"{_LEAN_NAME_ATOM}(?:\.{_LEAN_NAME_ATOM})*"
+_FAMILY_C_DECL_NAME_RE = re.compile(
+    rf"\b(?:theorem|lemma)\b[ \t]+(?P<name>{_LEAN_NAME})"
+)
+_FAMILY_C_OTHER_DECL_RE = re.compile(
+    rf"(?<![\w@\[])(?:"
+    rf"instance\b(?:[ \t]+(?P<inst>{_LEAN_NAME}))?(?=[ \t]*:)"
+    rf"|example\b(?:[ \t]+(?P<ex>{_LEAN_NAME}))?(?=[ \t]*:)"
+    rf"|abbrev\b[ \t]+(?P<abbrev>{_LEAN_NAME})"
+    rf")"
+)
 
-    if otype == "bar_check":
-        bar_tpl = dep_repo("mission") / "bar" / "template"
-        bar_chk = dep_repo("mission") / "bar" / "check.py"
-        pkg = str(meta["pkg"])
-        thms = list(meta["theorem_names"])
-        readme_body = re.sub(r"(?im)^Claim-Tier:[^\n]*\n+", "", completion_text, count=1)
-        says_verified = bool(
-            re.search(r"(?im)^status\s*:\s*verified\b", readme_body)
-            and not re.search(r"(?im)^status\s*:.*not verified", readme_body)
+
+def _normalize_family_c_statement(text: str) -> str:
+    """Collapse whitespace so statement hashes are layout-insensitive."""
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _family_c_candidate_statements(candidate_lean: str) -> dict[str, str]:
+    """Map each fully-qualified theorem name to the sha256 of its normalized statement."""
+    cleaned = strip_lean_comments_and_strings(candidate_lean)
+    stmts: dict[str, str] = {}
+    for match in THEOREM_DECL_RE.finditer(cleaned):
+        full = str(match.group("name"))
+        stmt = _normalize_family_c_statement(f"{full} {match.group('header')}")
+        stmts[full] = hashlib.sha256(stmt.encode("utf-8")).hexdigest()
+    return stmts
+
+
+def _family_c_all_decl_names(candidate_lean: str) -> set[str]:
+    """Declaration names the line-start ASCII theorem regex does not keep.
+
+    Includes a mid-line `theorem`, a `«quoted»` or non-ASCII name, and
+    `instance`, `example`, and `abbrev`. An unnamed `example` or `instance`
+    is recorded under that keyword.
+    """
+    cleaned = strip_lean_comments_and_strings(candidate_lean)
+    names = {str(match.group("name")) for match in _FAMILY_C_DECL_NAME_RE.finditer(cleaned)}
+    for match in _FAMILY_C_OTHER_DECL_RE.finditer(cleaned):
+        if match.group(0).startswith("instance"):
+            names.add(str(match.group("inst") or "instance"))
+        elif match.group(0).startswith("example"):
+            names.add(str(match.group("ex") or "example"))
+        elif match.group("abbrev"):
+            names.add(str(match.group("abbrev")))
+    return names
+
+
+def _family_c_forbidden_eval_findings(candidate_lean: str) -> list[dict[str, Any]]:
+    """Reject every command in the `FORBIDDEN_EVAL_COMMAND` lint, including mid-line.
+
+    The scan uses that lint's own pattern on comment-stripped and string-stripped
+    source. A hit returns before `lake build`, because those commands run candidate
+    code during elaboration.
+    """
+    cleaned = strip_lean_comments_and_strings(candidate_lean)
+    rx = dict(BAR_FORBIDDEN_RULES)["FORBIDDEN_EVAL_COMMAND"]
+    found: list[str] = []
+    for match in rx.finditer(cleaned):
+        cmd = match.group(0)
+        if cmd not in found:
+            found.append(cmd)
+    if not found:
+        return []
+    return [
+        {
+            "rule": "FORBIDDEN_EVAL_COMMAND",
+            "message": (
+                "candidate contains a Lean command that runs during elaboration: "
+                + ", ".join(found)
+                + "."
+            ),
+        }
+    ]
+
+
+# `initialize` / `builtin_initialize` and the `@[init]` / `@[builtin_init]` attributes run IO
+# during `lake build`. `run_cmd`, `run_elab`, `run_tac`, and `elab` do too, before the
+# comparator's own lint. Identifier characters include `'`, `.`, and `«»`, which are not
+# `\w`, so the boundary is explicit: `elab'`, `x.elab`, and `«elab»` stay legal names.
+_FAMILY_C_NAME_EDGE = r"\w.'»«"
+_FAMILY_C_INITIALIZER_RE = re.compile(
+    rf"(?<![{_FAMILY_C_NAME_EDGE}])(?:builtin_initialize|initialize)(?![{_FAMILY_C_NAME_EDGE}])"
+    r"|@\[[^\]]*?\b(?:builtin_init|init)\b"
+)
+_FAMILY_C_ELAB_COMMAND_RE = re.compile(
+    rf"\b(?:run_cmd|run_elab|run_tac)\b|(?<![{_FAMILY_C_NAME_EDGE}])elab(?![{_FAMILY_C_NAME_EDGE}])"
+)
+# These run during the build or the later import. They are recorded, and the build still
+# runs inside the sandbox. Returning here would hide a sandbox that no longer confines.
+# `attribute [init]` matches mid-line and across a newline, not only at column zero.
+_FAMILY_C_BUILD_SIDE_EFFECT_RE = re.compile(
+    r"attribute\s*\[[^\]]*\b(?:builtin_init|init)\b"
+    r"|\brun_meta\b"
+    r"|\belab_rules\b"
+)
+
+
+def _family_c_unique_matches(rx: re.Pattern[str], cleaned: str) -> list[str]:
+    found: list[str] = []
+    for match in rx.finditer(cleaned):
+        cmd = match.group(0)
+        if cmd not in found:
+            found.append(cmd)
+    return found
+
+
+def _family_c_initializer_findings(candidate_lean: str) -> list[dict[str, Any]]:
+    """Reject initializers before `lake build`. They execute IO while the project builds."""
+    cleaned = strip_lean_comments_and_strings(candidate_lean)
+    found = _family_c_unique_matches(_FAMILY_C_INITIALIZER_RE, cleaned)
+    if not found:
+        return []
+    return [
+        {
+            "rule": "FORBIDDEN_INITIALIZER",
+            "message": (
+                "candidate contains a Lean initializer that runs during lake build: "
+                + ", ".join(found)
+                + "."
+            ),
+        }
+    ]
+
+
+def _family_c_elab_command_findings(candidate_lean: str) -> list[dict[str, Any]]:
+    """Reject elaboration commands before the first `lake build`, not only in the comparator."""
+    cleaned = strip_lean_comments_and_strings(candidate_lean)
+    found = _family_c_unique_matches(_FAMILY_C_ELAB_COMMAND_RE, cleaned)
+    if not found:
+        return []
+    return [
+        {
+            "rule": "FORBIDDEN_ELAB_COMMAND",
+            "message": (
+                "candidate contains a Lean elaboration command that runs during lake build: "
+                + ", ".join(found)
+                + "."
+            ),
+        }
+    ]
+
+
+def _family_c_build_side_effect_findings(candidate_lean: str) -> list[dict[str, Any]]:
+    """Record `attribute [init]`, `run_meta`, and `elab_rules` without skipping the build.
+
+    The sandbox is what stops the write. These findings stay on the result either way.
+    """
+    cleaned = strip_lean_comments_and_strings(candidate_lean)
+    found = _family_c_unique_matches(_FAMILY_C_BUILD_SIDE_EFFECT_RE, cleaned)
+    if not found:
+        return []
+    return [
+        {
+            "rule": "FORBIDDEN_BUILD_SIDE_EFFECT",
+            "message": (
+                "candidate contains a command that runs during compilation or import: "
+                + ", ".join(found)
+                + "."
+            ),
+        }
+    ]
+
+
+def _family_c_statement_headers(
+    meta: Mapping[str, Any], theorem_names: Sequence[str]
+) -> dict[str, str] | None:
+    """Return the pinned header of every challenge theorem, or None if any pin is missing.
+
+    A header is the text after the fully-qualified theorem name, the same span
+    `THEOREM_DECL_RE` captures. Callers hash that text. Nothing here invents `op x = x`.
+    """
+    raw = meta.get("statements")
+    if not isinstance(raw, Mapping):
+        return None
+    headers: dict[str, str] = {}
+    for name in theorem_names:
+        full = str(name)
+        header = raw.get(full)
+        if not isinstance(header, str) or not header.strip():
+            return None
+        headers[full] = header.strip()
+    return headers
+
+
+def _family_c_expected_statements(headers: Mapping[str, str]) -> dict[str, str]:
+    """Map each fully-qualified name to the sha256 of its pinned, whitespace-normalized statement."""
+    expected: dict[str, str] = {}
+    for full, header in headers.items():
+        stmt = _normalize_family_c_statement(f"{full} {header}")
+        expected[str(full)] = hashlib.sha256(stmt.encode("utf-8")).hexdigest()
+    return expected
+
+
+def _family_c_root_source(pkg: str, meta: Mapping[str, Any]) -> str:
+    """Library module for the generated project. Uses caller-supplied defs, never an identity `op`."""
+    defs = meta.get("definitions")
+    if isinstance(defs, str) and defs.strip():
+        return defs.strip() + "\n"
+    return f"namespace {pkg}\nend {pkg}\n"
+
+
+def _family_c_spec_source(pkg: str, headers: Mapping[str, str]) -> str:
+    """Challenge module: each pinned header, proved with `sorry` so the solution file is what `lake` checks."""
+    lines = [f"import {pkg}", f"namespace {pkg}.Spec"]
+    for full, header in headers.items():
+        short = str(full).split(".")[-1]
+        lines.append(f"theorem {short} {header} := by sorry")
+    lines.append(f"end {pkg}.Spec")
+    return "\n".join(lines) + "\n"
+
+
+def _family_c_lakefile(pkg: str) -> str:
+    """Build the library, the challenge, and the candidate proofs. `["{pkg}"]` alone skips the proofs."""
+    return (
+        f'name = "{pkg.lower()}"\nversion = "0.1.0"\n'
+        f'defaultTargets = ["{pkg}", "{pkg}.Spec", "{pkg}.Proofs"]\n\n'
+        f'[[lean_lib]]\nname = "{pkg}"\n\n[[lean_lib]]\nname = "{pkg}.Spec"\n\n'
+        f'[[lean_lib]]\nname = "{pkg}.Proofs"\n\n[[lean_exe]]\nname = "{pkg.lower()}"\nroot = "Main"\n'
+    )
+
+
+def _family_c_code_under_proof(pkg: str, meta: Mapping[str, Any]) -> list[str]:
+    raw = meta.get("code_under_proof")
+    if isinstance(raw, list) and raw and all(isinstance(item, str) and item.strip() for item in raw):
+        return [str(item) for item in raw]
+    return [pkg]
+
+
+def _family_c_toolchain_pin() -> str:
+    return (repo_root() / "lean" / "lean-toolchain").read_text(encoding="utf-8").strip() + "\n"
+
+
+def _check_family_c_statement_match(
+    meta: Mapping[str, Any],
+    theorem_names: Sequence[str],
+    candidate_lean: str,
+) -> list[dict[str, Any]]:
+    """Statement-match guard: names plus hashes of the pinned target statements."""
+    findings: list[dict[str, Any]] = []
+    headers = _family_c_statement_headers(meta, theorem_names)
+    if headers is None:
+        findings.append(
+            {
+                "rule": "FAMILY_C_TARGET_STATEMENT_ABSENT",
+                "message": (
+                    "spec_meta.statements must pin the header of every theorem_names entry. "
+                    "The turn does not invent an identity statement."
+                ),
+            }
         )
-        bar_status = "verified" if says_verified else str(meta["bar_status"])
-        with tempfile.TemporaryDirectory(prefix="mcproof_rep_bar_") as td:
-            root = Path(td)
-            shutil.copytree(bar_tpl, root, dirs_exist_ok=True)
+        return findings
+    cand = _family_c_candidate_statements(candidate_lean)
+    exp = _family_c_expected_statements(headers)
+    hidden = _family_c_all_decl_names(candidate_lean) - set(cand)
+    if hidden or set(cand) != set(exp):
+        findings.append(
+            {
+                "rule": "FAMILY_C_THEOREM_NAME_MISMATCH",
+                "message": (
+                    "candidate theorem names do not equal challenge meta: "
+                    f"missing={sorted(set(exp) - set(cand))} "
+                    f"extra={sorted((set(cand) - set(exp)) | hidden)}."
+                ),
+            }
+        )
+        return findings
+    for name in sorted(exp):
+        if cand[name] != exp[name]:
+            findings.append(
+                {
+                    "rule": "FAMILY_C_STATEMENT_MISMATCH",
+                    "message": (
+                        f"candidate statement hash for '{name}' does not equal challenge meta; "
+                        "statements must match exactly."
+                    ),
+                }
+            )
+    return findings
+
+
+def _family_c_lake_failure_message(stdout: str, stderr: str) -> str:
+    """Keep the compiler `file:line:column` lines, then the short lake tail."""
+    lines = [line.strip() for line in f"{stdout}\n{stderr}".splitlines() if line.strip()]
+    located = [line for line in lines if re.search(r"\.lean:\d+:\d+", line)]
+    tail = lines[-6:]
+    kept: list[str] = []
+    for line in located + tail:
+        if line not in kept:
+            kept.append(line)
+    return " | ".join(kept[-8:])
+
+
+def _family_c_sandbox_unavailable_finding() -> dict[str, Any]:
+    return {
+        "rule": "SANDBOX_UNAVAILABLE",
+        "message": (
+            "Linux bubblewrap (`bwrap`) is unavailable; "
+            "refusing to compile or import candidate Lean unsandboxed."
+        ),
+    }
+
+
+def _family_c_direct_lake_build(root: Path) -> list[dict[str, Any]]:
+    """Run `lake build` on candidate text inside the bubblewrap sandbox.
+
+    A missing `soko` tree must not hide a Lean error. A missing `lean`/`lake` still fails closed.
+    A missing sandbox refuses the build. There is no unsandboxed fallback.
+    """
+    lake_hit = _lake_symlink_finding(root)
+    if lake_hit is not None:
+        return [lake_hit]
+    if not linux_bwrap_functional():
+        return [_family_c_sandbox_unavailable_finding()]
+    try:
+        lake_bin = find_lean_tool("lake")
+        env = _lean_env()
+    except (OSError, RuntimeError) as exc:
+        return [
+            {
+                "rule": "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE",
+                "message": f"Lean toolchain unavailable; turn fails closed: {exc}",
+            }
+        ]
+    try:
+        build_res = run_confined_command(
+            [lake_bin, "build"],
+            cwd=root,
+            env=env,
+            timeout_sec=300,
+        )
+    except CandidateSandboxUnavailable:
+        return [_family_c_sandbox_unavailable_finding()]
+    if build_res.returncode != 0:
+        return [
+            {
+                "rule": "LAKE_BUILD_FAILED",
+                "message": f"`lake build` failed: {_family_c_lake_failure_message(build_res.stdout or '', build_res.stderr or '')}",
+            }
+        ]
+    return []
+
+
+def _lean_exception_is_missing_toolchain(exc: BaseException) -> bool:
+    message = str(exc)
+    return "Lean tool" in message or "elan bin" in message
+
+
+def _run_family_c_real_lean_turn(harness: Mapping[str, Any], completion_text: str) -> list[dict[str, Any]]:
+    """Real-Lean Family C turn for `oracle_type: bar_check` only.
+
+    `bar_status` comes from harness meta. The challenge statements come from
+    `spec_meta.statements`. The solution file is the candidate's fenced lean.
+    `verdict_audit` items never enter this function. `lake build` still runs when
+    the mission template or the soko auditor checkout is absent. It does not run
+    when `lean` and `lake` themselves are absent.
+    """
+    meta = harness.get("spec_meta") or {}
+    pkg = str(meta.get("pkg", "")).strip()
+    thms = [str(t) for t in (meta.get("theorem_names") or [])]
+    # Bar status comes from harness meta exclusively; candidate prose can never promote it.
+    bar_status = str(meta.get("bar_status", "")).strip()
+    if not pkg or not thms:
+        return [
+            {
+                "rule": "FAMILY_C_MALFORMED_HARNESS",
+                "message": "harness spec_meta must define pkg and theorem_names.",
+            }
+        ]
+    findings: list[dict[str, Any]] = []
+    readme_body = re.sub(r"(?im)^Claim-Tier:[^\n]*\n+", "", completion_text, count=1)
+    if (
+        _FAMILY_C_STATUS_VERIFIED_RE.search(readme_body)
+        and not _FAMILY_C_STATUS_NOT_VERIFIED_RE.search(readme_body)
+        and bar_status.lower() != "verified"
+    ):
+        findings.append(
+            {
+                "rule": "FAMILY_C_STATUS_SELF_ATTESTATION",
+                "message": (
+                    f"candidate declares 'Status: verified' but harness meta bar_status is {bar_status!r}; "
+                    "bar status comes from harness meta exclusively."
+                ),
+            }
+        )
+    lean_blocks = extract_fenced_blocks(completion_text, ("lean", "lean4"))
+    candidate_lean = "\n\n".join(block.strip() for block in lean_blocks if block.strip())
+    if not candidate_lean:
+        findings.append(
+            {
+                "rule": "FAMILY_C_MISSING_CANDIDATE_LEAN",
+                "message": "no ```lean code blocks found; the checked project is built from the candidate's lean blocks.",
+            }
+        )
+        return findings
+    if _FAMILY_C_SORRY_OR_ADMIT_RE.search(strip_lean_comments_and_strings(candidate_lean)):
+        findings.append(
+            {
+                "rule": "FAMILY_C_SOLUTION_USES_SORRY_OR_ADMIT",
+                "message": "solution module uses 'sorry' or 'admit'; the turn fails.",
+            }
+        )
+    findings.extend(_family_c_forbidden_eval_findings(candidate_lean))
+    findings.extend(_family_c_initializer_findings(candidate_lean))
+    findings.extend(_family_c_elab_command_findings(candidate_lean))
+    for cmd in _lean_commands_that_may_run(candidate_lean):
+        if any(cmd in str(item.get("message", "")) for item in findings):
+            continue
+        if cmd.startswith("#"):
+            findings.append({
+                "rule": "FORBIDDEN_EVAL_COMMAND",
+                "message": "candidate contains a Lean command that runs during elaboration: " + cmd + ".",
+            })
+        else:
+            findings.append({
+                "rule": "FORBIDDEN_ELAB_COMMAND",
+                "message": "candidate contains a Lean elaboration command that runs during lake build: " + cmd + ".",
+            })
+    findings.extend(_check_family_c_statement_match(meta, thms, candidate_lean))
+    if findings:
+        return findings
+    headers = _family_c_statement_headers(meta, thms)
+    if headers is None:
+        return [
+            {
+                "rule": "FAMILY_C_TARGET_STATEMENT_ABSENT",
+                "message": (
+                    "spec_meta.statements must pin the header of every theorem_names entry. "
+                    "The turn does not invent an identity statement."
+                ),
+            }
+        ]
+    mission_bar: tuple[Path, Path] | None = None
+    try:
+        mission = dep_repo("mission")
+    except FileNotFoundError as exc:
+        findings.append(
+            {
+                "rule": "FAMILY_C_MISSION_BAR_UNAVAILABLE",
+                "message": (
+                    "mission bar template is unavailable, so the structural bar replay was not run. "
+                    f"{exc}"
+                ),
+            }
+        )
+    else:
+        bar_tpl = mission / "bar" / "template"
+        bar_chk = mission / "bar" / "check.py"
+        if bar_tpl.is_dir() and bar_chk.is_file():
+            mission_bar = (bar_tpl, bar_chk)
+        else:
+            findings.append(
+                {
+                    "rule": "FAMILY_C_MISSION_BAR_UNAVAILABLE",
+                    "message": f"mission checkout at {mission} has no bar/template or bar/check.py.",
+                }
+            )
+    code_toml = ", ".join(json.dumps(name) for name in _family_c_code_under_proof(pkg, meta))
+    test_cmd = str(meta.get("test_cmd") or "python3 tests/run_tests.py")
+    with tempfile.TemporaryDirectory(prefix="mcproof_rep_bar_") as td:
+        root = Path(td)
+        if mission_bar is not None:
+            shutil.copytree(mission_bar[0], root, dirs_exist_ok=True)
             (root / "Clamp.lean").unlink(missing_ok=True)
             shutil.rmtree(root / "Clamp", ignore_errors=True)
-            (root / f"{pkg}.lean").write_text(
-                f"namespace {pkg}\ndef op (x : Nat) : Nat := x\nend {pkg}\n",
-                encoding="utf-8",
+            # Keep lake-manifest.json. bar/check.py item 3 fails closed when it is
+            # absent, including under --no-lean, so deleting it rejects a correct proof.
+        else:
+            (root / "lean-toolchain").write_text(_family_c_toolchain_pin(), encoding="utf-8")
+        (root / f"{pkg}.lean").write_text(_family_c_root_source(pkg, meta), encoding="utf-8")
+        (root / pkg).mkdir(exist_ok=True)
+        (root / pkg / "Spec.lean").write_text(_family_c_spec_source(pkg, headers), encoding="utf-8")
+        # Solution module is the candidate's lean blocks verbatim. Theorems must use
+        # the fully-qualified challenge name (for example `theorem CrtPair.Spec.crt_mod_left ...`).
+        proofs_path = root / pkg / "Proofs.lean"
+        proofs_text = f"import {pkg}\n\n{candidate_lean}\n"
+        proofs_path.write_text(proofs_text, encoding="utf-8")
+        (root / "Main.lean").write_text(
+            f'import {pkg}\ndef main : IO Unit := IO.println "ok"\n',
+            encoding="utf-8",
+        )
+        (root / "lakefile.toml").write_text(_family_c_lakefile(pkg), encoding="utf-8")
+        comparator_path = root / "comparator.json"
+        comparator_text = (
+            json.dumps(
+                {
+                    "challenge_module": f"{pkg}.Spec",
+                    "solution_module": f"{pkg}.Proofs",
+                    "theorem_names": thms,
+                    "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
+                },
+                indent=2,
             )
-            (root / pkg).mkdir(exist_ok=True)
-            spec_lines = [f"import {pkg}", f"namespace {pkg}.Spec"]
-            proof_lines = [f"import {pkg}", f"namespace {pkg}.Spec"]
-            for tfull in thms:
-                tshort = str(tfull).split(".")[-1]
-                spec_lines.append(f"theorem {tshort} (x : Nat) : {pkg}.op x = x := by sorry")
-                proof_lines.append(f"theorem {tshort} (x : Nat) : {pkg}.op x = x := rfl")
-            spec_lines.append(f"end {pkg}.Spec\n")
-            proof_lines.append(f"end {pkg}.Spec\n")
-            (root / pkg / "Spec.lean").write_text("\n".join(spec_lines), encoding="utf-8")
-            (root / pkg / "Proofs.lean").write_text("\n".join(proof_lines), encoding="utf-8")
-            (root / "Main.lean").write_text(
-                f'import {pkg}\ndef main : IO Unit := IO.println s!"{{{pkg}.op 1}}"\n',
-                encoding="utf-8",
-            )
-            (root / "lakefile.toml").write_text(
-                f'name = "{pkg.lower()}"\nversion = "0.1.0"\ndefaultTargets = ["{pkg}"]\n\n'
-                f'[[lean_lib]]\nname = "{pkg}"\n\n[[lean_lib]]\nname = "{pkg}.Spec"\n\n'
-                f'[[lean_lib]]\nname = "{pkg}.Proofs"\n\n[[lean_exe]]\nname = "{pkg.lower()}"\nroot = "Main"\n',
-                encoding="utf-8",
-            )
-            (root / "comparator.json").write_text(
-                json.dumps(
-                    {
-                        "challenge_module": f"{pkg}.Spec",
-                        "solution_module": f"{pkg}.Proofs",
-                        "theorem_names": thms,
-                        "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
-                    },
-                    indent=2,
-                )
-                + "\n",
-                encoding="utf-8",
-            )
+            + "\n"
+        )
+        comparator_path.write_text(comparator_text, encoding="utf-8")
+        if mission_bar is not None:
             (root / "bar.toml").write_text(
                 f'[project]\nname = "{pkg.lower()}"\nstatus = "{bar_status}"\npage = "README.md"\n'
                 f'spec_authors = ["example-author"]\nentry_points = ["Main.lean"]\n\n'
-                f'[spec]\nfiles = ["SPEC.md", "{pkg}/Spec.lean"]\ncode = ["{pkg}.op"]\n\n'
-                f'[tests]\nresults = "tests/TEST-RESULTS.md"\ncommand = "{meta["test_cmd"]}"\nfiles = ["tests/run_tests.py"]\n',
+                f'[spec]\nfiles = ["SPEC.md", "{pkg}/Spec.lean"]\ncode = [{code_toml}]\n\n'
+                f'[tests]\nresults = "tests/TEST-RESULTS.md"\ncommand = "{test_cmd}"\nfiles = ["tests/run_tests.py"]\n',
                 encoding="utf-8",
             )
             (root / "README.md").write_text(readme_body, encoding="utf-8")
             out_json = root / "bar_out.json"
             proc = subprocess.run(
-                [sys.executable, "-O", "-B", "-W", "error", str(bar_chk), str(root), "--no-lean", "--offline", "--json", str(out_json)],
+                [
+                    sys.executable,
+                    "-O",
+                    "-B",
+                    "-W",
+                    "error",
+                    str(mission_bar[1]),
+                    str(root),
+                    "--no-lean",
+                    "--offline",
+                    "--json",
+                    str(out_json),
+                ],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -902,7 +1368,79 @@ def _run_public_family_c_harness(harness: Mapping[str, Any], completion_text: st
                 for req_i in (2, 4, 5, 6):
                     if by_item.get(req_i) != "PASS":
                         findings.append({"rule": "BAR_CHECK_ITEM_FAIL", "message": f"bar item {req_i} did not pass"})
-        return findings
+        # `lake build` is the formal signal. Its message keeps `.lean:line:column` lines.
+        # The comparator's own tail keeps only the last 6 lines, which can drop that error.
+        # Kernel checks run only after this build succeeds, and they run on a fresh
+        # copy of the files taken before the build. The candidate tree is not written again.
+        lake_hit = _lake_symlink_finding(root)
+        if lake_hit is not None:
+            findings.append(lake_hit)
+            return findings
+        try:
+            trusted_inputs = _trusted_inputs(_read_project_tree(root))
+        except UntrustedProjectPath as exc:
+            findings.append({"rule": exc.rule, "message": str(exc)})
+            return findings
+        findings.extend(_family_c_build_side_effect_findings(candidate_lean))
+        findings.extend(_family_c_direct_lake_build(root))
+        if any(
+            f.get("rule")
+            in {
+                "LAKE_BUILD_FAILED",
+                "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE",
+                "SANDBOX_UNAVAILABLE",
+                "LAKE_CACHE_SYMLINK",
+                "UNTRUSTED_PROJECT_SYMLINK",
+                "UNTRUSTED_PROJECT_FILE",
+                "NOFOLLOW_OPEN_UNAVAILABLE",
+            }
+            for f in findings
+        ):
+            return findings
+        fresh = _materialize_trusted_tree(trusted_inputs)
+        try:
+            try:
+                lean_res = verify_lean4_project_comparator(fresh, allow_unsandboxed=False)
+            except FileNotFoundError as exc:
+                if _lean_exception_is_missing_toolchain(exc):
+                    findings.append(
+                        {
+                            "rule": "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE",
+                            "message": f"Lean toolchain unavailable; turn fails closed: {exc}",
+                        }
+                    )
+                    return findings
+                findings.append(
+                    {
+                        "rule": "FAMILY_C_LEAN_AUDIT_DEPS_UNAVAILABLE",
+                        "message": f"lake build passed, but the comparator auditor checkout is missing: {exc}",
+                    }
+                )
+                return findings
+            except (OSError, RuntimeError) as exc:
+                findings.append(
+                    {
+                        "rule": "FAMILY_C_LEAN_TOOLCHAIN_UNAVAILABLE",
+                        "message": f"Lean toolchain unavailable; turn fails closed: {exc}",
+                    }
+                )
+                return findings
+            for finding in lean_res.findings:
+                findings.append(dict(finding))
+        finally:
+            shutil.rmtree(fresh, ignore_errors=True)
+    return findings
+
+
+def _run_public_family_c_harness(harness: Mapping[str, Any], completion_text: str) -> list[dict[str, Any]]:
+    """Post-hoc Family C ground-truth scorer matching `datasets/scripts/grade_item.py`."""
+    otype = harness.get("oracle_type")
+
+    if otype == "bar_check":
+        return _run_family_c_real_lean_turn(harness, completion_text)
+
+    meta = harness.get("spec_meta") or {}
+    findings: list[dict[str, Any]] = []
 
     if otype == "verdict_audit":
         jb = _extract_first_json_block(completion_text)
@@ -1101,6 +1639,8 @@ def run_repair_item(
     datasets_root: Path | None = None,
     spec_path: Path | None = None,
     include_plane1_retrieval: bool = True,
+    allow_early_stop: bool = True,
+    forbid_subtier_early_stop: bool = False,
 ) -> dict[str, Any]:
     """Execute bounded `k`-turn label-free inference repair + post-hoc benchmark scoring on one item.
 
@@ -1135,6 +1675,9 @@ def run_repair_item(
 
     turn_records: list[dict[str, Any]] = []
     eval_pass_by_turn: dict[int, bool] = {}
+    best_oracle_turn_by_k: dict[int, int | None] = {}
+    best_oracle_rank = 0
+    best_oracle_turn: int | None = None
     total_prompt_tokens = 0
     total_completion_tokens = 0
     total_retrieved_tokens = 0
@@ -1219,10 +1762,24 @@ def run_repair_item(
         total_retrieved_tokens += ret_toks
         total_elapsed_ms += gen_ms + inf_ms
 
+        # Stopping rule depends ONLY on label-free `inf_passed` & fail-closed allowlist (Issue #12)!
+        inf_status = str(inf_res.get("epistemic_status", "")).strip().upper()
+        subtier_blocked = forbid_subtier_early_stop and inf_status not in ("VERIFIED", "PROVEN")
+        early_stop_blocked = inf_passed and (not allow_early_stop or subtier_blocked)
+
+        # Label-free candidate retention: never silently drop an oracle-passing turn when early stop is blocked.
+        turn_rank = 2 if (inf_passed and inf_status in ("VERIFIED", "PROVEN")) else (1 if inf_passed else 0)
+        if turn_rank > best_oracle_rank:
+            best_oracle_rank = turn_rank
+            best_oracle_turn = turn_idx
+        best_oracle_turn_by_k[turn_idx] = best_oracle_turn
+
         turn_records.append(
             {
                 "turn": turn_idx,
                 "inference_passed": inf_passed,
+                "inference_epistemic_status": inf_status,
+                "early_stop_blocked": early_stop_blocked,
                 "eval_passed": eval_passed,
                 "passed": eval_passed,
                 "stagnation_prompt_mode": stagnation_next,
@@ -1242,20 +1799,20 @@ def run_repair_item(
             }
         )
 
-        # Stopping rule depends ONLY on label-free `inf_passed`!
-        if inf_passed:
+        if inf_passed and allow_early_stop and not subtier_blocked:
             inference_certified_at_turn = turn_idx
             deployed_eval_passed_when_certified = eval_passed
             break
 
-        primary_rule = sanitized[0]["rule"] if sanitized else "ORACLE_REJECTED"
-        refuted_routes.append(
-            {
-                "turn": turn_idx,
-                "state_hash": state_hash[:12],
-                "primary_rule": primary_rule,
-            }
-        )
+        if not inf_passed:
+            primary_rule = sanitized[0]["rule"] if sanitized else "ORACLE_REJECTED"
+            refuted_routes.append(
+                {
+                    "turn": turn_idx,
+                    "state_hash": state_hash[:12],
+                    "primary_rule": primary_rule,
+                }
+            )
         prior_completion = comp_text
         prior_inf_findings = inf_findings
         prior_sanitized = sanitized
@@ -1263,14 +1820,19 @@ def run_repair_item(
 
     # Deployed output at budget k (1..max_turns):
     # - If inference oracle certified at turn t <= k, the deployed output at budget k is turn t's output!
-    # - Otherwise the loop ran through turn k, so the deployed output at budget k is turn k's output.
+    # - Else if an earlier turn passed the inference oracle (e.g. early stop blocked), deploy the earliest
+    #   highest-tier oracle-passing turn up through k (strictly label-free; never drops a passing turn).
+    # - Otherwise the loop ran through turn k with no oracle pass, so deploy turn k's output.
     pass_by_k: dict[str, bool] = {}
     first_eval_pass_turn: int | None = None
     for k in range(1, max_turns + 1):
+        capped_k = min(k, len(turn_records))
         if inference_certified_at_turn is not None and inference_certified_at_turn <= k:
             deployed_ok = bool(deployed_eval_passed_when_certified)
+        elif best_oracle_turn_by_k.get(capped_k) is not None:
+            deployed_ok = bool(eval_pass_by_turn.get(int(best_oracle_turn_by_k[capped_k]), False))
         else:
-            deployed_ok = bool(eval_pass_by_turn.get(min(k, len(turn_records)), False))
+            deployed_ok = bool(eval_pass_by_turn.get(capped_k, False))
         pass_by_k[f"pass_at_{k}"] = deployed_ok
         if deployed_ok and first_eval_pass_turn is None:
             first_eval_pass_turn = k
@@ -1281,9 +1843,12 @@ def run_repair_item(
         "family": fam,
         "max_turns": max_turns,
         "label_free_inference_stopping": True,
+        "allow_early_stop": allow_early_stop,
+        "forbid_subtier_early_stop": forbid_subtier_early_stop,
         "passed": final_deployed_passed,
         "inference_certified": inference_certified_at_turn is not None,
         "inference_certified_at_turn": inference_certified_at_turn,
+        "best_oracle_pass_turn": best_oracle_turn,
         "solved_at_turn": first_eval_pass_turn,
         "turns_used": len(turn_records),
         "oracle_calls": len(turn_records),
@@ -1299,6 +1864,31 @@ def run_repair_item(
     }
 
 
+def _checkpoint_record_valid(
+    rec: Mapping[str, Any],
+    *,
+    max_turns: int,
+    allow_early_stop: bool,
+    forbid_subtier_early_stop: bool,
+) -> bool:
+    """Return True iff a cached checkpoint record satisfies the active stopping policy and turn budget."""
+    cached_turns = int(rec.get("turns_used", 0))
+    cached_max_turns = int(rec.get("max_turns", max_turns))
+    if cached_turns > max_turns or cached_max_turns != max_turns:
+        return False
+    if not allow_early_stop and (
+        cached_turns < max_turns
+        or bool(rec.get("inference_certified", False))
+        or rec.get("allow_early_stop") is True
+    ):
+        return False
+    if forbid_subtier_early_stop and rec.get("forbid_subtier_early_stop") is not True and (
+        cached_turns < max_turns or bool(rec.get("inference_certified", False))
+    ):
+        return False
+    return True
+
+
 def run_repair_split(
     items: Sequence[Mapping[str, Any]],
     generator_fn: Callable[[str, int], dict[str, Any] | str],
@@ -1312,8 +1902,26 @@ def run_repair_split(
     spec_path: Path | None = None,
     include_plane1_retrieval: bool = True,
     checkpoint_jsonl: Path | None = None,
+    early_stop_disabled_families: frozenset[str] = frozenset(),
+    forbid_subtier_early_stop: bool = False,
+    oracle_version: str = "mcproof-inference-oracle/v0.2",
+    max_early_stop_false_pass_rate: Fraction = Fraction(1, 20),
+    min_early_stop_oracle_passes: int = 1,
+    prior_gap_summary: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run bounded label-free closed-loop repair across a dataset split with crash-safe checkpointing."""
+    disabled_set = {str(f).strip().upper() for f in early_stop_disabled_families}
+    if prior_gap_summary is not None:
+        prior_elig = evaluate_early_stop_eligibility(
+            prior_gap_summary,
+            max_false_pass_rate=max_early_stop_false_pass_rate,
+            min_oracle_passes=min_early_stop_oracle_passes,
+        )
+        for fam_key, gate in prior_elig.items():
+            if not gate["allow_early_stop"]:
+                disabled_set.add(str(fam_key).strip().upper())
+    disabled_norm = frozenset(disabled_set)
+
     completed_by_id: dict[str, dict[str, Any]] = {}
     if checkpoint_jsonl is not None and checkpoint_jsonl.is_file():
         for ln in checkpoint_jsonl.read_text(encoding="utf-8").splitlines():
@@ -1324,7 +1932,14 @@ def run_repair_split(
     results: list[dict[str, Any]] = []
     for item in items:
         iid = str(item["id"])
-        if iid in completed_by_id:
+        fam_norm = str(item["family"]).strip().upper()
+        item_allow_early_stop = fam_norm not in disabled_norm
+        if iid in completed_by_id and _checkpoint_record_valid(
+            completed_by_id[iid],
+            max_turns=max_turns,
+            allow_early_stop=item_allow_early_stop,
+            forbid_subtier_early_stop=forbid_subtier_early_stop,
+        ):
             results.append(completed_by_id[iid])
             continue
         res = run_repair_item(
@@ -1338,6 +1953,8 @@ def run_repair_split(
             datasets_root=datasets_root,
             spec_path=spec_path,
             include_plane1_retrieval=include_plane1_retrieval,
+            allow_early_stop=item_allow_early_stop,
+            forbid_subtier_early_stop=forbid_subtier_early_stop,
         )
         results.append(res)
         if checkpoint_jsonl is not None:
@@ -1369,15 +1986,25 @@ def run_repair_split(
             for k in range(1, max_turns + 1)
         }
 
+    oracle_grader_gap = summarize_oracle_grader_gap(results, oracle_version=oracle_version)
+    early_stop_eligibility = evaluate_early_stop_eligibility(
+        oracle_grader_gap,
+        max_false_pass_rate=max_early_stop_false_pass_rate,
+        min_oracle_passes=min_early_stop_oracle_passes,
+    )
     return {
         "schema": "mcproof-repair-loop-receipt/v0.2",
         "label_free_inference_stopping": True,
+        "early_stop_disabled_families": sorted(disabled_norm),
+        "forbid_subtier_early_stop": forbid_subtier_early_stop,
         "max_turns": max_turns,
         "retrieval_max_tokens": retrieval_max_tokens,
         "include_plane1_retrieval": include_plane1_retrieval,
         "total_items": n_total,
         "pass_curve": pass_curve,
         "by_family": by_family,
+        "oracle_grader_gap": oracle_grader_gap,
+        "early_stop_eligibility": early_stop_eligibility,
         "budget_totals": {
             "replies_used": sum(int(r["turns_used"]) for r in results),
             "oracle_calls": sum(int(r["oracle_calls"]) for r in results),
@@ -1394,3 +2021,136 @@ def run_repair_split(
         },
         "items": results,
     }
+
+
+def _item_oracle_pass_outcome(row: Mapping[str, Any]) -> tuple[bool, bool]:
+    """Return `(had_oracle_pass, oracle_false_pass)` from turn records (falling back to `inference_certified`)."""
+    turns = row.get("turns")
+    if isinstance(turns, list) and len(turns) > 0:
+        first_o = next((t for t in turns if isinstance(t, Mapping) and bool(t.get("inference_passed", False))), None)
+        had_oracle_pass = (first_o is not None) or bool(row.get("inference_certified", False))
+        if not had_oracle_pass:
+            return False, False
+        if first_o is not None:
+            first_eval_ok = bool(first_o.get("eval_passed", first_o.get("passed", False)))
+            return True, (not first_eval_ok) or (not bool(row.get("passed", False)))
+        return True, not bool(row.get("passed", False))
+    had_oracle_pass = bool(row.get("inference_certified", False))
+    return had_oracle_pass, had_oracle_pass and not bool(row.get("passed", False))
+
+
+def summarize_oracle_grader_gap(
+    results: Sequence[Mapping[str, Any]],
+    *,
+    oracle_version: str = "mcproof-inference-oracle/v0.2",
+) -> dict[str, Any]:
+    """Post-hoc grader-side accounting of oracle-pass vs grader-reject gaps (Issue #12).
+
+    Computed strictly after the repair run so no ground-truth label reaches the loop.
+    Counts oracle passes from per-turn `inference_passed` when turn records exist (so
+    early-stop-disabled and subtier-blocked families still report their real gap) and
+    falls back to `inference_certified` for compact receipts without `turns`.
+    Uses exact integers and rational strings (zero floats on decision paths).
+    """
+    by_family: dict[str, dict[str, Any]] = {}
+    tot_oracle = 0
+    tot_false = 0
+    tot_grader_pass = 0
+    tot_grader_without_oracle = 0
+    tot_turn1_false = 0
+    for fam in ("A", "B", "C", "D"):
+        rows = [r for r in results if str(r.get("family", "")).strip().upper() == fam]
+        if not rows:
+            continue
+        o_pass = 0
+        g_rej_among_o = 0
+        g_pass = 0
+        g_without_o = 0
+        t1_false = 0
+        for r in rows:
+            had_o, false_o = _item_oracle_pass_outcome(r)
+            passed_ok = bool(r.get("passed", False))
+            if had_o:
+                o_pass += 1
+                if false_o:
+                    g_rej_among_o += 1
+            elif passed_ok:
+                g_without_o += 1
+            if passed_ok:
+                g_pass += 1
+            if bool(r.get("inference_certified", False)) and not passed_ok and r.get("turns_used") == 1:
+                t1_false += 1
+        rate = Fraction(g_rej_among_o, o_pass) if o_pass > 0 else None
+        by_family[fam] = {
+            "items": len(rows),
+            "oracle_passes": o_pass,
+            "grader_rejects_among_oracle_passes": g_rej_among_o,
+            "grader_passes": g_pass,
+            "grader_without_oracle_passes": g_without_o,
+            "premature_turn1_stops": t1_false,
+            "false_pass_rate_frac": None if rate is None else f"{rate.numerator}/{rate.denominator}",
+        }
+        tot_oracle += o_pass
+        tot_false += g_rej_among_o
+        tot_grader_pass += g_pass
+        tot_grader_without_oracle += g_without_o
+        tot_turn1_false += t1_false
+
+    tot_rate = Fraction(tot_false, tot_oracle) if tot_oracle > 0 else None
+    return {
+        "oracle_version": oracle_version,
+        "by_family": by_family,
+        "totals": {
+            "items": len(results),
+            "oracle_passes": tot_oracle,
+            "grader_rejects_among_oracle_passes": tot_false,
+            "grader_passes": tot_grader_pass,
+            "grader_without_oracle_passes": tot_grader_without_oracle,
+            "premature_turn1_stops": tot_turn1_false,
+            "false_pass_rate_frac": None if tot_rate is None else f"{tot_rate.numerator}/{tot_rate.denominator}",
+        },
+    }
+
+
+def evaluate_early_stop_eligibility(
+    gap_summary: Mapping[str, Any],
+    *,
+    max_false_pass_rate: Fraction = Fraction(1, 20),
+    min_oracle_passes: int = 1,
+) -> dict[str, dict[str, Any]]:
+    """Fail-closed per-family early-stopping eligibility gate (Issue #12 Proposal #2/#3)."""
+    if not isinstance(gap_summary, Mapping):
+        raise ValueError("gap_summary must be a mapping")
+    if not isinstance(max_false_pass_rate, Fraction) or max_false_pass_rate < 0 or max_false_pass_rate > 1:
+        raise ValueError("max_false_pass_rate must be a Fraction in [0, 1]")
+    if type(min_oracle_passes) is not int or min_oracle_passes < 1:
+        raise ValueError("min_oracle_passes must be an int >= 1")
+    by_fam = gap_summary.get("by_family")
+    if not isinstance(by_fam, Mapping):
+        raise ValueError("gap_summary.by_family must be a mapping")
+    out: dict[str, dict[str, Any]] = {}
+    for fam, stats in by_fam.items():
+        if not isinstance(stats, Mapping):
+            raise ValueError(f"by_family[{fam!r}] must be a mapping")
+        o_pass = stats.get("oracle_passes")
+        g_rej = stats.get("grader_rejects_among_oracle_passes")
+        if type(o_pass) is not int or type(g_rej) is not int:
+            raise ValueError(f"by_family[{fam!r}] counts must be exact int (bool/float/str forbidden)")
+        if o_pass < 0 or g_rej < 0 or g_rej > o_pass:
+            raise ValueError(f"by_family[{fam!r}] must satisfy 0 <= grader_rejects <= oracle_passes")
+        if o_pass < min_oracle_passes:
+            out[fam] = {
+                "allow_early_stop": False,
+                "allow_calibration_filter": False,
+                "reason": "UNMEASURED_OR_UNDERPOWERED_ORACLE_GAP",
+            }
+            continue
+        rate = Fraction(g_rej, o_pass)
+        ok = rate <= max_false_pass_rate
+        out[fam] = {
+            "allow_early_stop": ok,
+            "allow_calibration_filter": ok,
+            "false_pass_rate_frac": f"{rate.numerator}/{rate.denominator}",
+            "reason": "ELIGIBLE" if ok else "ORACLE_GAP_EXCEEDS_THRESHOLD",
+        }
+    return out

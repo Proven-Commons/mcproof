@@ -60,6 +60,7 @@ from .repair_loop import (
     compute_candidate_state_hash,
     compute_failure_signature,
     default_inference_oracle,
+    evaluate_early_stop_eligibility,
     format_diagnostics,
     make_llama_server_generator,
     retrieve_plane1_excerpt,
@@ -67,6 +68,7 @@ from .repair_loop import (
     run_repair_item,
     run_repair_split,
     sanitize_oracle_diagnostics,
+    summarize_oracle_grader_gap,
 )
 
 __version__ = "0.2.0"
@@ -93,6 +95,7 @@ __all__ = [
     "compute_candidate_state_hash",
     "compute_failure_signature",
     "default_inference_oracle",
+    "evaluate_early_stop_eligibility",
     "find_forbidden_control_bytes",
     "format_diagnostics",
     "grade_family_completion",
@@ -119,6 +122,7 @@ __all__ = [
     "run_verdicts_oracle",
     "sanitize_oracle_diagnostics",
     "scrub_challenge_artifacts",
+    "summarize_oracle_grader_gap",
     "verify_dual_product_parity",
     "verify_lean4_project_comparator",
     "verify_lean4_source",
