@@ -2001,7 +2001,7 @@ def _read_project_tree(proj: Path) -> dict[str, bytes]:
 
 
 def _read_tree_at(dir_fd: int, rel: str, files: dict[str, bytes]) -> None:
-    for name in sorted(os.listdir(f"/proc/self/fd/{dir_fd}")):
+    for name in sorted(os.listdir(dir_fd)):
         if name in {".lake", ".git"}:
             continue
         child = f"{rel}/{name}" if rel else name

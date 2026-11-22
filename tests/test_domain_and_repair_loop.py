@@ -574,6 +574,10 @@ def test_family_c_known_bad_proof_reaches_lake_build() -> None:
         pytest.skip(
             "Lean 4.35.0 (`lean` and `lake`) is absent, so the Family C lake path was not exercised"
         )
+    if not linux_bwrap_functional():
+        pytest.skip(
+            "functional Linux bwrap is absent, so the confined Family C lake build was not exercised"
+        )
     comp = (
         "Status: in progress.\n\n"
         "```lean\n"
