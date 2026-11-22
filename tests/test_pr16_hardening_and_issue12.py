@@ -924,3 +924,160 @@ def test_summarize_oracle_grader_gap_legacy_compact_and_eligibility_validation()
     for fn in bad_calls:
         with pytest.raises(ValueError):
             fn()
+
+
+# ---------------------------------------------------------------------------
+# 13. Review 6012069978: 20 offline (-O-safe, tiktoken-free) separating tests
+#     covering every listed accept/reject boundary in src/mcproof/domain_protocol.py
+# ---------------------------------------------------------------------------
+
+
+def test_review_6012069978_01_sandbox_mixed_int_str_injected_globals() -> None:
+    rep = run_restricted_sandbox_cell("x = 1", injected_globals={1: 1, "a": 2})  # type: ignore[dict-item]
+    expect_false(rep["ok"], f"mixed int/str injected_globals must be rejected cleanly: {rep}")
+    expect_true(rep["ast_rejected"])
+    expect_eq(rep["violations"], ["invalid_injected_global_key:1"])
+
+
+def test_review_6012069978_02_portfolio_shortest_known_eq_live_record_accepted() -> None:
+    rep = audit_portfolio_bounds(
+        [{"id": "p1", "shortest_known": 5, "live_record": 5}],
+        registered_verified_ids=frozenset({"p1"}),
+    )
+    expect_true(rep["passed"], f"shortest_known == live_record must be accepted: {rep}")
+    expect_eq(rep["epistemic_status"], "VERIFIED")
+    expect_eq(rep["items"][0]["epistemic_status"], "VERIFIED")
+    expect_eq(rep["findings"], [])
+
+
+def test_review_6012069978_03_portfolio_floor_eq_live_record_accepted() -> None:
+    rep = audit_portfolio_bounds(
+        [{"id": "p1", "proven_floor": 5, "live_record": 5}],
+        registered_verified_ids=frozenset({"p1"}),
+    )
+    expect_true(rep["passed"], f"proven_floor == live_record must be accepted: {rep}")
+    expect_eq(rep["epistemic_status"], "VERIFIED")
+    expect_eq(rep["items"][0]["epistemic_status"], "VERIFIED")
+    expect_eq(rep["findings"], [])
+
+
+def test_review_6012069978_04_lower_bound_int_witness_sha256_rejected() -> None:
+    _expect_only_rule(
+        {
+            "epistemic_status": "LOWER_BOUND",
+            "tcb_pins": {"tcb_manifest_verified": True, "checker_sha256": HEX64},
+            "witness_or_proof_sha256": 5,
+        },
+        TYPE_RULE,
+    )
+
+
+def test_review_6012069978_05_verified_none_instance_sha256_rejected() -> None:
+    _expect_only_rule(_verified(instance_sha256=None), TYPE_RULE)
+
+
+def test_review_6012069978_06_verified_int_canonical_instance_sha256_without_instance_rejected() -> None:
+    _expect_only_rule(_verified(canonical_instance_sha256=5), TYPE_RULE)
+
+
+def test_review_6012069978_07_differential_match_oracles_checked_int_tail_rejected() -> None:
+    _expect_only_rule(
+        _verified(differential_match=True, oracles_checked=["a", "b", 5]),
+        TYPE_RULE,
+    )
+
+
+def test_review_6012069978_08_control_records_padded_name_matches_must_fail_controls() -> None:
+    _expect_accepted(
+        _verified(
+            must_fail_controls=["c1"],
+            control_records=[{"name": " c1 ", "oracle_invoked": True, "unexpectedly_passed": False}],
+        )
+    )
+
+
+def test_review_6012069978_09_control_records_nonlist_int_cleanly_rejected() -> None:
+    rep = audit_transition_certificate(_verified(must_fail_controls=["c1"], control_records=1))
+    expect_false(rep["passed"], f"non-list control_records must be rejected cleanly: {rep}")
+    expect_eq(rep["epistemic_status"], "REJECTED")
+    expect_in(TYPE_RULE, _rules(rep))
+    expect_in("CERT_A6_CONTROL_COVERAGE_INCOMPLETE", _rules(rep))
+
+
+def test_review_6012069978_10_must_fail_controls_padded_name_matches_control_record() -> None:
+    _expect_accepted(
+        _verified(
+            must_fail_controls=[" c1 "],
+            control_records=[{"name": "c1", "oracle_invoked": True, "unexpectedly_passed": False}],
+        )
+    )
+
+
+def test_review_6012069978_11_differential_match_padded_duplicate_oracles_rejected() -> None:
+    _expect_only_rule(
+        _verified(differential_match=True, oracles_checked=["x", " x"]),
+        "CERT_SINGLE_ORACLE_DIFFERENTIAL",
+    )
+
+
+def test_review_6012069978_12_tcb_pins_empty_pin_keys_rejected() -> None:
+    _expect_only_rule(
+        _verified(tcb_pins={"tcb_manifest_verified": True}),
+        "CERT_TCB_MANIFEST_UNLOCKED",
+    )
+
+
+def test_review_6012069978_13_proven_empty_witness_with_floor_rejected() -> None:
+    _expect_only_rule(
+        _verified(epistemic_status="PROVEN", witness="", proven_floor=1),
+        "CERT_UNWITNESSED_VERIFIED_OPTIMUM",
+    )
+
+
+def test_review_6012069978_14_explicit_witness_cost_mismatch_when_len_matches_floor_rejected() -> None:
+    _expect_only_rule(
+        _verified(witness="UU", proven_floor=2, witness_cost=5),
+        "CERT_WITNESS_FLOOR_MISMATCH",
+    )
+
+
+def test_review_6012069978_15_lp_string_b_rejected() -> None:
+    rep = verify_rational_lp_certificate(
+        {"mode": "bounds", "A": [[1]], "b": "1", "y": [1], "c": [1], "claimed_lower_bound": 1}
+    )
+    expect_false(rep["passed"], f"string b must be rejected: {rep}")
+    expect_eq(rep["epistemic_status"], "REJECTED")
+    expect_eq(_rules(rep), ["LP_CERT_MALFORMED"])
+
+
+def test_review_6012069978_16_lp_string_y_rejected() -> None:
+    rep = verify_rational_lp_certificate(
+        {"mode": "bounds", "A": [[1]], "b": [1], "y": "1", "c": [1], "claimed_lower_bound": 1}
+    )
+    expect_false(rep["passed"], f"string y must be rejected: {rep}")
+    expect_eq(rep["epistemic_status"], "REJECTED")
+    expect_eq(_rules(rep), ["LP_CERT_MALFORMED"])
+
+
+def test_review_6012069978_17_witness_hangul_choseong_filler_u115f_rejected() -> None:
+    _expect_only_rule(_verified(witness="\u115f", proven_floor=1), "CERT_UNWITNESSED_VERIFIED_OPTIMUM")
+
+
+def test_review_6012069978_18_witness_hangul_jungseong_filler_u1160_rejected() -> None:
+    _expect_only_rule(_verified(witness="\u1160", proven_floor=1), "CERT_UNWITNESSED_VERIFIED_OPTIMUM")
+
+
+def test_review_6012069978_19_witness_nested_list_with_blank_element_rejected() -> None:
+    rep = audit_transition_certificate(_verified(witness=[["U", ""]], proven_floor=1))
+    expect_false(rep["passed"], f"nested blank element in witness list must be rejected: {rep}")
+    expect_eq(rep["epistemic_status"], "REJECTED")
+    expect_in(TYPE_RULE, _rules(rep))
+    expect_in("CERT_UNWITNESSED_VERIFIED_OPTIMUM", _rules(rep))
+
+
+def test_review_6012069978_20_witness_mapping_non_str_key_cleanly_rejected() -> None:
+    rep = audit_transition_certificate(_verified(witness=[{1: 2}], proven_floor=1))
+    expect_false(rep["passed"], f"non-string dict key in witness must be rejected cleanly: {rep}")
+    expect_eq(rep["epistemic_status"], "REJECTED")
+    expect_in(TYPE_RULE, _rules(rep))
+    expect_in("CERT_UNWITNESSED_VERIFIED_OPTIMUM", _rules(rep))
