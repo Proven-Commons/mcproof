@@ -1640,7 +1640,7 @@ def run_repair_item(
     spec_path: Path | None = None,
     include_plane1_retrieval: bool = True,
     allow_early_stop: bool = True,
-    forbid_subtier_early_stop: bool = True,
+    forbid_subtier_early_stop: bool = False,
 ) -> dict[str, Any]:
     """Execute bounded `k`-turn label-free inference repair + post-hoc benchmark scoring on one item.
 
@@ -1675,6 +1675,9 @@ def run_repair_item(
 
     turn_records: list[dict[str, Any]] = []
     eval_pass_by_turn: dict[int, bool] = {}
+    best_oracle_turn_by_k: dict[int, int | None] = {}
+    best_oracle_rank = 0
+    best_oracle_turn: int | None = None
     total_prompt_tokens = 0
     total_completion_tokens = 0
     total_retrieved_tokens = 0
@@ -1759,10 +1762,24 @@ def run_repair_item(
         total_retrieved_tokens += ret_toks
         total_elapsed_ms += gen_ms + inf_ms
 
+        # Stopping rule depends ONLY on label-free `inf_passed` & fail-closed allowlist (Issue #12)!
+        inf_status = str(inf_res.get("epistemic_status", "")).strip().upper()
+        subtier_blocked = forbid_subtier_early_stop and inf_status not in ("VERIFIED", "PROVEN")
+        early_stop_blocked = inf_passed and (not allow_early_stop or subtier_blocked)
+
+        # Label-free candidate retention: never silently drop an oracle-passing turn when early stop is blocked.
+        turn_rank = 2 if (inf_passed and inf_status in ("VERIFIED", "PROVEN")) else (1 if inf_passed else 0)
+        if turn_rank > best_oracle_rank:
+            best_oracle_rank = turn_rank
+            best_oracle_turn = turn_idx
+        best_oracle_turn_by_k[turn_idx] = best_oracle_turn
+
         turn_records.append(
             {
                 "turn": turn_idx,
                 "inference_passed": inf_passed,
+                "inference_epistemic_status": inf_status,
+                "early_stop_blocked": early_stop_blocked,
                 "eval_passed": eval_passed,
                 "passed": eval_passed,
                 "stagnation_prompt_mode": stagnation_next,
@@ -1782,22 +1799,20 @@ def run_repair_item(
             }
         )
 
-        # Stopping rule depends ONLY on label-free `inf_passed` & fail-closed allowlist (Issue #12)!
-        inf_status = str(inf_res.get("epistemic_status", "")).strip().upper()
-        subtier_blocked = forbid_subtier_early_stop and inf_status not in ("VERIFIED", "PROVEN")
         if inf_passed and allow_early_stop and not subtier_blocked:
             inference_certified_at_turn = turn_idx
             deployed_eval_passed_when_certified = eval_passed
             break
 
-        primary_rule = sanitized[0]["rule"] if sanitized else "ORACLE_REJECTED"
-        refuted_routes.append(
-            {
-                "turn": turn_idx,
-                "state_hash": state_hash[:12],
-                "primary_rule": primary_rule,
-            }
-        )
+        if not inf_passed:
+            primary_rule = sanitized[0]["rule"] if sanitized else "ORACLE_REJECTED"
+            refuted_routes.append(
+                {
+                    "turn": turn_idx,
+                    "state_hash": state_hash[:12],
+                    "primary_rule": primary_rule,
+                }
+            )
         prior_completion = comp_text
         prior_inf_findings = inf_findings
         prior_sanitized = sanitized
@@ -1805,14 +1820,19 @@ def run_repair_item(
 
     # Deployed output at budget k (1..max_turns):
     # - If inference oracle certified at turn t <= k, the deployed output at budget k is turn t's output!
-    # - Otherwise the loop ran through turn k, so the deployed output at budget k is turn k's output.
+    # - Else if an earlier turn passed the inference oracle (e.g. early stop blocked), deploy the earliest
+    #   highest-tier oracle-passing turn up through k (strictly label-free; never drops a passing turn).
+    # - Otherwise the loop ran through turn k with no oracle pass, so deploy turn k's output.
     pass_by_k: dict[str, bool] = {}
     first_eval_pass_turn: int | None = None
     for k in range(1, max_turns + 1):
+        capped_k = min(k, len(turn_records))
         if inference_certified_at_turn is not None and inference_certified_at_turn <= k:
             deployed_ok = bool(deployed_eval_passed_when_certified)
+        elif best_oracle_turn_by_k.get(capped_k) is not None:
+            deployed_ok = bool(eval_pass_by_turn.get(int(best_oracle_turn_by_k[capped_k]), False))
         else:
-            deployed_ok = bool(eval_pass_by_turn.get(min(k, len(turn_records)), False))
+            deployed_ok = bool(eval_pass_by_turn.get(capped_k, False))
         pass_by_k[f"pass_at_{k}"] = deployed_ok
         if deployed_ok and first_eval_pass_turn is None:
             first_eval_pass_turn = k
@@ -1823,9 +1843,12 @@ def run_repair_item(
         "family": fam,
         "max_turns": max_turns,
         "label_free_inference_stopping": True,
+        "allow_early_stop": allow_early_stop,
+        "forbid_subtier_early_stop": forbid_subtier_early_stop,
         "passed": final_deployed_passed,
         "inference_certified": inference_certified_at_turn is not None,
         "inference_certified_at_turn": inference_certified_at_turn,
+        "best_oracle_pass_turn": best_oracle_turn,
         "solved_at_turn": first_eval_pass_turn,
         "turns_used": len(turn_records),
         "oracle_calls": len(turn_records),
@@ -1839,6 +1862,31 @@ def run_repair_item(
         **pass_by_k,
         "turns": turn_records,
     }
+
+
+def _checkpoint_record_valid(
+    rec: Mapping[str, Any],
+    *,
+    max_turns: int,
+    allow_early_stop: bool,
+    forbid_subtier_early_stop: bool,
+) -> bool:
+    """Return True iff a cached checkpoint record satisfies the active stopping policy and turn budget."""
+    cached_turns = int(rec.get("turns_used", 0))
+    cached_max_turns = int(rec.get("max_turns", max_turns))
+    if cached_turns > max_turns or cached_max_turns != max_turns:
+        return False
+    if not allow_early_stop and (
+        cached_turns < max_turns
+        or bool(rec.get("inference_certified", False))
+        or rec.get("allow_early_stop") is True
+    ):
+        return False
+    if forbid_subtier_early_stop and rec.get("forbid_subtier_early_stop") is not True and (
+        cached_turns < max_turns or bool(rec.get("inference_certified", False))
+    ):
+        return False
+    return True
 
 
 def run_repair_split(
@@ -1855,11 +1903,25 @@ def run_repair_split(
     include_plane1_retrieval: bool = True,
     checkpoint_jsonl: Path | None = None,
     early_stop_disabled_families: frozenset[str] = frozenset(),
-    forbid_subtier_early_stop: bool = True,
+    forbid_subtier_early_stop: bool = False,
     oracle_version: str = "mcproof-inference-oracle/v0.2",
+    max_early_stop_false_pass_rate: Fraction = Fraction(1, 20),
+    min_early_stop_oracle_passes: int = 1,
+    prior_gap_summary: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run bounded label-free closed-loop repair across a dataset split with crash-safe checkpointing."""
-    disabled_norm = frozenset(str(f).strip().upper() for f in early_stop_disabled_families)
+    disabled_set = {str(f).strip().upper() for f in early_stop_disabled_families}
+    if prior_gap_summary is not None:
+        prior_elig = evaluate_early_stop_eligibility(
+            prior_gap_summary,
+            max_false_pass_rate=max_early_stop_false_pass_rate,
+            min_oracle_passes=min_early_stop_oracle_passes,
+        )
+        for fam_key, gate in prior_elig.items():
+            if not gate["allow_early_stop"]:
+                disabled_set.add(str(fam_key).strip().upper())
+    disabled_norm = frozenset(disabled_set)
+
     completed_by_id: dict[str, dict[str, Any]] = {}
     if checkpoint_jsonl is not None and checkpoint_jsonl.is_file():
         for ln in checkpoint_jsonl.read_text(encoding="utf-8").splitlines():
@@ -1870,7 +1932,14 @@ def run_repair_split(
     results: list[dict[str, Any]] = []
     for item in items:
         iid = str(item["id"])
-        if iid in completed_by_id:
+        fam_norm = str(item["family"]).strip().upper()
+        item_allow_early_stop = fam_norm not in disabled_norm
+        if iid in completed_by_id and _checkpoint_record_valid(
+            completed_by_id[iid],
+            max_turns=max_turns,
+            allow_early_stop=item_allow_early_stop,
+            forbid_subtier_early_stop=forbid_subtier_early_stop,
+        ):
             results.append(completed_by_id[iid])
             continue
         res = run_repair_item(
@@ -1884,7 +1953,7 @@ def run_repair_split(
             datasets_root=datasets_root,
             spec_path=spec_path,
             include_plane1_retrieval=include_plane1_retrieval,
-            allow_early_stop=(str(item["family"]).strip().upper() not in disabled_norm),
+            allow_early_stop=item_allow_early_stop,
             forbid_subtier_early_stop=forbid_subtier_early_stop,
         )
         results.append(res)
@@ -1918,6 +1987,11 @@ def run_repair_split(
         }
 
     oracle_grader_gap = summarize_oracle_grader_gap(results, oracle_version=oracle_version)
+    early_stop_eligibility = evaluate_early_stop_eligibility(
+        oracle_grader_gap,
+        max_false_pass_rate=max_early_stop_false_pass_rate,
+        min_oracle_passes=min_early_stop_oracle_passes,
+    )
     return {
         "schema": "mcproof-repair-loop-receipt/v0.2",
         "label_free_inference_stopping": True,
@@ -1930,6 +2004,7 @@ def run_repair_split(
         "pass_curve": pass_curve,
         "by_family": by_family,
         "oracle_grader_gap": oracle_grader_gap,
+        "early_stop_eligibility": early_stop_eligibility,
         "budget_totals": {
             "replies_used": sum(int(r["turns_used"]) for r in results),
             "oracle_calls": sum(int(r["oracle_calls"]) for r in results),
@@ -1948,6 +2023,22 @@ def run_repair_split(
     }
 
 
+def _item_oracle_pass_outcome(row: Mapping[str, Any]) -> tuple[bool, bool]:
+    """Return `(had_oracle_pass, oracle_false_pass)` from turn records (falling back to `inference_certified`)."""
+    turns = row.get("turns")
+    if isinstance(turns, list) and len(turns) > 0:
+        first_o = next((t for t in turns if isinstance(t, Mapping) and bool(t.get("inference_passed", False))), None)
+        had_oracle_pass = (first_o is not None) or bool(row.get("inference_certified", False))
+        if not had_oracle_pass:
+            return False, False
+        if first_o is not None:
+            first_eval_ok = bool(first_o.get("eval_passed", first_o.get("passed", False)))
+            return True, (not first_eval_ok) or (not bool(row.get("passed", False)))
+        return True, not bool(row.get("passed", False))
+    had_oracle_pass = bool(row.get("inference_certified", False))
+    return had_oracle_pass, had_oracle_pass and not bool(row.get("passed", False))
+
+
 def summarize_oracle_grader_gap(
     results: Sequence[Mapping[str, Any]],
     *,
@@ -1956,6 +2047,9 @@ def summarize_oracle_grader_gap(
     """Post-hoc grader-side accounting of oracle-pass vs grader-reject gaps (Issue #12).
 
     Computed strictly after the repair run so no ground-truth label reaches the loop.
+    Counts oracle passes from per-turn `inference_passed` when turn records exist (so
+    early-stop-disabled and subtier-blocked families still report their real gap) and
+    falls back to `inference_certified` for compact receipts without `turns`.
     Uses exact integers and rational strings (zero floats on decision paths).
     """
     by_family: dict[str, dict[str, Any]] = {}
@@ -1968,21 +2062,24 @@ def summarize_oracle_grader_gap(
         rows = [r for r in results if str(r.get("family", "")).strip().upper() == fam]
         if not rows:
             continue
-        o_pass = sum(1 for r in rows if bool(r.get("inference_certified", False)))
-        g_rej_among_o = sum(
-            1 for r in rows if bool(r.get("inference_certified", False)) and not bool(r.get("passed", False))
-        )
-        g_pass = sum(1 for r in rows if bool(r.get("passed", False)))
-        g_without_o = sum(
-            1 for r in rows if not bool(r.get("inference_certified", False)) and bool(r.get("passed", False))
-        )
-        t1_false = sum(
-            1
-            for r in rows
-            if bool(r.get("inference_certified", False))
-            and not bool(r.get("passed", False))
-            and r.get("turns_used") == 1
-        )
+        o_pass = 0
+        g_rej_among_o = 0
+        g_pass = 0
+        g_without_o = 0
+        t1_false = 0
+        for r in rows:
+            had_o, false_o = _item_oracle_pass_outcome(r)
+            passed_ok = bool(r.get("passed", False))
+            if had_o:
+                o_pass += 1
+                if false_o:
+                    g_rej_among_o += 1
+            elif passed_ok:
+                g_without_o += 1
+            if passed_ok:
+                g_pass += 1
+            if bool(r.get("inference_certified", False)) and not passed_ok and r.get("turns_used") == 1:
+                t1_false += 1
         rate = Fraction(g_rej_among_o, o_pass) if o_pass > 0 else None
         by_family[fam] = {
             "items": len(rows),

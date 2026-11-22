@@ -29,6 +29,7 @@ import subprocess
 import sys
 import tempfile
 from typing import Any, Callable, Mapping, Protocol, Sequence, runtime_checkable
+import unicodedata
 
 from .repair_loop import (
     MAX_RETRIEVAL_TOKENS_HARD_CAP,
@@ -42,8 +43,12 @@ MAX_SANDBOX_TIMEOUT_SEC = 4.0
 MAX_CERT_ABS_INT = 10**60
 STRICT_RATIONAL_RE = re.compile(r"^-?[0-9]+(?:/[1-9][0-9]*)?$")
 SHA256_64_RE = re.compile(r"^[0-9a-f]{64}$")
-# Zero-width and word-joiner marks. Unicode whitespace is rejected separately.
-_CITATION_INVISIBLE_CHARS = frozenset("\u200b\u200c\u200d\u2060\ufeff")
+# Blank-looking filler / ignorable codepoints whose Unicode category is Lo/So/Mn/Cf
+# (e.g. Braille Pattern Blank U+2800, Hangul Filler U+3164, Halfwidth Hangul Filler U+FFA0).
+_CITATION_INVISIBLE_CHARS = frozenset(
+    "\u034f\u115f\u1160\u17b4\u17b5\u180e\u200b\u200c\u200d\u2060\u2800\u3164\ufeff\uffa0"
+)
+_INVISIBLE_UNICODE_CATEGORIES = frozenset({"Cc", "Cf", "Cn", "Cs", "Mn", "Zl", "Zp", "Zs"})
 NON_VERIFIED_SUBTIERS: frozenset[str] = frozenset(
     {
         "LINT_PASS",
@@ -621,11 +626,15 @@ def audit_portfolio_bounds(
         p_floor = row.get("proven_floor")
         s_known = row.get("shortest_known")
         l_rec = row.get("live_record")
+        raw_row_status = row.get("epistemic_status")
         row_bad_type = False
         for bname, bval in (("proven_floor", p_floor), ("shortest_known", s_known), ("live_record", l_rec)):
             if bval is not None and not _is_count(bval):
                 findings.append(_type_finding(f"{iid}.{bname}", "a non-negative integer", bval))
                 row_bad_type = True
+        if raw_row_status is not None and not isinstance(raw_row_status, str):
+            findings.append(_type_finding(f"{iid}.epistemic_status", "a string", raw_row_status))
+            row_bad_type = True
         if row_bad_type:
             status = "REJECTED_INVALID_BOUND_TYPE"
         elif p_floor is not None and s_known is not None and p_floor > s_known:
@@ -653,7 +662,7 @@ def audit_portfolio_bounds(
             )
             status = "REJECTED_INCONSISTENT_PORTFOLIO_BOUNDS"
         elif iid not in registered_verified_ids:
-            if str(row.get("epistemic_status", "")).upper() in ("VERIFIED", "PROVEN"):
+            if isinstance(raw_row_status, str) and raw_row_status.strip().upper() in ("VERIFIED", "PROVEN"):
                 findings.append(
                     {
                         "rule": "CERT_F07_UNVERIFIED_CALLER_BOUNDS",
@@ -675,11 +684,34 @@ def audit_portfolio_bounds(
 
 
 def _citation_text_visible(value: str) -> bool:
-    """True when `value` has a printable character that is not whitespace or invisible."""
+    """True when `value` contains at least one visible, non-blank, non-format character."""
     return any(
-        ch.isprintable() and not ch.isspace() and ch not in _CITATION_INVISIBLE_CHARS
+        ch.isprintable()
+        and not ch.isspace()
+        and ch not in _CITATION_INVISIBLE_CHARS
+        and unicodedata.category(ch) not in _INVISIBLE_UNICODE_CATEGORIES
         for ch in value
     )
+
+
+def _witness_value_valid(value: Any, *, _depth: int = 0) -> bool:
+    """True iff `value` is a non-empty, non-blank exact witness element (no bool/float/None/empty containers)."""
+    if _depth > 16:
+        return False
+    if value is None or type(value) is bool or isinstance(value, float):
+        return False
+    if type(value) is int:
+        return True
+    if isinstance(value, str):
+        return _citation_text_visible(value)
+    if isinstance(value, list):
+        return len(value) > 0 and all(_witness_value_valid(elem, _depth=_depth + 1) for elem in value)
+    if isinstance(value, Mapping):
+        return len(value) > 0 and all(
+            isinstance(k, str) and _citation_text_visible(k) and _witness_value_valid(v, _depth=_depth + 1)
+            for k, v in value.items()
+        )
+    return False
 
 
 def _known_citation_findings(cert: Mapping[str, Any]) -> list[dict[str, str]]:
@@ -878,8 +910,8 @@ def _certificate_type_findings(cert: Mapping[str, Any]) -> list[dict[str, str]]:
                 findings.append(_type_finding(wkey, "a string, list, or null", wval))
             elif isinstance(wval, list):
                 for idx, elem in enumerate(wval):
-                    if elem is None or type(elem) is bool or isinstance(elem, float) or (isinstance(elem, str) and not _citation_text_visible(elem)):
-                        findings.append(_type_finding(f"{wkey}[{idx}]", "a non-blank non-null step value", elem))
+                    if not _witness_value_valid(elem):
+                        findings.append(_type_finding(f"{wkey}[{idx}]", "a non-blank exact step value", elem))
     return findings
 
 
@@ -960,7 +992,7 @@ def audit_transition_certificate(
                 }
             )
         else:
-            clean_names = [str(c).strip() for c in controls if str(c).strip()]
+            clean_names = [c.strip() for c in controls if isinstance(c, str) and _citation_text_visible(c)]
             if len(clean_names) != len(controls) or len(set(clean_names)) != len(clean_names):
                 findings.append(
                     {
@@ -996,8 +1028,8 @@ def audit_transition_certificate(
                         "message": f"Negative control {cname!r} is tautological or omits oracle_invoked/unexpectedly_passed.",
                     }
                 )
-        if isinstance(controls, list) and len(controls) > 0 and ("control_records" in cert or require_must_fail_controls):
-            expected_cnames = {str(c).strip() for c in controls if isinstance(c, str) and str(c).strip()}
+        if isinstance(controls, list) and len(controls) > 0:
+            expected_cnames = {c.strip() for c in controls if isinstance(c, str) and _citation_text_visible(c)}
             missing_cnames = sorted(expected_cnames - seen_control_names)
             if missing_cnames:
                 findings.append(
@@ -1081,24 +1113,15 @@ def audit_transition_certificate(
             }
         )
     if status in ("VERIFIED", "PROVEN"):
-        witness_key = "witness" if "witness" in cert else "winning_witness"
-        witness = cert.get(witness_key)
-        witness_claimed = "proven_floor" in cert or witness_key in cert
-        witness_nonempty = (
-            (isinstance(witness, str) and _citation_text_visible(witness))
-            or (
-                isinstance(witness, list)
-                and len(witness) > 0
-                and all(
-                    e is not None
-                    and type(e) is not bool
-                    and not isinstance(e, float)
-                    and (not isinstance(e, str) or _citation_text_visible(e))
-                    for e in witness
-                )
-            )
-        )
-        if cert.get("exact_optimum_reached") is False or (witness_claimed and not witness_nonempty):
+        present_wkeys = [wk for wk in ("witness", "winning_witness") if wk in cert]
+        witness_claimed = "proven_floor" in cert or bool(present_wkeys)
+        valid_witnesses = [
+            cert[wk]
+            for wk in present_wkeys
+            if isinstance(cert[wk], (str, list)) and _witness_value_valid(cert[wk])
+        ]
+        all_present_nonempty = bool(present_wkeys) and len(valid_witnesses) == len(present_wkeys)
+        if cert.get("exact_optimum_reached") is False or (witness_claimed and not all_present_nonempty):
             findings.append(
                 {
                     "rule": "CERT_UNWITNESSED_VERIFIED_OPTIMUM",
@@ -1107,15 +1130,24 @@ def audit_transition_certificate(
             )
         elif p_floor is not None:
             witness_cost = cert.get("witness_cost")
-            if witness_cost is None and isinstance(witness, (str, list)):
-                witness_cost = len(witness)
-            if _is_count(witness_cost) and witness_cost != p_floor:
-                findings.append(
-                    {
-                        "rule": "CERT_WITNESS_FLOOR_MISMATCH",
-                        "message": f"Witness cost {witness_cost} != claimed proven_floor {p_floor}.",
-                    }
-                )
+            if witness_cost is not None:
+                if _is_count(witness_cost) and witness_cost != p_floor:
+                    findings.append(
+                        {
+                            "rule": "CERT_WITNESS_FLOOR_MISMATCH",
+                            "message": f"Witness cost {witness_cost} != claimed proven_floor {p_floor}.",
+                        }
+                    )
+            else:
+                for wval in valid_witnesses:
+                    if len(wval) != p_floor:
+                        findings.append(
+                            {
+                                "rule": "CERT_WITNESS_FLOOR_MISMATCH",
+                                "message": f"Witness cost {len(wval)} != claimed proven_floor {p_floor}.",
+                            }
+                        )
+                        break
 
     # Instance digest format & mismatch checks (fail closed on blank/newline/all-zero)
     for ikey in ("instance_sha256", "canonical_instance_sha256"):
