@@ -724,6 +724,106 @@ def _known_citation_findings(cert: Mapping[str, Any]) -> list[dict[str, str]]:
     return findings
 
 
+_CERT_FLAG_FIELDS: tuple[str, ...] = (
+    "includes_hidden_state",
+    "caller_bounds_verified",
+    "differential_match",
+    "unverified_caller_claim",
+    "valid_winning_witness",
+    "valid_winning_route",
+    "truncated_by_budget",
+    "exact_optimum_reached",
+    "complete_space",
+    "complete_domain_closed",
+    "impl_invariant_checked",
+    "impl_goal_parity_checked",
+    "obs_projection_injective",
+)
+_CERT_COUNT_FIELDS: tuple[str, ...] = (
+    "step_consistency_violations",
+    "open_transitions",
+    "proven_floor",
+)
+# These two may be null, which means the same as leaving the key out.
+_CERT_OPTIONAL_COUNT_FIELDS: tuple[str, ...] = ("max_bound", "witness_cost")
+_CERT_TEXT_FIELDS: tuple[str, ...] = (
+    "epistemic_status",
+    "prior_status",
+    "evidence_kind",
+    "proof_mode",
+    "state_hash_mode",
+    "certificate_kind",
+)
+_CERT_CONTROL_FLAG_FIELDS: tuple[str, ...] = ("oracle_invoked", "unexpectedly_passed", "seed_equals_target")
+
+
+def _type_finding(path: str, expected: str, value: Any) -> dict[str, str]:
+    shown = repr(value)
+    if len(shown) > 40:
+        shown = shown[:37] + "..."
+    return {
+        "rule": "CERT_FIELD_TYPE_INVALID",
+        "message": f"{path} must be {expected} (got {type(value).__name__} {shown}).",
+    }
+
+
+def _is_count(value: Any) -> bool:
+    """True for a non-negative `int`. A `bool` is not a count."""
+    return type(value) is int and value >= 0
+
+
+def _certificate_type_findings(cert: Mapping[str, Any]) -> list[dict[str, str]]:
+    """Check the type of every field the auditor reads, before any value is compared.
+
+    The value checks test `is False`, truthiness or `int()`. A flag written as the
+    string "false" or as 0, or a count written as a negative number, slips past them.
+    """
+    findings: list[dict[str, str]] = []
+    for key in _CERT_FLAG_FIELDS:
+        if key in cert and type(cert[key]) is not bool:
+            findings.append(_type_finding(key, "a boolean", cert[key]))
+    for key in _CERT_COUNT_FIELDS:
+        if key in cert and not _is_count(cert[key]):
+            findings.append(_type_finding(key, "a non-negative integer", cert[key]))
+    for key in _CERT_OPTIONAL_COUNT_FIELDS:
+        if cert.get(key) is not None and not _is_count(cert[key]):
+            findings.append(_type_finding(key, "a non-negative integer or null", cert[key]))
+    for key in _CERT_TEXT_FIELDS:
+        if key in cert and not isinstance(cert[key], str):
+            findings.append(_type_finding(key, "a string", cert[key]))
+    if "tcb_pins" in cert:
+        pins = cert["tcb_pins"]
+        if not isinstance(pins, Mapping):
+            findings.append(_type_finding("tcb_pins", "an object", pins))
+        else:
+            if "tcb_manifest_verified" in pins and type(pins["tcb_manifest_verified"]) is not bool:
+                findings.append(_type_finding("tcb_pins.tcb_manifest_verified", "a boolean", pins["tcb_manifest_verified"]))
+            for key in ("checker_sha256", "checker_auditor_py_sha256"):
+                if pins.get(key) is not None and not isinstance(pins[key], str):
+                    findings.append(_type_finding(f"tcb_pins.{key}", "a string", pins[key]))
+    if "must_fail_controls" in cert:
+        controls = cert["must_fail_controls"]
+        if not isinstance(controls, list):
+            findings.append(_type_finding("must_fail_controls", "a list of strings", controls))
+        else:
+            for idx, name in enumerate(controls):
+                if not isinstance(name, str):
+                    findings.append(_type_finding(f"must_fail_controls[{idx}]", "a string", name))
+    if "control_records" in cert:
+        records = cert["control_records"]
+        if not isinstance(records, list):
+            findings.append(_type_finding("control_records", "a list of objects", records))
+        else:
+            for idx, rec in enumerate(records):
+                if not isinstance(rec, Mapping):
+                    findings.append(_type_finding(f"control_records[{idx}]", "an object", rec))
+                    continue
+                for key in _CERT_CONTROL_FLAG_FIELDS:
+                    if key in rec and type(rec[key]) is not bool:
+                        findings.append(_type_finding(f"control_records[{idx}].{key}", "a boolean", rec[key]))
+    return findings
+
+
 def audit_transition_certificate(
     cert: Mapping[str, Any],
     *,
@@ -735,7 +835,19 @@ def audit_transition_certificate(
     A KNOWN certificate carries `citation`: `source` and `reference` are non-empty
     strings, and `artifact_sha256` is a lowercase 64-hex digest of the cited artifact.
     """
-    findings: list[dict[str, str]] = []
+    if not isinstance(cert, Mapping):
+        return {
+            "passed": False,
+            "epistemic_status": "REJECTED",
+            "finding_count": 1,
+            "findings": [
+                {
+                    "rule": "CERT_NOT_AN_OBJECT",
+                    "message": f"Certificate must be a JSON object (got {type(cert).__name__}).",
+                }
+            ],
+        }
+    findings: list[dict[str, str]] = _certificate_type_findings(cert)
     status = str(cert.get("epistemic_status", "")).strip().upper()
     proof_mode = str(cert.get("proof_mode", "")).strip().lower()
 
@@ -827,7 +939,7 @@ def audit_transition_certificate(
         )
 
     # F-02: Partial-projection state hash missing hidden state bits
-    if cert.get("includes_hidden_state") is False or cert.get("state_hash_mode") in ("observable_projection_only", "ascii_only", "rendered_board_only"):
+    if cert.get("includes_hidden_state") is False or str(cert.get("state_hash_mode", "")).strip().lower() in ("observable_projection_only", "ascii_only", "rendered_board_only"):
         findings.append(
             {
                 "rule": "CERT_PARTIAL_STATE_PROJECTION",
@@ -847,7 +959,7 @@ def audit_transition_certificate(
             )
         else:
             chk_sha = str(pins.get("checker_sha256") or pins.get("checker_auditor_py_sha256") or "")
-            if not pins.get("tcb_manifest_verified", False) or not SHA256_64_RE.fullmatch(chk_sha):
+            if pins.get("tcb_manifest_verified") is not True or not SHA256_64_RE.fullmatch(chk_sha):
                 findings.append(
                     {
                         "rule": "CERT_TCB_MANIFEST_UNLOCKED",
@@ -868,30 +980,34 @@ def audit_transition_certificate(
             }
         )
 
-    # F-04: Unwitnessed or mismatched-length `proven_floor` claimed as `VERIFIED`
-    if "proven_floor" in cert:
-        p_floor = int(cert["proven_floor"])
-        max_b = cert.get("max_bound")
-        if max_b is not None and p_floor > int(max_b):
+    # F-04: Unwitnessed or mismatched-length `proven_floor` claimed as `VERIFIED`.
+    # A certificate that says `exact_optimum_reached: false`, or that carries a witness
+    # key with no witness in it, fails whether or not `proven_floor` is present.
+    p_floor = cert.get("proven_floor") if _is_count(cert.get("proven_floor")) else None
+    max_b = cert.get("max_bound") if _is_count(cert.get("max_bound")) else None
+    if p_floor is not None and max_b is not None and p_floor > max_b:
+        findings.append(
+            {
+                "rule": "CERT_FLOOR_EXCEEDS_MAX_BOUND",
+                "message": f"proven_floor ({p_floor}) exceeds search max_bound ({max_b}).",
+            }
+        )
+    if status == "VERIFIED":
+        witness_key = "witness" if "witness" in cert else "winning_witness"
+        witness = cert.get(witness_key)
+        witness_claimed = "proven_floor" in cert or witness_key in cert
+        if cert.get("exact_optimum_reached") is False or (witness_claimed and not witness):
             findings.append(
                 {
-                    "rule": "CERT_FLOOR_EXCEEDS_MAX_BOUND",
-                    "message": f"proven_floor ({p_floor}) exceeds search max_bound ({max_b}).",
+                    "rule": "CERT_UNWITNESSED_VERIFIED_OPTIMUM",
+                    "message": "Unwitnessed lower bound must carry status LOWER_BOUND_UNWITNESSED, never VERIFIED.",
                 }
             )
-        if status == "VERIFIED":
-            witness = cert.get("witness") if "witness" in cert else cert.get("winning_witness")
+        elif p_floor is not None:
             witness_cost = cert.get("witness_cost")
             if witness_cost is None and isinstance(witness, str):
                 witness_cost = len(witness)
-            if cert.get("exact_optimum_reached") is False or not witness:
-                findings.append(
-                    {
-                        "rule": "CERT_UNWITNESSED_VERIFIED_OPTIMUM",
-                        "message": "Unwitnessed lower bound must carry status LOWER_BOUND_UNWITNESSED, never VERIFIED.",
-                    }
-                )
-            elif witness_cost is not None and int(witness_cost) != p_floor:
+            if _is_count(witness_cost) and witness_cost != p_floor:
                 findings.append(
                     {
                         "rule": "CERT_WITNESS_FLOOR_MISMATCH",
@@ -908,7 +1024,7 @@ def audit_transition_certificate(
                     "message": "Certificate instance_sha256 does not match canonical target instance.",
                 }
             )
-    if int(cert.get("step_consistency_violations", 0)) > 0:
+    if _is_count(cert.get("step_consistency_violations")) and cert["step_consistency_violations"] > 0:
         findings.append(
             {
                 "rule": "CERT_STEP_INCONSISTENCY",
@@ -920,7 +1036,7 @@ def audit_transition_certificate(
     incomplete_graph = (
         cert.get("complete_space") is False
         or cert.get("complete_domain_closed") is False
-        or int(cert.get("open_transitions", 0)) > 0
+        or (_is_count(cert.get("open_transitions")) and cert["open_transitions"] > 0)
     )
     if (
         proof_mode == "inductive_potential"
