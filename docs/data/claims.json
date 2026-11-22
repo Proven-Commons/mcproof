@@ -2,181 +2,409 @@
   "schema": "mcproof/claims/v1",
   "title": "The mcproof claim graph",
   "note": "Every factual claim on the site is one record here. Status is never typed in by hand: tools/verify.py and docs/assets/proof-core.js each recompute it from depends_on and the tier rules in docs/data/RULES.md. If the two disagree, CI fails and the site does not publish.",
-  "tiers": ["OPEN", "CONJECTURE", "KNOWN", "VERIFIED", "PROVEN"],
+  "tiers": [
+    "OPEN",
+    "CONJECTURE",
+    "KNOWN",
+    "VERIFIED",
+    "PROVEN"
+  ],
   "claims": [
     {
-      "id": "A1", "kind": "axiom", "section": "axioms",
+      "id": "A1",
+      "kind": "axiom",
+      "section": "axioms",
       "title": "Model weights never hold authority",
       "statement": "A trained adapter may carry habits. It may never carry the right to approve a spec, admit a proof, or overrule a checker. Approval stays with named people; enforcement stays with programs anyone can rerun.",
-      "asserted_tier": "KNOWN", "depends_on": [],
-      "evidence": [{"label": "Blueprint, three-tier placement", "url": "https://github.com/siliconcordat/mde/issues/4"}]
-    },
-    {
-      "id": "A2", "kind": "axiom", "section": "axioms",
-      "title": "When in doubt, refuse",
-      "statement": "Every gate in the stack fails closed. A stale manifest, a forged certificate, or a contested rule stops the load instead of guessing. A refusal is a valid result; a silent pass is not.",
-      "asserted_tier": "KNOWN", "depends_on": [],
-      "evidence": [{"label": "Blueprint, hard vetoes", "url": "https://github.com/siliconcordat/mde/issues/4"}]
-    },
-    {
-      "id": "A3", "kind": "axiom", "section": "axioms",
-      "title": "Exact arithmetic in exact checkers",
-      "statement": "A checker for exact mathematics uses integers and fractions only. No floating point value may decide whether an exact claim passes, because rounding can turn a false claim true.",
-      "asserted_tier": "KNOWN", "depends_on": [],
-      "evidence": [{"label": "finite-state-proofs verify.py, the reference checker", "url": "https://github.com/Foundation-0/finite-state-proofs/blob/main/verify.py"}]
-    },
-    {
-      "id": "A4", "kind": "axiom", "section": "axioms",
-      "title": "Say what is not proved",
-      "statement": "Every formal write-up states what it does not prove and what a reader must trust without proof. A result with no stated boundary is treated as a claim with no stated scope, and does not pass the bar.",
-      "asserted_tier": "KNOWN", "depends_on": [],
-      "evidence": [{"label": "The verified bar, Proven-Commons/mission", "url": "https://github.com/Proven-Commons/mission/blob/main/playbook/verified-bar.md"}]
-    },
-    {
-      "id": "D1", "kind": "definition", "section": "definitions",
-      "title": "A zone is a span of text with one set of rules",
-      "statement": "A Multi-Domain Editing (MDE) zone marks a span, such as a proof block or a JSON record, and names which rules govern it. Precedence runs formal proof, then condensed JSON, then interface code, then ordinary code, then prose.",
-      "asserted_tier": "KNOWN", "depends_on": [],
-      "evidence": [{"label": "zone-manifest.v0.1.json", "url": "https://github.com/siliconcordat/mde/blob/main/schemas/zone-manifest.v0.1.json"}]
-    },
-    {
-      "id": "D2", "kind": "definition", "section": "definitions",
-      "title": "Five words for how sure we are",
-      "statement": "OPEN means nobody has discharged it yet. CONJECTURE means stated, not proved. KNOWN means established prior work or a stated axiom. VERIFIED means a named checker was run and passed. PROVEN means a proof checker accepted a complete proof with no escape hatches.",
-      "asserted_tier": "KNOWN", "depends_on": [],
-      "evidence": [{"label": "Foundation-0 REPO-STANDARD.md", "url": "https://github.com/Foundation-0/.github/blob/main/REPO-STANDARD.md"}]
-    },
-    {
-      "id": "D3", "kind": "definition", "section": "definitions",
-      "title": "A deterministic oracle gives the same answer every run",
-      "statement": "An oracle here is a program, never a language model, whose verdict on the same input is byte-identical on every run: a Lean build, an auditor script, a schema check. If a verdict can drift between runs, it cannot gate anything.",
-      "asserted_tier": "KNOWN", "depends_on": ["A3"],
-      "evidence": [{"label": "Blueprint, oracle catalog", "url": "https://github.com/siliconcordat/mde/issues/4"}]
-    },
-    {
-      "id": "L1", "kind": "lemma", "section": "baseline",
-      "title": "The source specs and oracles exist and are public",
-      "statement": "About 32.7k tokens of formal-verification source specs sit in public repositories, with working oracles: the soko auditors, bar/check.py, and f0/scripts/gate.py. The formal-claims-audit ledger holds zero verdicts so far, and its reviewer list is empty.",
-      "asserted_tier": "VERIFIED", "depends_on": ["D3"],
+      "asserted_tier": "KNOWN",
+      "depends_on": [],
       "evidence": [
-        {"label": "soko auditors", "url": "https://github.com/ahrazzle/soko"},
-        {"label": "f0 claim gate", "url": "https://github.com/Foundation-0/f0/blob/main/scripts/gate.py"},
-        {"label": "18-package Lean v4.35.0 anthology", "url": "https://github.com/Foundation-0/proven-commons"}
+        {
+          "label": "Blueprint, three-tier placement",
+          "url": "https://github.com/siliconcordat/mde/issues/4"
+        }
       ]
     },
     {
-      "id": "L2", "kind": "lemma", "section": "baseline",
+      "id": "A2",
+      "kind": "axiom",
+      "section": "axioms",
+      "title": "When in doubt, refuse",
+      "statement": "Every gate in the stack fails closed. A stale manifest, a forged certificate, or a contested rule stops the load instead of guessing. A refusal is a valid result; a silent pass is not.",
+      "asserted_tier": "KNOWN",
+      "depends_on": [],
+      "evidence": [
+        {
+          "label": "Blueprint, hard vetoes",
+          "url": "https://github.com/siliconcordat/mde/issues/4"
+        }
+      ]
+    },
+    {
+      "id": "A3",
+      "kind": "axiom",
+      "section": "axioms",
+      "title": "Exact arithmetic in exact checkers",
+      "statement": "A checker for exact mathematics uses integers and fractions only. No floating point value may decide whether an exact claim passes, because rounding can turn a false claim true.",
+      "asserted_tier": "KNOWN",
+      "depends_on": [],
+      "evidence": [
+        {
+          "label": "finite-state-proofs verify.py, the reference checker",
+          "url": "https://github.com/Foundation-0/finite-state-proofs/blob/main/verify.py"
+        }
+      ]
+    },
+    {
+      "id": "A4",
+      "kind": "axiom",
+      "section": "axioms",
+      "title": "Say what is not proved",
+      "statement": "Every formal write-up states what it does not prove and what a reader must trust without proof. A result with no stated boundary is treated as a claim with no stated scope, and does not pass the bar.",
+      "asserted_tier": "KNOWN",
+      "depends_on": [],
+      "evidence": [
+        {
+          "label": "The verified bar, Proven-Commons/mission",
+          "url": "https://github.com/Proven-Commons/mission/blob/main/playbook/verified-bar.md"
+        }
+      ]
+    },
+    {
+      "id": "D1",
+      "kind": "definition",
+      "section": "definitions",
+      "title": "A zone is a span of text with one set of rules",
+      "statement": "A Multi-Domain Editing (MDE) zone marks a span, such as a proof block or a JSON record, and names which rules govern it. Precedence runs formal proof, then condensed JSON, then interface code, then ordinary code, then prose.",
+      "asserted_tier": "KNOWN",
+      "depends_on": [],
+      "evidence": [
+        {
+          "label": "zone-manifest.v0.1.json",
+          "url": "https://github.com/siliconcordat/mde/blob/main/schemas/zone-manifest.v0.1.json"
+        }
+      ]
+    },
+    {
+      "id": "D2",
+      "kind": "definition",
+      "section": "definitions",
+      "title": "Five words for how sure we are",
+      "statement": "OPEN means nobody has discharged it yet. CONJECTURE means stated, not proved. KNOWN means established prior work or a stated axiom. VERIFIED means a named checker was run and passed. PROVEN means a proof checker accepted a complete proof with no escape hatches.",
+      "asserted_tier": "KNOWN",
+      "depends_on": [],
+      "evidence": [
+        {
+          "label": "Foundation-0 REPO-STANDARD.md",
+          "url": "https://github.com/Foundation-0/.github/blob/main/REPO-STANDARD.md"
+        }
+      ]
+    },
+    {
+      "id": "D3",
+      "kind": "definition",
+      "section": "definitions",
+      "title": "A deterministic oracle gives the same answer every run",
+      "statement": "An oracle here is a program, never a language model, whose verdict on the same input is byte-identical on every run: a Lean build, an auditor script, a schema check. If a verdict can drift between runs, it cannot gate anything.",
+      "asserted_tier": "KNOWN",
+      "depends_on": [
+        "A3"
+      ],
+      "evidence": [
+        {
+          "label": "Blueprint, oracle catalog",
+          "url": "https://github.com/siliconcordat/mde/issues/4"
+        }
+      ]
+    },
+    {
+      "id": "L1",
+      "kind": "lemma",
+      "section": "baseline",
+      "title": "The source specs and oracles exist and are public",
+      "statement": "About 32.7k tokens of formal-verification source specs sit in public repositories, with working oracles: the soko auditors, bar/check.py, and f0/scripts/gate.py. The formal-claims-audit ledger holds zero verdicts so far, and its reviewer list is empty.",
+      "asserted_tier": "VERIFIED",
+      "depends_on": [
+        "D3"
+      ],
+      "evidence": [
+        {
+          "label": "soko auditors",
+          "url": "https://github.com/ahrazzle/soko"
+        },
+        {
+          "label": "f0 claim gate",
+          "url": "https://github.com/Foundation-0/f0/blob/main/scripts/gate.py"
+        },
+        {
+          "label": "18-package Lean v4.35.0 anthology",
+          "url": "https://github.com/Foundation-0/proven-commons"
+        }
+      ]
+    },
+    {
+      "id": "L2",
+      "kind": "lemma",
+      "section": "baseline",
       "title": "Layer 5 classifies zones and audits generated code",
       "statement": "The mde tool carries a canonical zone manifest (sha256 4e00656c...) and a native guard that rejects bare asserts, silent exception swallows, and duplicate JSON keys in generated verifiers.",
-      "asserted_tier": "VERIFIED", "depends_on": ["D1", "D3"],
-      "evidence": [{"label": "siliconcordat/mde at 52ce0178", "url": "https://github.com/siliconcordat/mde/commit/52ce0178854a67490eb718544961ba6cff710f22"}]
+      "asserted_tier": "VERIFIED",
+      "depends_on": [
+        "D1",
+        "D3"
+      ],
+      "evidence": [
+        {
+          "label": "siliconcordat/mde at 52ce0178",
+          "url": "https://github.com/siliconcordat/mde/commit/52ce0178854a67490eb718544961ba6cff710f22"
+        }
+      ]
     },
     {
-      "id": "L3", "kind": "lemma", "section": "baseline",
+      "id": "L3",
+      "kind": "lemma",
+      "section": "baseline",
       "title": "Layer 4 routes proof spans to the proof adapter only",
       "statement": "The exo router sends a formal_proof span to the formal-verification adapter at weight 1.0 and to the prose and style packs at 0.0. Unit tests cover all seven cross-domain interference rules.",
-      "asserted_tier": "VERIFIED", "depends_on": ["D1"],
-      "evidence": [{"label": "siliconcordat/exo at 9d52aa1f", "url": "https://github.com/siliconcordat/exo/commit/9d52aa1f28272753ddf83dbe02864d05989b74d2"}]
+      "asserted_tier": "VERIFIED",
+      "depends_on": [
+        "D1"
+      ],
+      "evidence": [
+        {
+          "label": "siliconcordat/exo at 9d52aa1f",
+          "url": "https://github.com/siliconcordat/exo/commit/9d52aa1f28272753ddf83dbe02864d05989b74d2"
+        }
+      ]
     },
     {
-      "id": "L4", "kind": "lemma", "section": "baseline",
+      "id": "L4",
+      "kind": "lemma",
+      "section": "baseline",
       "title": "Layer 3 loads adapters through four fail-closed stages",
       "statement": "The warp-modeld daemon checks binding, an integer certificate, a shadow load with verifier-owned canaries, and a constant-time kill switch, in that order. It was live-verified against llama-server with 54 of 54 tests passing.",
-      "asserted_tier": "VERIFIED", "depends_on": ["A2", "D3"],
-      "evidence": [{"label": "siliconcordat/warp at 28f56549", "url": "https://github.com/siliconcordat/warp/commit/28f56549a8bb59b723281afa31831df0824e7dec"}]
+      "asserted_tier": "VERIFIED",
+      "depends_on": [
+        "A2",
+        "D3"
+      ],
+      "evidence": [
+        {
+          "label": "siliconcordat/warp at 28f56549",
+          "url": "https://github.com/siliconcordat/warp/commit/28f56549a8bb59b723281afa31831df0824e7dec"
+        }
+      ]
     },
     {
-      "id": "L5", "kind": "lemma", "section": "baseline",
+      "id": "L5",
+      "kind": "lemma",
+      "section": "baseline",
       "title": "Layer 2 compiles adapters you can rebuild byte for byte",
       "statement": "The weft compiler solves its edit in CPU float64, packs it into a checked container, and certifies the packed result with integer arithmetic. Experiments E1 to E7 cover composition, tamper rejection, packing, and a live server load. The composition runs so far are synthetic.",
-      "asserted_tier": "VERIFIED", "depends_on": ["A2", "A3"],
-      "evidence": [{"label": "siliconcordat/weft at 3d66f07e, RESULTS.md", "url": "https://github.com/siliconcordat/weft/blob/main/experiments/RESULTS.md"}]
+      "asserted_tier": "VERIFIED",
+      "depends_on": [
+        "A2",
+        "A3"
+      ],
+      "evidence": [
+        {
+          "label": "siliconcordat/weft at 3d66f07e",
+          "url": "https://github.com/siliconcordat/weft/commit/3d66f07e5ee67863a7e6c1029e7473c9c8c11b08"
+        }
+      ]
     },
     {
-      "id": "O1", "kind": "obligation", "section": "obligations",
+      "id": "O1",
+      "kind": "obligation",
+      "section": "obligations",
       "title": "Freeze a 240-prompt test set with a private holdout",
-      "statement": "Assemble 240 prompts in four families (Lean proofs, exact checkers, claim-tier traps, mixed-zone documents), split 96 compile, 48 validation, 96 untouched private holdout, and pin every record by SHA-256. Discharge: the frozen manifest and its sums file exist and recompute.",
-      "asserted_tier": "OPEN", "depends_on": ["L1"], "evidence": []
+      "statement": "Assemble 240 prompts in four families (Lean proofs, exact checkers, claim-tier traps, mixed-zone documents), split 96 compile, 48 validation, 96 untouched private holdout, and pin every record by SHA-256. Status: open pull requests in this repository (#3, #6) contain a candidate corpus with recomputing sums, but nothing is merged to main and the private split is not in this public repo, so the obligation stays open. Discharge: the frozen manifest merged, with its sums recomputing from a fresh clone.",
+      "asserted_tier": "OPEN",
+      "depends_on": [
+        "L1"
+      ],
+      "evidence": []
     },
     {
-      "id": "O2", "kind": "obligation", "section": "obligations",
+      "id": "O2",
+      "kind": "obligation",
+      "section": "obligations",
       "title": "Compile a real 1.7B to 4B adapter and score it live",
-      "statement": "Build the formal-verification adapter for a real open checkpoint and score it against the Lean compiler and the soko, bar, and f0 oracles. Discharge: scored runs on the frozen set, with the bare model and the full-spec prompt as matched arms.",
-      "asserted_tier": "OPEN", "depends_on": ["O1", "L5"], "evidence": []
+      "statement": "Build the formal-verification adapter for a real open checkpoint and score it against the Lean compiler and the soko, bar, and f0 oracles, with the bare model and the full-spec prompt as matched arms. Status: pull request #3 reports such runs and a negative result (0 of 96 on the holdout across arms) in committed receipts that this page has not rerun and that are not merged. Discharge: scored runs merged with enough artifacts for an independent rerun.",
+      "asserted_tier": "OPEN",
+      "depends_on": [
+        "O1",
+        "L5"
+      ],
+      "evidence": []
     },
     {
-      "id": "O3", "kind": "obligation", "section": "obligations",
+      "id": "O3",
+      "kind": "obligation",
+      "section": "obligations",
       "title": "Meet the pre-registered pass and kill criteria",
-      "statement": "Pass means at least 50 percent fewer oracle failures than the bare model on the private holdout, at least 80 percent of the full-spec ceiling, all safety canaries green, and zero corrupted proof blocks. Discharge: the scored table, published either way. A miss on deep proof search is published as a negative result, not re-gated.",
-      "asserted_tier": "OPEN", "depends_on": ["O2", "L4"], "evidence": []
+      "statement": "Pass means at least 50 percent fewer oracle failures than the bare model on the private holdout, at least 80 percent of the full-spec ceiling, all safety canaries green, and zero corrupted proof blocks. Status: pull request #3 records a kill verdict against its own candidate (REJECTED for negative efficacy), disclosed in its verification report; the obligation therefore stays open for a future candidate, and the negative result stands on the record. Discharge: the scored table merged, published either way, with gates unchanged.",
+      "asserted_tier": "OPEN",
+      "depends_on": [
+        "O2",
+        "L4"
+      ],
+      "evidence": []
     },
     {
-      "id": "O4", "kind": "obligation", "section": "obligations",
+      "id": "O4",
+      "kind": "obligation",
+      "section": "obligations",
       "title": "Compose with prose and style packs without interference",
       "statement": "Run the proof adapter beside a prose pack and the Eido style system under gates T-C1 to T-C5: solo gains kept, zones isolated, base ability retained, order-invariant composition, and a serving budget. Discharge: all five gates scored on a real checkpoint.",
-      "asserted_tier": "OPEN", "depends_on": ["O3", "L3"], "evidence": []
+      "asserted_tier": "OPEN",
+      "depends_on": [
+        "O3",
+        "L3"
+      ],
+      "evidence": []
     },
     {
-      "id": "O5", "kind": "obligation", "section": "obligations",
+      "id": "O5",
+      "kind": "obligation",
+      "section": "obligations",
       "title": "Seat the human bar",
       "statement": "Name spec reviewers in bar/reviewers.toml and record the first verdicts in formal-claims-audit. Until then the human tier of the system is specified but unstaffed, and no library counts as admitted. Discharge: a non-empty reviewer list and at least one recorded verdict.",
-      "asserted_tier": "OPEN", "depends_on": ["A1"], "evidence": []
+      "asserted_tier": "OPEN",
+      "depends_on": [
+        "A1"
+      ],
+      "evidence": []
     },
     {
-      "id": "T0", "kind": "theorem", "section": "theorem",
+      "id": "T0",
+      "kind": "theorem",
+      "section": "theorem",
       "title": "A model can work inside a formal domain it cannot talk its way out of",
       "statement": "A model fitted with the formal-verification adapter, mounted through layers 2 to 5, produces proofs and checkers that pass deterministic oracles at rates the bare model does not reach, while every authority stays outside the weights. This is the claim mcproof exists to test. It is not proved, and this site will not call it proved until O1 to O4 are discharged.",
-      "asserted_tier": "CONJECTURE", "depends_on": ["L1", "L2", "L3", "L4", "L5", "O1", "O2", "O3", "O4"],
-      "evidence": [{"label": "Blueprint issue, siliconcordat/mde#4", "url": "https://github.com/siliconcordat/mde/issues/4"}]
+      "asserted_tier": "CONJECTURE",
+      "depends_on": [
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "L5",
+        "O1",
+        "O2",
+        "O3",
+        "O4"
+      ],
+      "evidence": [
+        {
+          "label": "Blueprint issue, siliconcordat/mde#4",
+          "url": "https://github.com/siliconcordat/mde/issues/4"
+        }
+      ]
     },
     {
-      "id": "T1", "kind": "theorem", "section": "theorem",
+      "id": "T1",
+      "kind": "theorem",
+      "section": "theorem",
       "title": "This page checks its own claims",
       "statement": "The claim graph behind this page is acyclic, every tier on it follows the tier rules, and two checkers that share no code (one Python, one JavaScript running in your browser) recompute the same verdict from the same file. The panel below shows the live result. Break the graph with the tamper button and the verdict turns red.",
-      "asserted_tier": "VERIFIED", "depends_on": ["D2", "D3"],
-      "evidence": [{"label": "docs/data/certificate.json, generated by tools/verify.py", "url": "data/certificate.json"}]
+      "asserted_tier": "VERIFIED",
+      "depends_on": [
+        "D2",
+        "D3"
+      ],
+      "evidence": [
+        {
+          "label": "docs/data/certificate.json, generated by tools/verify.py",
+          "url": "data/certificate.json"
+        }
+      ]
     },
     {
-      "id": "H1", "kind": "hazard", "section": "hazards",
+      "id": "H1",
+      "kind": "hazard",
+      "section": "hazards",
       "title": "A style rule against negative clauses could strip the honesty sections",
       "statement": "Guard: inside a formal_proof zone the prose pack weight is 0.0 and negative disclaimers are explicitly allowed, so What is not proved survives every style pass.",
-      "asserted_tier": "KNOWN", "depends_on": ["A4", "D1"], "evidence": []
+      "asserted_tier": "KNOWN",
+      "depends_on": [
+        "A4",
+        "D1"
+      ],
+      "evidence": []
     },
     {
-      "id": "H2", "kind": "hazard", "section": "hazards",
+      "id": "H2",
+      "kind": "hazard",
+      "section": "hazards",
       "title": "Readability rules could rewrite axioms and commit hashes",
       "statement": "Guard: protect_axioms and protect_sha_digests pin exact identifiers. A 40-character verdict hash is never shortened to please a style rule.",
-      "asserted_tier": "KNOWN", "depends_on": ["D1"], "evidence": []
+      "asserted_tier": "KNOWN",
+      "depends_on": [
+        "D1"
+      ],
+      "evidence": []
     },
     {
-      "id": "H3", "kind": "hazard", "section": "hazards",
+      "id": "H3",
+      "kind": "hazard",
+      "section": "hazards",
       "title": "Two vocabularies for certainty could blur into each other",
       "statement": "Guard: claim-tier words are locked per repository by policy, outside the weights. Tested and deployed never silently become VERIFIED or PROVEN.",
-      "asserted_tier": "KNOWN", "depends_on": ["D2"], "evidence": []
+      "asserted_tier": "KNOWN",
+      "depends_on": [
+        "D2"
+      ],
+      "evidence": []
     },
     {
-      "id": "H4", "kind": "hazard", "section": "hazards",
+      "id": "H4",
+      "kind": "hazard",
+      "section": "hazards",
       "title": "Prose grammar rules could mangle terse machine records",
       "statement": "Guard: a condensed_json zone with no formal claims zeroes the prose pack, so grammar rules never reach inside a data record.",
-      "asserted_tier": "KNOWN", "depends_on": ["D1"], "evidence": []
+      "asserted_tier": "KNOWN",
+      "depends_on": [
+        "D1"
+      ],
+      "evidence": []
     },
     {
-      "id": "H5", "kind": "hazard", "section": "hazards",
+      "id": "H5",
+      "kind": "hazard",
+      "section": "hazards",
       "title": "Two delivery styles could each claim the same page",
       "statement": "Guard: a contested delivery choice fails closed with ContestedPreferenceError until a human-written precedence override names the winner.",
-      "asserted_tier": "KNOWN", "depends_on": ["A1", "A2"], "evidence": []
+      "asserted_tier": "KNOWN",
+      "depends_on": [
+        "A1",
+        "A2"
+      ],
+      "evidence": []
     },
     {
-      "id": "H6", "kind": "hazard", "section": "hazards",
+      "id": "H6",
+      "kind": "hazard",
+      "section": "hazards",
       "title": "A floating-point picture could pose as an exact result",
       "statement": "Guard: research pages forbid floats inside exact verifiers and require every illustrative figure to carry an illustrative tag and a link to its certificate.",
-      "asserted_tier": "KNOWN", "depends_on": ["A3"], "evidence": []
+      "asserted_tier": "KNOWN",
+      "depends_on": [
+        "A3"
+      ],
+      "evidence": []
     },
     {
-      "id": "H7", "kind": "hazard", "section": "hazards",
+      "id": "H7",
+      "kind": "hazard",
+      "section": "hazards",
       "title": "Automatic shortening could cut the hedges off a claim",
       "statement": "Guard: condensing refuses any block marked data-eido-skip. On this page the condense switch shortens plain prose and visibly refuses every proof block. Try it in the header.",
-      "asserted_tier": "KNOWN", "depends_on": ["A4", "D1"], "evidence": []
+      "asserted_tier": "KNOWN",
+      "depends_on": [
+        "A4",
+        "D1"
+      ],
+      "evidence": []
     }
   ]
 }

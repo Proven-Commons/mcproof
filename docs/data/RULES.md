@@ -7,10 +7,18 @@ no code. A disagreement fails the build.
 
 Tiers, weakest to strongest: `OPEN < CONJECTURE < KNOWN < VERIFIED < PROVEN`.
 
-- **R1 Shape.** Claim ids are unique. Every `depends_on` entry names an
-  existing claim. The dependency graph has no cycle.
+- **R1 Shape.** Claim ids are unique and match `^[A-Za-z][A-Za-z0-9_-]*$`
+  (so `__proto__` and friends can never be ids). Every claim has a
+  non-empty title, statement, and a known section. Every `depends_on`
+  entry is a string naming an existing claim. The list is non-empty and
+  the dependency graph has no cycle. Duplicate JSON keys are rejected
+  by the Python checker at parse time; the browser detects any byte
+  change, duplicate keys included, as a certificate hash mismatch.
 - **R2 Evidence.** A claim asserted `VERIFIED` or `PROVEN` carries at
-  least one evidence link. An `obligation` asserted `OPEN` carries none.
+  least one evidence link. Every evidence entry is an object with a
+  non-empty label and a URL that is either `https://` or a plain
+  relative path (no `javascript:`, `data:`, or protocol-relative URLs).
+  An `obligation` asserted `OPEN` carries none.
 - **R3 No tier inflation.** Compute each claim's allowed tier:
   - `axiom` and `definition`: allowed equals asserted (they are the
     stated trust base, listed under "What you must trust").

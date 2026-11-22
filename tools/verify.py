@@ -18,6 +18,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 RANK = {"OPEN": 0, "CONJECTURE": 1, "KNOWN": 2, "VERIFIED": 3, "PROVEN": 4}
 KINDS = {"axiom", "definition", "lemma", "theorem", "obligation", "hazard"}
+SECTIONS = {"axioms", "definitions", "baseline", "theorem", "obligations", "hazards"}
+ID_RE = __import__("re").compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 
 
 def fail(errors):
@@ -29,9 +31,16 @@ def fail(errors):
 
 def load(path):
     raw = path.read_bytes()
+    def no_dupes(pairs):
+        seen = {}
+        for k, v in pairs:
+            if k in seen:
+                raise ValueError(f"duplicate JSON key {k!r}")
+            seen[k] = v
+        return seen
     try:
-        doc = json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        doc = json.loads(raw.decode("utf-8"), object_pairs_hook=no_dupes)
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
         fail([f"{path.name}: not valid UTF-8 JSON ({exc.__class__.__name__})"])
     return raw, doc
 
@@ -39,8 +48,8 @@ def load(path):
 def check(doc):
     errors = []
     claims = doc.get("claims") if isinstance(doc, dict) else None
-    if not isinstance(claims, list):
-        return ["claims: missing or not a list"], {}, []
+    if not isinstance(claims, list) or not claims:
+        return ["claims: missing, not a list, or empty (R1)"], {}, []
     by_id = {}
     for c in claims:
         if not isinstance(c, dict) or not isinstance(c.get("id"), str) or not c.get("id"):
@@ -53,6 +62,14 @@ def check(doc):
             errors.append(f"{cid}: unknown kind {c.get('kind')!r}")
         if c.get("asserted_tier") not in RANK:
             errors.append(f"{cid}: unknown tier {c.get('asserted_tier')!r}")
+        if not ID_RE.match(cid):
+            errors.append(f"{cid}: id must match ^[A-Za-z][A-Za-z0-9_-]*$ (R1)")
+        if not isinstance(c.get("title"), str) or not c["title"].strip():
+            errors.append(f"{cid}: missing title (R1)")
+        if not isinstance(c.get("statement"), str) or not c["statement"].strip():
+            errors.append(f"{cid}: missing statement (R1)")
+        if c.get("section") not in SECTIONS:
+            errors.append(f"{cid}: unknown section {c.get('section')!r} (R1)")
         if not isinstance(c.get("depends_on"), list):
             errors.append(f"{cid}: depends_on is not a list")
         by_id[cid] = c
@@ -62,9 +79,18 @@ def check(doc):
         cid = c["id"]
         deps = c["depends_on"] if isinstance(c.get("depends_on"), list) else []
         for d in deps:
-            if d not in by_id:
+            if not isinstance(d, str):
+                errors.append(f"{cid}: depends_on entries must be strings (R1)")
+            elif d not in by_id:
                 errors.append(f"{cid}: depends on missing claim {d!r}")
         ev = c["evidence"] if isinstance(c.get("evidence"), list) else []
+        for e in ev:
+            url = e.get("url") if isinstance(e, dict) else None
+            label = e.get("label") if isinstance(e, dict) else None
+            url_ok = isinstance(url, str) and (url.startswith("https://") or
+                      (all(ch.isalnum() or ch in "_./-" for ch in url) and not url.startswith("//")))
+            if not (isinstance(label, str) and label.strip() and url_ok):
+                errors.append(f"{cid}: evidence must be {{label, https-or-relative url}} (R2)")
         if c.get("asserted_tier") in ("VERIFIED", "PROVEN") and not ev:
             errors.append(f"{cid}: asserted {c['asserted_tier']} with no evidence (R2)")
         if c.get("kind") == "obligation" and c.get("asserted_tier") == "OPEN" and ev:
@@ -74,7 +100,7 @@ def check(doc):
     dependents = {i: [] for i in by_id}
     for c in by_id.values():
         for d in c["depends_on"] if isinstance(c.get("depends_on"), list) else []:
-            if d in by_id:
+            if isinstance(d, str) and d in by_id:
                 indeg[c["id"]] += 1
                 dependents[d].append(c["id"])
     ready = sorted(i for i, n in indeg.items() if n == 0)
@@ -98,7 +124,7 @@ def check(doc):
             continue
         allowed = RANK[tier]
         if c.get("kind") not in ("axiom", "definition"):
-            deps = [d for d in c["depends_on"] if d in by_id] if isinstance(c.get("depends_on"), list) else []
+            deps = [d for d in c["depends_on"] if isinstance(d, str) and d in by_id] if isinstance(c.get("depends_on"), list) else []
             if any(RANK[computed[d]] <= 1 for d in deps):
                 allowed = min(allowed, 1)
             if tier == "PROVEN":

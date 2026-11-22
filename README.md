@@ -25,7 +25,7 @@ its own headline. The page figure, stats, colours, and background weave
 are all deterministic functions of the claim graph and its SHA-256.
 
 CI is the gate: the Pages workflow runs the Python checker three ways,
-rejects twelve planted corruptions of the graph
+rejects seventeen planted corruptions of the graph
 (`tools/run_mutations.py`), checks the JavaScript checker against the
 certificate (`node --test "test/*.test.mjs"`), and builds the page twice
 to prove the output is byte-identical. The deploy job runs only if all

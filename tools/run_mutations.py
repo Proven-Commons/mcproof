@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Planted-bug suite: corrupt the claim graph twelve ways and require
+"""Planted-bug suite: corrupt the claim graph seventeen ways and require
 tools/verify.py to reject every corruption. Modeled on the f0 gate
 corruption suite. A checker that passes a corrupted graph is the bug.
 """
@@ -36,6 +36,12 @@ def mutations(doc):
         "asserted_tier": "PROVEN", "depends_on": ["H3"],
         "evidence": [{"label": "x", "url": "https://example.invalid"}]}))
     yield m("empty claim list entry", lambda d: d["claims"].append({}))
+    yield m("javascript: evidence URL", lambda d: claim(d, "L1")["evidence"].append(
+        {"label": "x", "url": "javascript:alert(1)"}))
+    yield m("evidence with no label", lambda d: claim(d, "L1")["evidence"].append({"url": "https://example.invalid"}))
+    yield m("missing title", lambda d: claim(d, "L1").pop("title"))
+    yield m("unknown section vanishes claim", lambda d: claim(d, "L1").update(section="appendix"))
+    yield m("prototype-name tier", lambda d: claim(d, "L1").update(asserted_tier="constructor"))
 
 
 def claim(doc, cid):

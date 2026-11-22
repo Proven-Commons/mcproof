@@ -17,7 +17,7 @@ test("JS checker accepts the real graph", () => {
 
 test("JS computed tiers equal the Python certificate", () => {
   const r = checkGraph(claims);
-  assert.deepEqual(r.computed, cert.computed_tiers);
+  assert.deepEqual({ ...r.computed }, cert.computed_tiers);
   assert.deepEqual([...r.openObligations].sort(), cert.open_obligations);
 });
 
@@ -61,4 +61,23 @@ test("hue mixes on the circle: red plus red stays red", () => {
 test("seeded randomness repeats exactly", () => {
   const r1 = seededRand("4e00656c"), r2 = seededRand("4e00656c");
   assert.deepEqual([r1(), r1(), r1()], [r2(), r2(), r2()]);
+});
+
+test("prototype names are not tiers or ids", () => {
+  const a = structuredClone(claims);
+  a.claims.find((c) => c.id === "L1").asserted_tier = "constructor";
+  assert.equal(checkGraph(a).ok, false);
+  const b = structuredClone(claims);
+  b.claims.push({ id: "__proto__", kind: "lemma", section: "baseline", title: "x", statement: "x",
+    asserted_tier: "KNOWN", depends_on: [], evidence: [] });
+  assert.equal(checkGraph(b).ok, false);
+});
+
+test("dangerous evidence URLs and missing titles are rejected", () => {
+  const a = structuredClone(claims);
+  a.claims.find((c) => c.id === "L1").evidence.push({ label: "x", url: "javascript:alert(1)" });
+  assert.equal(checkGraph(a).ok, false);
+  const b = structuredClone(claims);
+  delete b.claims.find((c) => c.id === "L1").title;
+  assert.equal(checkGraph(b).ok, false);
 });

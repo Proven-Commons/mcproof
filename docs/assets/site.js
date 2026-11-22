@@ -63,7 +63,7 @@ function runCheck(doc, rawText) {
   if (rawText && CERT && window.crypto?.subtle) {
     sha256Hex(rawText).then((h) => done(h === CERT.claims_sha256)).catch(() => done(false));
   } else {
-    done(rawText == null ? false : true); // tampered in-memory copy: hash cannot match
+    done(false); // no hash available (tampered copy or insecure context): fail closed (A2)
   }
   return result;
 }
@@ -193,7 +193,7 @@ function applyPoint(w, why) {
   const label = `Formal ${Math.round(w.formal * 100)}%, Loom ${Math.round(w.loom * 100)}%, Radiant ${Math.round(w.radiant * 100)}%`;
   const out = $("[data-mixer-out]");
   if (out) out.textContent = why ? `${label} (${why})` : label;
-  $("#simplex")?.setAttribute("aria-valuetext", label);
+  const sx = $("#simplex"); if (sx) { sx.setAttribute("aria-valuetext", label); sx.setAttribute("aria-valuenow", String(Math.round(w.formal * 100))); }
   if (DOC && LIVE) drawDag(DOC, LIVE);
 }
 
@@ -293,7 +293,8 @@ function setupCondense() {
     for (const el of $$("[data-condense]")) {
       if (el.closest("[data-eido-skip]")) continue;
       if (!originals.has(el)) originals.set(el, el.innerHTML);
-      el.innerHTML = on && condensed[el.dataset.condense] ? condensed[el.dataset.condense] : originals.get(el);
+      if (on && typeof condensed[el.dataset.condense] === "string") el.textContent = condensed[el.dataset.condense];
+      else el.innerHTML = originals.get(el);
     }
     for (const el of $$("[data-eido-skip]")) {
       el.classList.remove("condense-refused");
@@ -319,7 +320,9 @@ async function init() {
     applyPoint(proofPoint, "the proof point, from the graph hash");
     startWeave(CERT.graph_sha256);
   } catch (err) {
-    if (text) text.textContent = `Could not load the claim graph (${err.name}). The printed claims below were baked at build time and stand as published.`;
+    const box = $("[data-verdict]"); if (box) box.dataset.state = "fail";
+    const qed = $("[data-qed]"); if (qed) qed.textContent = "✗";
+    if (text) text.textContent = `Proof refused in this tab: could not load the claim graph (${err.name}). The printed claims below were baked at build time, but this tab cannot certify them.`;
   }
 }
 setupSimplex();

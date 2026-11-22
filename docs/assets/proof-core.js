@@ -4,17 +4,23 @@
 
 export const TIER_RANK = { OPEN: 0, CONJECTURE: 1, KNOWN: 2, VERIFIED: 3, PROVEN: 4 };
 export const KINDS = ["axiom", "definition", "lemma", "theorem", "obligation", "hazard"];
+export const SECTIONS = ["axioms", "definitions", "baseline", "theorem", "obligations", "hazards"];
+const URL_OK = (u) => typeof u === "string" && (u.startsWith("https://") || (/^[A-Za-z0-9_./-]+$/.test(u) && !u.startsWith("//")));
 
 export function checkGraph(doc) {
   const errors = [];
   const claims = doc && Array.isArray(doc.claims) ? doc.claims : null;
-  if (!claims) return { ok: false, errors: ["claims: missing or not a list"], computed: {}, order: [] };
+  if (!claims || claims.length === 0) return { ok: false, errors: ["claims: missing, not a list, or empty (R1)"], computed: Object.create(null), order: [], openObligations: [] };
   const byId = new Map();
   for (const c of claims) {
     if (!c || typeof c.id !== "string" || !c.id) { errors.push("claim with missing id"); continue; }
     if (byId.has(c.id)) errors.push(`${c.id}: duplicate id`);
     if (!KINDS.includes(c.kind)) errors.push(`${c.id}: unknown kind ${JSON.stringify(c.kind)}`);
-    if (!(c.asserted_tier in TIER_RANK)) errors.push(`${c.id}: unknown tier ${JSON.stringify(c.asserted_tier)}`);
+    if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(c.id)) errors.push(`${c.id}: id must match ^[A-Za-z][A-Za-z0-9_-]*$ (R1)`);
+    if (typeof c.title !== "string" || !c.title.trim()) errors.push(`${c.id}: missing title (R1)`);
+    if (typeof c.statement !== "string" || !c.statement.trim()) errors.push(`${c.id}: missing statement (R1)`);
+    if (!SECTIONS.includes(c.section)) errors.push(`${c.id}: unknown section ${JSON.stringify(c.section)} (R1)`);
+    if (!Object.hasOwn(TIER_RANK, c.asserted_tier)) errors.push(`${c.id}: unknown tier ${JSON.stringify(c.asserted_tier)}`);
     if (!Array.isArray(c.depends_on)) errors.push(`${c.id}: depends_on is not a list`);
     byId.set(c.id, c);
   }
@@ -24,6 +30,14 @@ export function checkGraph(doc) {
       if (!byId.has(d)) errors.push(`${c.id}: depends on missing claim ${JSON.stringify(d)}`);
     }
     const ev = Array.isArray(c.evidence) ? c.evidence : [];
+    for (const e of ev) {
+      if (!e || typeof e !== "object" || typeof e.label !== "string" || !e.label.trim() || !URL_OK(e.url)) {
+        errors.push(`${c.id}: evidence must be {label, https-or-relative url} (R2)`);
+      }
+    }
+    for (const d of Array.isArray(c.depends_on) ? c.depends_on : []) {
+      if (typeof d !== "string") errors.push(`${c.id}: depends_on entries must be strings (R1)`);
+    }
     if ((c.asserted_tier === "VERIFIED" || c.asserted_tier === "PROVEN") && ev.length === 0) {
       errors.push(`${c.id}: asserted ${c.asserted_tier} with no evidence (R2)`);
     }
@@ -51,7 +65,7 @@ export function checkGraph(doc) {
   }
   if (order.length !== byId.size) errors.push("dependency graph has a cycle (R1)");
 
-  const computed = {};
+  const computed = Object.create(null);
   for (const id of order) {
     const c = byId.get(id);
     const asserted = TIER_RANK[c.asserted_tier];

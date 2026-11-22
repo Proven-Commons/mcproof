@@ -55,7 +55,7 @@
         <div class="prov">
           <a class="chip" href="data/claims.json">live from data/claims.json</a>
           <a class="chip" href="data/certificate.json">certificate.json</a>
-          <span class="chip" data-seal><!--prerender:seal--><span class="seal-hash">claims sha256:06368909a8a2ba5f…</span> <span class="seal-hash">graph sha256:8db78bc6bcc69042…</span><!--/prerender:seal--></span>
+          <span class="chip" data-seal><!--prerender:seal--><span class="seal-hash">claims sha256:b473432464387ac7…</span> <span class="seal-hash">graph sha256:8db78bc6bcc69042…</span><!--/prerender:seal--></span>
         </div>
       </div>
 
@@ -80,7 +80,7 @@
           <button class="tbtn" type="button" data-tamper>Break the proof (add a cycle)</button>
           <button class="tbtn" type="button" data-restore hidden>Restore claims.json</button>
         </p>
-        <p class="fine" data-tamper-note hidden>The break happens in memory only, in this tab. The file on the server is untouched. Reload restores it too. This is Hazard-grade tampering, and both checkers reject it: the same corruption is one of the twelve planted bugs CI runs before publishing.</p>
+        <p class="fine" data-tamper-note hidden>The break happens in memory only, in this tab. The file on the server is untouched. Reload restores it too. This is Hazard-grade tampering, and both checkers reject it: the same corruption is one of the seventeen planted bugs CI runs before publishing.</p>
       </div>
       <div class="mixer frame">
         <div class="mixer-text">
@@ -89,7 +89,7 @@
           <p class="mixer-out"><output data-mixer-out for="simplex">weights derive from the graph hash on load</output>
           <button class="tbtn" type="button" data-mixer-reset>Reset to the proof point</button></p>
         </div>
-        <svg id="simplex" viewBox="0 0 220 200" role="slider" tabindex="0" aria-label="Style point. Arrow keys move it between Formal, Loom and Radiant." aria-valuetext="">
+        <svg id="simplex" viewBox="0 0 220 200" role="slider" tabindex="0" aria-label="Style point, Formal weight. Arrow keys move it between Formal, Loom and Radiant." aria-valuemin="0" aria-valuemax="100" aria-valuenow="33" aria-valuetext="">
           <polygon points="110,14 14,178 206,178" class="tri"></polygon>
           <text x="110" y="10" text-anchor="middle">Formal</text>
           <text x="16" y="194">Loom</text>
@@ -184,7 +184,7 @@
 <header><span class="cid">Lemma L5</span><span class="tier"><span class="ladder" data-r="4" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Verified</span></header>
 <h3>Layer 2 compiles adapters you can rebuild byte for byte</h3>
 <p>The weft compiler solves its edit in CPU float64, packs it into a checked container, and certifies the packed result with integer arithmetic. Experiments E1 to E7 cover composition, tamper rejection, packing, and a live server load. The composition runs so far are synthetic.</p>
-<p class="deps"><span>Uses</span> <a href="#claim-A2">A2</a>, <a href="#claim-A3">A3</a></p><div class="evid"><span>Evidence</span><ul><li><a href="https://github.com/siliconcordat/weft/blob/main/experiments/RESULTS.md">siliconcordat/weft at 3d66f07e, RESULTS.md</a></li></ul></div></article>
+<p class="deps"><span>Uses</span> <a href="#claim-A2">A2</a>, <a href="#claim-A3">A3</a></p><div class="evid"><span>Evidence</span><ul><li><a href="https://github.com/siliconcordat/weft/commit/3d66f07e5ee67863a7e6c1029e7473c9c8c11b08">siliconcordat/weft at 3d66f07e</a></li></ul></div></article>
 <!--/prerender:claims-baseline--></div>
     </div>
   </section>
@@ -216,17 +216,17 @@
 <article class="claim" id="claim-O1" data-claim="O1" data-kind="obligation" data-tier="OPEN" data-eido-skip>
 <header><span class="cid">Obligation O1</span><span class="tier"><span class="ladder" data-r="0" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Open</span></header>
 <h3>Freeze a 240-prompt test set with a private holdout</h3>
-<p>Assemble 240 prompts in four families (Lean proofs, exact checkers, claim-tier traps, mixed-zone documents), split 96 compile, 48 validation, 96 untouched private holdout, and pin every record by SHA-256. Discharge: the frozen manifest and its sums file exist and recompute.</p>
+<p>Assemble 240 prompts in four families (Lean proofs, exact checkers, claim-tier traps, mixed-zone documents), split 96 compile, 48 validation, 96 untouched private holdout, and pin every record by SHA-256. Status: open pull requests in this repository (#3, #6) contain a candidate corpus with recomputing sums, but nothing is merged to main and the private split is not in this public repo, so the obligation stays open. Discharge: the frozen manifest merged, with its sums recomputing from a fresh clone.</p>
 <p class="deps"><span>Uses</span> <a href="#claim-L1">L1</a></p></article>
 <article class="claim" id="claim-O2" data-claim="O2" data-kind="obligation" data-tier="OPEN" data-eido-skip>
 <header><span class="cid">Obligation O2</span><span class="tier"><span class="ladder" data-r="0" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Open</span></header>
 <h3>Compile a real 1.7B to 4B adapter and score it live</h3>
-<p>Build the formal-verification adapter for a real open checkpoint and score it against the Lean compiler and the soko, bar, and f0 oracles. Discharge: scored runs on the frozen set, with the bare model and the full-spec prompt as matched arms.</p>
+<p>Build the formal-verification adapter for a real open checkpoint and score it against the Lean compiler and the soko, bar, and f0 oracles, with the bare model and the full-spec prompt as matched arms. Status: pull request #3 reports such runs and a negative result (0 of 96 on the holdout across arms) in committed receipts that this page has not rerun and that are not merged. Discharge: scored runs merged with enough artifacts for an independent rerun.</p>
 <p class="deps"><span>Uses</span> <a href="#claim-O1">O1</a>, <a href="#claim-L5">L5</a></p></article>
 <article class="claim" id="claim-O3" data-claim="O3" data-kind="obligation" data-tier="OPEN" data-eido-skip>
 <header><span class="cid">Obligation O3</span><span class="tier"><span class="ladder" data-r="0" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Open</span></header>
 <h3>Meet the pre-registered pass and kill criteria</h3>
-<p>Pass means at least 50 percent fewer oracle failures than the bare model on the private holdout, at least 80 percent of the full-spec ceiling, all safety canaries green, and zero corrupted proof blocks. Discharge: the scored table, published either way. A miss on deep proof search is published as a negative result, not re-gated.</p>
+<p>Pass means at least 50 percent fewer oracle failures than the bare model on the private holdout, at least 80 percent of the full-spec ceiling, all safety canaries green, and zero corrupted proof blocks. Status: pull request #3 records a kill verdict against its own candidate (REJECTED for negative efficacy), disclosed in its verification report; the obligation therefore stays open for a future candidate, and the negative result stands on the record. Discharge: the scored table merged, published either way, with gates unchanged.</p>
 <p class="deps"><span>Uses</span> <a href="#claim-O2">O2</a>, <a href="#claim-L4">L4</a></p></article>
 <article class="claim" id="claim-O4" data-claim="O4" data-kind="obligation" data-tier="OPEN" data-eido-skip>
 <header><span class="cid">Obligation O4</span><span class="tier"><span class="ladder" data-r="0" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Open</span></header>
@@ -336,13 +336,13 @@
     <div class="wrap">
       <div class="sec-head"><p class="sec-label"><b>07</b><i>//</i>Verify</p><span class="chip">no proof, no publish</span></div>
       <h2 id="ver-h">Do not take this page's word for it.</h2>
-      <p class="lede" data-condense="verify">Clone the repository and run the same gates CI runs. The Python checker runs three ways, including with optimisations and warnings as errors. The JavaScript checker runs under Node and must agree with the Python certificate claim by claim. Twelve planted corruptions of the graph must all be rejected. The page is then built twice and the two builds must be byte-identical. Only if all of that passes does the publish job run.</p>
+      <p class="lede" data-condense="verify">Clone the repository and run the same gates CI runs. The Python checker runs three ways, including with optimisations and warnings as errors. The JavaScript checker runs under Node and must agree with the Python certificate claim by claim. Seventeen planted corruptions of the graph must all be rejected. The page is then built twice and the two builds must be byte-identical. Only if all of that passes does the publish job run.</p>
       <pre class="code"><code>git clone https://github.com/Proven-Commons/mcproof
 cd mcproof
 python3 -I -B   tools/verify.py --write-certificate
 python3 -I -O -B tools/verify.py
 python3 -I -B -W error tools/verify.py
-python3 -I -B tools/run_mutations.py     # 12 planted bugs, all must be rejected
+python3 -I -B tools/run_mutations.py     # 17 planted bugs, all must be rejected
 node --test "test/*.test.mjs"            # JS checker vs the Python certificate
 python3 -I -B tools/build.py --verify    # deterministic prerender</code></pre>
       <p>To add or change a claim, edit <a href="data/claims.json">docs/data/claims.json</a>, keep the tier rules in <a href="data/RULES.md">RULES.md</a>, and rerun the gates. The page text, the figure, the stats, and the seal all rebuild from that one file.</p>

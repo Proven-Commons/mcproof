@@ -1,7 +1,7 @@
 {
   "checker": "tools/verify.py",
   "claim_count": 26,
-  "claims_sha256": "06368909a8a2ba5ff7bb68fd075047c294736a719751d331ff26a2aba797f14f",
+  "claims_sha256": "b473432464387ac7a07c7454b826999373b902ebacf6e315335c845ce4d785b8",
   "computed_tiers": {
     "A1": "KNOWN",
     "A2": "KNOWN",
