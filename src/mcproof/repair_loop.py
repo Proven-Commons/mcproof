@@ -1639,6 +1639,8 @@ def run_repair_item(
     datasets_root: Path | None = None,
     spec_path: Path | None = None,
     include_plane1_retrieval: bool = True,
+    allow_early_stop: bool = True,
+    forbid_subtier_early_stop: bool = True,
 ) -> dict[str, Any]:
     """Execute bounded `k`-turn label-free inference repair + post-hoc benchmark scoring on one item.
 
@@ -1780,8 +1782,10 @@ def run_repair_item(
             }
         )
 
-        # Stopping rule depends ONLY on label-free `inf_passed`!
-        if inf_passed:
+        # Stopping rule depends ONLY on label-free `inf_passed` & fail-closed allowlist (Issue #12)!
+        inf_status = str(inf_res.get("epistemic_status", "")).strip().upper()
+        subtier_blocked = forbid_subtier_early_stop and inf_status not in ("VERIFIED", "PROVEN")
+        if inf_passed and allow_early_stop and not subtier_blocked:
             inference_certified_at_turn = turn_idx
             deployed_eval_passed_when_certified = eval_passed
             break
@@ -1850,8 +1854,12 @@ def run_repair_split(
     spec_path: Path | None = None,
     include_plane1_retrieval: bool = True,
     checkpoint_jsonl: Path | None = None,
+    early_stop_disabled_families: frozenset[str] = frozenset(),
+    forbid_subtier_early_stop: bool = True,
+    oracle_version: str = "mcproof-inference-oracle/v0.2",
 ) -> dict[str, Any]:
     """Run bounded label-free closed-loop repair across a dataset split with crash-safe checkpointing."""
+    disabled_norm = frozenset(str(f).strip().upper() for f in early_stop_disabled_families)
     completed_by_id: dict[str, dict[str, Any]] = {}
     if checkpoint_jsonl is not None and checkpoint_jsonl.is_file():
         for ln in checkpoint_jsonl.read_text(encoding="utf-8").splitlines():
@@ -1876,6 +1884,8 @@ def run_repair_split(
             datasets_root=datasets_root,
             spec_path=spec_path,
             include_plane1_retrieval=include_plane1_retrieval,
+            allow_early_stop=(str(item["family"]).strip().upper() not in disabled_norm),
+            forbid_subtier_early_stop=forbid_subtier_early_stop,
         )
         results.append(res)
         if checkpoint_jsonl is not None:
@@ -1907,15 +1917,19 @@ def run_repair_split(
             for k in range(1, max_turns + 1)
         }
 
+    oracle_grader_gap = summarize_oracle_grader_gap(results, oracle_version=oracle_version)
     return {
         "schema": "mcproof-repair-loop-receipt/v0.2",
         "label_free_inference_stopping": True,
+        "early_stop_disabled_families": sorted(disabled_norm),
+        "forbid_subtier_early_stop": forbid_subtier_early_stop,
         "max_turns": max_turns,
         "retrieval_max_tokens": retrieval_max_tokens,
         "include_plane1_retrieval": include_plane1_retrieval,
         "total_items": n_total,
         "pass_curve": pass_curve,
         "by_family": by_family,
+        "oracle_grader_gap": oracle_grader_gap,
         "budget_totals": {
             "replies_used": sum(int(r["turns_used"]) for r in results),
             "oracle_calls": sum(int(r["oracle_calls"]) for r in results),
@@ -1932,3 +1946,114 @@ def run_repair_split(
         },
         "items": results,
     }
+
+
+def summarize_oracle_grader_gap(
+    results: Sequence[Mapping[str, Any]],
+    *,
+    oracle_version: str = "mcproof-inference-oracle/v0.2",
+) -> dict[str, Any]:
+    """Post-hoc grader-side accounting of oracle-pass vs grader-reject gaps (Issue #12).
+
+    Computed strictly after the repair run so no ground-truth label reaches the loop.
+    Uses exact integers and rational strings (zero floats on decision paths).
+    """
+    by_family: dict[str, dict[str, Any]] = {}
+    tot_oracle = 0
+    tot_false = 0
+    tot_grader_pass = 0
+    tot_grader_without_oracle = 0
+    tot_turn1_false = 0
+    for fam in ("A", "B", "C", "D"):
+        rows = [r for r in results if str(r.get("family", "")).strip().upper() == fam]
+        if not rows:
+            continue
+        o_pass = sum(1 for r in rows if bool(r.get("inference_certified", False)))
+        g_rej_among_o = sum(
+            1 for r in rows if bool(r.get("inference_certified", False)) and not bool(r.get("passed", False))
+        )
+        g_pass = sum(1 for r in rows if bool(r.get("passed", False)))
+        g_without_o = sum(
+            1 for r in rows if not bool(r.get("inference_certified", False)) and bool(r.get("passed", False))
+        )
+        t1_false = sum(
+            1
+            for r in rows
+            if bool(r.get("inference_certified", False))
+            and not bool(r.get("passed", False))
+            and r.get("turns_used") == 1
+        )
+        rate = Fraction(g_rej_among_o, o_pass) if o_pass > 0 else None
+        by_family[fam] = {
+            "items": len(rows),
+            "oracle_passes": o_pass,
+            "grader_rejects_among_oracle_passes": g_rej_among_o,
+            "grader_passes": g_pass,
+            "grader_without_oracle_passes": g_without_o,
+            "premature_turn1_stops": t1_false,
+            "false_pass_rate_frac": None if rate is None else f"{rate.numerator}/{rate.denominator}",
+        }
+        tot_oracle += o_pass
+        tot_false += g_rej_among_o
+        tot_grader_pass += g_pass
+        tot_grader_without_oracle += g_without_o
+        tot_turn1_false += t1_false
+
+    tot_rate = Fraction(tot_false, tot_oracle) if tot_oracle > 0 else None
+    return {
+        "oracle_version": oracle_version,
+        "by_family": by_family,
+        "totals": {
+            "items": len(results),
+            "oracle_passes": tot_oracle,
+            "grader_rejects_among_oracle_passes": tot_false,
+            "grader_passes": tot_grader_pass,
+            "grader_without_oracle_passes": tot_grader_without_oracle,
+            "premature_turn1_stops": tot_turn1_false,
+            "false_pass_rate_frac": None if tot_rate is None else f"{tot_rate.numerator}/{tot_rate.denominator}",
+        },
+    }
+
+
+def evaluate_early_stop_eligibility(
+    gap_summary: Mapping[str, Any],
+    *,
+    max_false_pass_rate: Fraction = Fraction(1, 20),
+    min_oracle_passes: int = 1,
+) -> dict[str, dict[str, Any]]:
+    """Fail-closed per-family early-stopping eligibility gate (Issue #12 Proposal #2/#3)."""
+    if not isinstance(gap_summary, Mapping):
+        raise ValueError("gap_summary must be a mapping")
+    if not isinstance(max_false_pass_rate, Fraction) or max_false_pass_rate < 0 or max_false_pass_rate > 1:
+        raise ValueError("max_false_pass_rate must be a Fraction in [0, 1]")
+    if type(min_oracle_passes) is not int or min_oracle_passes < 1:
+        raise ValueError("min_oracle_passes must be an int >= 1")
+    by_fam = gap_summary.get("by_family")
+    if not isinstance(by_fam, Mapping):
+        raise ValueError("gap_summary.by_family must be a mapping")
+    out: dict[str, dict[str, Any]] = {}
+    for fam, stats in by_fam.items():
+        if not isinstance(stats, Mapping):
+            raise ValueError(f"by_family[{fam!r}] must be a mapping")
+        o_pass = stats.get("oracle_passes")
+        g_rej = stats.get("grader_rejects_among_oracle_passes")
+        if type(o_pass) is not int or type(g_rej) is not int:
+            raise ValueError(f"by_family[{fam!r}] counts must be exact int (bool/float/str forbidden)")
+        if o_pass < 0 or g_rej < 0 or g_rej > o_pass:
+            raise ValueError(f"by_family[{fam!r}] must satisfy 0 <= grader_rejects <= oracle_passes")
+        if o_pass < min_oracle_passes:
+            out[fam] = {
+                "allow_early_stop": False,
+                "allow_calibration_filter": False,
+                "reason": "UNMEASURED_OR_UNDERPOWERED_ORACLE_GAP",
+            }
+            continue
+        rate = Fraction(g_rej, o_pass)
+        ok = rate <= max_false_pass_rate
+        out[fam] = {
+            "allow_early_stop": ok,
+            "allow_calibration_filter": ok,
+            "false_pass_rate_frac": f"{rate.numerator}/{rate.denominator}",
+            "reason": "ELIGIBLE" if ok else "ORACLE_GAP_EXCEEDS_THRESHOLD",
+        }
+    return out

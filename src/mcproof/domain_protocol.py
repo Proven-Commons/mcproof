@@ -420,9 +420,19 @@ def run_restricted_sandbox_cell(
     preimport_mods = [m for m in allowed_sorted if m != "__future__"]
     preamble_lines: list[str] = []
     if injected_globals:
-        for key in sorted(injected_globals.keys()):
-            if re.match(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$", key):
-                preamble_lines.append(f"_ns[{key!r}] = {injected_globals[key]!r}")
+        for key in sorted(injected_globals.keys(), key=repr):
+            if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", key):
+                return {
+                    "ok": False,
+                    "returncode": 2,
+                    "timed_out": False,
+                    "ast_rejected": True,
+                    "violations": [f"invalid_injected_global_key:{key!r}"],
+                    "timeout_sec": capped_timeout,
+                    "stdout": "",
+                    "stderr": f"invalid injected_globals key {key!r}",
+                }
+            preamble_lines.append(f"_ns[{key!r}] = {injected_globals[key]!r}")
 
     with tempfile.TemporaryDirectory(prefix="mcproof_sandbox_") as tmp_dir:
         if os.name != "nt":
@@ -595,13 +605,30 @@ def audit_portfolio_bounds(
     """Audit portfolio lower/upper bound records, closing `F-07` caller-bound inflation and bound inversions."""
     findings: list[dict[str, str]] = []
     triaged: list[dict[str, Any]] = []
-    for row in items:
+    if not isinstance(items, Sequence) or isinstance(items, (str, bytes)) or len(items) == 0:
+        return {
+            "passed": False,
+            "epistemic_status": "REJECTED",
+            "items": [],
+            "findings": [{"rule": "CERT_PORTFOLIO_EMPTY", "message": "Portfolio bounds list must be a non-empty sequence."}],
+        }
+    for idx, row in enumerate(items):
+        if not isinstance(row, Mapping):
+            findings.append(_type_finding(f"items[{idx}]", "an object", row))
+            triaged.append({"id": f"item_{idx}", "epistemic_status": "REJECTED", "caller_bounds_verified": False})
+            continue
         iid = str(row.get("id", "unknown"))
         p_floor = row.get("proven_floor")
         s_known = row.get("shortest_known")
         l_rec = row.get("live_record")
-
-        if p_floor is not None and s_known is not None and int(p_floor) > int(s_known):
+        row_bad_type = False
+        for bname, bval in (("proven_floor", p_floor), ("shortest_known", s_known), ("live_record", l_rec)):
+            if bval is not None and not _is_count(bval):
+                findings.append(_type_finding(f"{iid}.{bname}", "a non-negative integer", bval))
+                row_bad_type = True
+        if row_bad_type:
+            status = "REJECTED_INVALID_BOUND_TYPE"
+        elif p_floor is not None and s_known is not None and p_floor > s_known:
             findings.append(
                 {
                     "rule": "CERT_F07_INCONSISTENT_PORTFOLIO_BOUNDS",
@@ -609,11 +636,19 @@ def audit_portfolio_bounds(
                 }
             )
             status = "REJECTED_INCONSISTENT_PORTFOLIO_BOUNDS"
-        elif s_known is not None and l_rec is not None and int(s_known) > int(l_rec):
+        elif s_known is not None and l_rec is not None and s_known > l_rec:
             findings.append(
                 {
                     "rule": "CERT_F07_INCONSISTENT_PORTFOLIO_BOUNDS",
                     "message": f"{iid}: shortest_known ({s_known}) > live_record ({l_rec})",
+                }
+            )
+            status = "REJECTED_INCONSISTENT_PORTFOLIO_BOUNDS"
+        elif p_floor is not None and l_rec is not None and p_floor > l_rec:
+            findings.append(
+                {
+                    "rule": "CERT_F07_INCONSISTENT_PORTFOLIO_BOUNDS",
+                    "message": f"{iid}: proven_floor ({p_floor}) > live_record ({l_rec})",
                 }
             )
             status = "REJECTED_INCONSISTENT_PORTFOLIO_BOUNDS"
@@ -745,7 +780,7 @@ _CERT_COUNT_FIELDS: tuple[str, ...] = (
     "proven_floor",
 )
 # These two may be null, which means the same as leaving the key out.
-_CERT_OPTIONAL_COUNT_FIELDS: tuple[str, ...] = ("max_bound", "witness_cost")
+_CERT_OPTIONAL_COUNT_FIELDS: tuple[str, ...] = ("max_bound", "witness_cost", "certified_lower_bound")
 _CERT_TEXT_FIELDS: tuple[str, ...] = (
     "epistemic_status",
     "prior_status",
@@ -753,7 +788,11 @@ _CERT_TEXT_FIELDS: tuple[str, ...] = (
     "proof_mode",
     "state_hash_mode",
     "certificate_kind",
+    "witness_or_proof_sha256",
+    "instance_sha256",
+    "canonical_instance_sha256",
 )
+_CERT_ORACLE_LIST_FIELDS: tuple[str, ...] = ("oracles_checked", "engines_verified", "checkers_executed")
 _CERT_CONTROL_FLAG_FIELDS: tuple[str, ...] = ("oracle_invoked", "unexpectedly_passed", "seed_equals_target")
 
 
@@ -818,9 +857,29 @@ def _certificate_type_findings(cert: Mapping[str, Any]) -> list[dict[str, str]]:
                 if not isinstance(rec, Mapping):
                     findings.append(_type_finding(f"control_records[{idx}]", "an object", rec))
                     continue
+                if "name" in rec and (not isinstance(rec["name"], str) or not _citation_text_visible(rec["name"])):
+                    findings.append(_type_finding(f"control_records[{idx}].name", "a non-empty string", rec["name"]))
                 for key in _CERT_CONTROL_FLAG_FIELDS:
                     if key in rec and type(rec[key]) is not bool:
                         findings.append(_type_finding(f"control_records[{idx}].{key}", "a boolean", rec[key]))
+    for okey in _CERT_ORACLE_LIST_FIELDS:
+        if okey in cert:
+            olist = cert[okey]
+            if not isinstance(olist, list):
+                findings.append(_type_finding(okey, "a list of non-empty strings", olist))
+            else:
+                for idx, entry in enumerate(olist):
+                    if not isinstance(entry, str) or not _citation_text_visible(entry):
+                        findings.append(_type_finding(f"{okey}[{idx}]", "a non-empty string", entry))
+    for wkey in ("witness", "winning_witness"):
+        if wkey in cert and cert[wkey] is not None:
+            wval = cert[wkey]
+            if not isinstance(wval, (str, list)):
+                findings.append(_type_finding(wkey, "a string, list, or null", wval))
+            elif isinstance(wval, list):
+                for idx, elem in enumerate(wval):
+                    if elem is None or type(elem) is bool or isinstance(elem, float) or (isinstance(elem, str) and not _citation_text_visible(elem)):
+                        findings.append(_type_finding(f"{wkey}[{idx}]", "a non-blank non-null step value", elem))
     return findings
 
 
@@ -909,10 +968,15 @@ def audit_transition_certificate(
                         "message": "must_fail_controls contains empty or duplicate control identifiers.",
                     }
                 )
-        for crec in cert.get("control_records") or []:
+        seen_control_names: set[str] = set()
+        raw_crecs = cert.get("control_records")
+        for crec in (raw_crecs if isinstance(raw_crecs, list) else []):
             if not isinstance(crec, Mapping):
                 continue
-            cname = str(crec.get("name", "unnamed_control"))
+            raw_cname = crec.get("name")
+            cname = raw_cname.strip() if isinstance(raw_cname, str) and _citation_text_visible(raw_cname) else "unnamed_control"
+            if isinstance(raw_cname, str) and _citation_text_visible(raw_cname):
+                seen_control_names.add(cname)
             if crec.get("unexpectedly_passed") is True:
                 findings.append(
                     {
@@ -920,23 +984,43 @@ def audit_transition_certificate(
                         "message": f"Negative control {cname!r} unexpectedly passed.",
                     }
                 )
-            if crec.get("oracle_invoked") is False or crec.get("seed_equals_target") is True:
+            if (
+                crec.get("oracle_invoked") is False
+                or crec.get("seed_equals_target") is True
+                or ("oracle_invoked" not in crec)
+                or ("unexpectedly_passed" not in crec)
+            ):
                 findings.append(
                     {
                         "rule": "CERT_A6_TAUTOLOGICAL_CONTROL",
-                        "message": f"Negative control {cname!r} is tautological (zero oracle invocation or pre-seeded at target).",
+                        "message": f"Negative control {cname!r} is tautological or omits oracle_invoked/unexpectedly_passed.",
+                    }
+                )
+        if isinstance(controls, list) and len(controls) > 0 and ("control_records" in cert or require_must_fail_controls):
+            expected_cnames = {str(c).strip() for c in controls if isinstance(c, str) and str(c).strip()}
+            missing_cnames = sorted(expected_cnames - seen_control_names)
+            if missing_cnames:
+                findings.append(
+                    {
+                        "rule": "CERT_A6_CONTROL_COVERAGE_INCOMPLETE",
+                        "message": f"control_records omits must_fail_controls entries: {missing_cnames}.",
                     }
                 )
 
-    # F-01: Optimistic differential boolean without >=2 independent replay engines
-    oracles = cert.get("oracles_checked") or cert.get("engines_verified") or cert.get("checkers_executed") or []
-    if cert.get("differential_match") is True and (not isinstance(oracles, list) or len(oracles) < 2):
-        findings.append(
-            {
-                "rule": "CERT_SINGLE_ORACLE_DIFFERENTIAL",
-                "message": "differential_match=True requires >=2 independent verification engines.",
-            }
-        )
+    # F-01: Optimistic differential boolean without >=2 distinct independent replay engines
+    if cert.get("differential_match") is True:
+        present_okeys = [okey for okey in _CERT_ORACLE_LIST_FIELDS if okey in cert]
+        if not present_okeys or any(
+            not isinstance(cert[okey], list)
+            or len({e.strip() for e in cert[okey] if isinstance(e, str) and _citation_text_visible(e)}) < 2
+            for okey in present_okeys
+        ):
+            findings.append(
+                {
+                    "rule": "CERT_SINGLE_ORACLE_DIFFERENTIAL",
+                    "message": "differential_match=True requires >=2 distinct independent verification engines.",
+                }
+            )
 
     # F-02: Partial-projection state hash missing hidden state bits
     if cert.get("includes_hidden_state") is False or str(cert.get("state_hash_mode", "")).strip().lower() in ("observable_projection_only", "ascii_only", "rendered_board_only"):
@@ -958,12 +1042,16 @@ def audit_transition_certificate(
                 }
             )
         else:
-            chk_sha = str(pins.get("checker_sha256") or pins.get("checker_auditor_py_sha256") or "")
-            if pins.get("tcb_manifest_verified") is not True or not SHA256_64_RE.fullmatch(chk_sha):
+            present_chk_keys = [k for k in ("checker_sha256", "checker_auditor_py_sha256") if k in pins]
+            chk_valid = bool(present_chk_keys) and all(
+                isinstance(pins[k], str) and bool(SHA256_64_RE.fullmatch(pins[k])) and pins[k] != "0" * 64
+                for k in present_chk_keys
+            )
+            if pins.get("tcb_manifest_verified") is not True or not chk_valid:
                 findings.append(
                     {
                         "rule": "CERT_TCB_MANIFEST_UNLOCKED",
-                        "message": "TCB pins must verify SHA256SUMS and bind a 64-hex checker/auditor SHA-256.",
+                        "message": "TCB pins must verify SHA256SUMS and bind non-zero 64-hex checker/auditor SHA-256(s).",
                     }
                 )
 
@@ -992,20 +1080,34 @@ def audit_transition_certificate(
                 "message": f"proven_floor ({p_floor}) exceeds search max_bound ({max_b}).",
             }
         )
-    if status == "VERIFIED":
+    if status in ("VERIFIED", "PROVEN"):
         witness_key = "witness" if "witness" in cert else "winning_witness"
         witness = cert.get(witness_key)
         witness_claimed = "proven_floor" in cert or witness_key in cert
-        if cert.get("exact_optimum_reached") is False or (witness_claimed and not witness):
+        witness_nonempty = (
+            (isinstance(witness, str) and _citation_text_visible(witness))
+            or (
+                isinstance(witness, list)
+                and len(witness) > 0
+                and all(
+                    e is not None
+                    and type(e) is not bool
+                    and not isinstance(e, float)
+                    and (not isinstance(e, str) or _citation_text_visible(e))
+                    for e in witness
+                )
+            )
+        )
+        if cert.get("exact_optimum_reached") is False or (witness_claimed and not witness_nonempty):
             findings.append(
                 {
                     "rule": "CERT_UNWITNESSED_VERIFIED_OPTIMUM",
-                    "message": "Unwitnessed lower bound must carry status LOWER_BOUND_UNWITNESSED, never VERIFIED.",
+                    "message": "Unwitnessed lower bound must carry status LOWER_BOUND_UNWITNESSED, never VERIFIED/PROVEN.",
                 }
             )
         elif p_floor is not None:
             witness_cost = cert.get("witness_cost")
-            if witness_cost is None and isinstance(witness, str):
+            if witness_cost is None and isinstance(witness, (str, list)):
                 witness_cost = len(witness)
             if _is_count(witness_cost) and witness_cost != p_floor:
                 findings.append(
@@ -1015,8 +1117,18 @@ def audit_transition_certificate(
                     }
                 )
 
-    # Instance mismatch & step-consistency violations
-    if cert.get("instance_sha256") and cert.get("canonical_instance_sha256"):
+    # Instance digest format & mismatch checks (fail closed on blank/newline/all-zero)
+    for ikey in ("instance_sha256", "canonical_instance_sha256"):
+        if ikey in cert and isinstance(cert[ikey], str):
+            ival = cert[ikey]
+            if not SHA256_64_RE.fullmatch(ival) or ival == "0" * 64:
+                findings.append(
+                    {
+                        "rule": "CERT_INSTANCE_DIGEST_MALFORMED",
+                        "message": f"{ikey} must be a non-zero lowercase 64-hex SHA-256 digest.",
+                    }
+                )
+    if "instance_sha256" in cert and "canonical_instance_sha256" in cert:
         if cert.get("instance_sha256") != cert.get("canonical_instance_sha256"):
             findings.append(
                 {
@@ -1076,7 +1188,7 @@ def audit_transition_certificate(
     # F-08: Missing, malformed non-64-hex, or unregistered witness_or_proof_sha256 (fail closed, NEON-D5)
     if status in ("VERIFIED", "PROVEN"):
         w_sha = str(cert.get("witness_or_proof_sha256", ""))
-        if not SHA256_64_RE.fullmatch(w_sha):
+        if not SHA256_64_RE.fullmatch(w_sha) or w_sha == "0" * 64:
             findings.append(
                 {
                     "rule": "CERT_INVALID_WITNESS_SHA256",
@@ -1161,12 +1273,30 @@ def _parse_exact_rational(val: Any, *, max_abs_int: int = MAX_CERT_ABS_INT) -> F
 
 def verify_rational_lp_certificate(cert: Mapping[str, Any]) -> dict[str, Any]:
     """Verify exact rational LP dual lower-bound (`bounds`) or Farkas (`infeasible`) certificates."""
-    mode = str(cert.get("mode", "bounds")).strip().lower()
+    if not isinstance(cert, Mapping):
+        return {
+            "passed": False,
+            "epistemic_status": "REJECTED",
+            "findings": [{"rule": "LP_CERT_NOT_AN_OBJECT", "message": f"LP certificate must be a JSON object (got {type(cert).__name__})."}],
+        }
+    raw_mode = cert.get("mode", "bounds")
+    if not isinstance(raw_mode, str):
+        return {
+            "passed": False,
+            "epistemic_status": "REJECTED",
+            "findings": [{"rule": "LP_CERT_MALFORMED", "message": "mode must be a string"}],
+        }
+    mode = raw_mode.strip().lower()
     findings: list[dict[str, str]] = []
     try:
-        matrix_a = [[_parse_exact_rational(x) for x in row] for row in cert["A"]]
-        rhs_b = [_parse_exact_rational(x) for x in cert["b"]]
-        dual_y = [_parse_exact_rational(x) for x in cert["y"]]
+        raw_a, raw_b, raw_y = cert["A"], cert["b"], cert["y"]
+        if not isinstance(raw_a, list) or not isinstance(raw_b, list) or not isinstance(raw_y, list):
+            raise TypeError("A, b, and y must be lists")
+        if any(not isinstance(row, list) for row in raw_a):
+            raise TypeError("each row of A must be a list")
+        matrix_a = [[_parse_exact_rational(x) for x in row] for row in raw_a]
+        rhs_b = [_parse_exact_rational(x) for x in raw_b]
+        dual_y = [_parse_exact_rational(x) for x in raw_y]
     except (KeyError, TypeError, ValueError) as exc:
         return {
             "passed": False,
@@ -1176,6 +1306,12 @@ def verify_rational_lp_certificate(cert: Mapping[str, Any]) -> dict[str, Any]:
 
     m_rows = len(matrix_a)
     n_cols = len(matrix_a[0]) if m_rows > 0 else 0
+    if m_rows == 0 or n_cols == 0:
+        return {
+            "passed": False,
+            "epistemic_status": "REJECTED",
+            "findings": [{"rule": "LP_CERT_EMPTY_SYSTEM", "message": "LP constraint matrix A must have >= 1 row and >= 1 column."}],
+        }
     if len(rhs_b) != m_rows or len(dual_y) != m_rows or any(len(r) != n_cols for r in matrix_a):
         return {
             "passed": False,
@@ -1192,7 +1328,10 @@ def verify_rational_lp_certificate(cert: Mapping[str, Any]) -> dict[str, Any]:
 
     if mode == "bounds":
         try:
-            cost_c = [_parse_exact_rational(x) for x in cert["c"]]
+            raw_c = cert["c"]
+            if not isinstance(raw_c, list):
+                raise TypeError("c must be a list")
+            cost_c = [_parse_exact_rational(x) for x in raw_c]
             claimed_lb = _parse_exact_rational(cert["claimed_lower_bound"])
         except (KeyError, TypeError, ValueError) as exc:
             return {
