@@ -14,11 +14,18 @@ Tiers, weakest to strongest: `OPEN < CONJECTURE < KNOWN < VERIFIED < PROVEN`.
   the dependency graph has no cycle. Duplicate JSON keys are rejected
   by the Python checker at parse time; the browser detects any byte
   change, duplicate keys included, as a certificate hash mismatch.
-- **R2 Evidence.** A claim asserted `VERIFIED` or `PROVEN` carries at
-  least one evidence link. Every evidence entry is an object with a
-  non-empty label and a URL that is either `https://` or a plain
-  relative path (no `javascript:`, `data:`, or protocol-relative URLs).
+- **R2 Evidence.** `evidence`, when present, must be a list. A claim
+  asserted `VERIFIED` or `PROVEN` carries at least one evidence link.
+  Every evidence entry is an object with a non-empty label and a URL
+  that passes **R2-URL**:
+  - `https://` followed by a non-empty host (at least one character
+    before the first `/` or end of string); bare `https://` is invalid.
+  - or a non-empty relative path matching `^[A-Za-z0-9_./-]+$` that does
+    not start with `//`, does not use `..` as a path segment, and is not
+    a scheme such as `javascript:` or `data:`.
   An `obligation` asserted `OPEN` carries none.
+  String fields (`kind`, `asserted_tier`, `section`) must be strings
+  before they are validated; wrong types fail R1 or R2, never crash.
 - **R3 No tier inflation.** Compute each claim's allowed tier:
   - `axiom` and `definition`: allowed equals asserted (they are the
     stated trust base, listed under "What you must trust").

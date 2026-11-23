@@ -12,6 +12,7 @@ error on failure.
 """
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -19,7 +20,27 @@ ROOT = Path(__file__).resolve().parent.parent
 RANK = {"OPEN": 0, "CONJECTURE": 1, "KNOWN": 2, "VERIFIED": 3, "PROVEN": 4}
 KINDS = {"axiom", "definition", "lemma", "theorem", "obligation", "hazard"}
 SECTIONS = {"axioms", "definitions", "baseline", "theorem", "obligations", "hazards"}
-ID_RE = __import__("re").compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
+ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
+REL_URL_RE = re.compile(r"^[A-Za-z0-9_./-]+$")
+
+
+def url_ok(url):
+    """R2-URL: same rule as docs/assets/proof-core.js URL_OK."""
+    if not isinstance(url, str) or not url:
+        return False
+    if url.startswith("//"):
+        return False
+    if url.startswith("https://"):
+        rest = url[8:]
+        if not rest or rest.startswith("/"):
+            return False
+        host = rest.split("/")[0]
+        if not host or any(c in host for c in " \t\n\"'"):
+            return False
+        return True
+    if ".." in url.split("/"):
+        return False
+    return bool(REL_URL_RE.match(url))
 
 
 def fail(errors):
@@ -30,7 +51,10 @@ def fail(errors):
 
 
 def load(path):
-    raw = path.read_bytes()
+    try:
+        raw = path.read_bytes()
+    except OSError as exc:
+        fail([f"{path}: cannot read ({exc.__class__.__name__})"])
     def no_dupes(pairs):
         seen = {}
         for k, v in pairs:
@@ -58,20 +82,25 @@ def check(doc):
         cid = c["id"]
         if cid in by_id:
             errors.append(f"{cid}: duplicate id")
-        if c.get("kind") not in KINDS:
-            errors.append(f"{cid}: unknown kind {c.get('kind')!r}")
-        if c.get("asserted_tier") not in RANK:
-            errors.append(f"{cid}: unknown tier {c.get('asserted_tier')!r}")
+        kind = c.get("kind")
+        if not isinstance(kind, str) or kind not in KINDS:
+            errors.append(f"{cid}: unknown kind {kind!r} (R1)")
+        tier = c.get("asserted_tier")
+        if not isinstance(tier, str) or tier not in RANK:
+            errors.append(f"{cid}: unknown tier {tier!r} (R1)")
         if not ID_RE.match(cid):
             errors.append(f"{cid}: id must match ^[A-Za-z][A-Za-z0-9_-]*$ (R1)")
         if not isinstance(c.get("title"), str) or not c["title"].strip():
             errors.append(f"{cid}: missing title (R1)")
         if not isinstance(c.get("statement"), str) or not c["statement"].strip():
             errors.append(f"{cid}: missing statement (R1)")
-        if c.get("section") not in SECTIONS:
-            errors.append(f"{cid}: unknown section {c.get('section')!r} (R1)")
+        section = c.get("section")
+        if not isinstance(section, str) or section not in SECTIONS:
+            errors.append(f"{cid}: unknown section {section!r} (R1)")
         if not isinstance(c.get("depends_on"), list):
             errors.append(f"{cid}: depends_on is not a list")
+        if "evidence" in c and not isinstance(c.get("evidence"), list):
+            errors.append(f"{cid}: evidence is not a list (R2)")
         by_id[cid] = c
     for c in claims:
         if not isinstance(c, dict) or c.get("id") not in by_id:
@@ -83,13 +112,16 @@ def check(doc):
                 errors.append(f"{cid}: depends_on entries must be strings (R1)")
             elif d not in by_id:
                 errors.append(f"{cid}: depends on missing claim {d!r}")
+        if "evidence" in c and not isinstance(c.get("evidence"), list):
+            continue
         ev = c["evidence"] if isinstance(c.get("evidence"), list) else []
         for e in ev:
-            url = e.get("url") if isinstance(e, dict) else None
-            label = e.get("label") if isinstance(e, dict) else None
-            url_ok = isinstance(url, str) and (url.startswith("https://") or
-                      (all(ch.isalnum() or ch in "_./-" for ch in url) and not url.startswith("//")))
-            if not (isinstance(label, str) and label.strip() and url_ok):
+            if not isinstance(e, dict):
+                errors.append(f"{cid}: evidence must be {{label, https-or-relative url}} (R2)")
+                continue
+            label = e.get("label")
+            url = e.get("url")
+            if not (isinstance(label, str) and label.strip() and url_ok(url)):
                 errors.append(f"{cid}: evidence must be {{label, https-or-relative url}} (R2)")
         if c.get("asserted_tier") in ("VERIFIED", "PROVEN") and not ev:
             errors.append(f"{cid}: asserted {c['asserted_tier']} with no evidence (R2)")
@@ -119,7 +151,7 @@ def check(doc):
     for cid in order:
         c = by_id[cid]
         tier = c.get("asserted_tier")
-        if tier not in RANK:
+        if not isinstance(tier, str) or tier not in RANK:
             computed[cid] = "OPEN"
             continue
         allowed = RANK[tier]
@@ -171,6 +203,8 @@ def main(argv):
             i += 1
         else:
             fail([f"unknown argument {argv[i]!r}"])
+    if claims_path.is_dir():
+        fail([f"{claims_path}: is a directory"])
     raw, doc = load(claims_path)
     errors, computed, open_obligations = check(doc)
     if errors:

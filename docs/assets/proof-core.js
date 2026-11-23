@@ -5,7 +5,21 @@
 export const TIER_RANK = { OPEN: 0, CONJECTURE: 1, KNOWN: 2, VERIFIED: 3, PROVEN: 4 };
 export const KINDS = ["axiom", "definition", "lemma", "theorem", "obligation", "hazard"];
 export const SECTIONS = ["axioms", "definitions", "baseline", "theorem", "obligations", "hazards"];
-const URL_OK = (u) => typeof u === "string" && (u.startsWith("https://") || (/^[A-Za-z0-9_./-]+$/.test(u) && !u.startsWith("//")));
+/** R2-URL: same rule as tools/verify.py url_ok (docs/data/RULES.md). */
+export function urlOk(u) {
+  if (typeof u !== "string" || !u) return false;
+  if (u.startsWith("//")) return false;
+  if (u.startsWith("https://")) {
+    const rest = u.slice(8);
+    if (!rest || rest.startsWith("/")) return false;
+    const host = rest.split("/")[0];
+    if (!host || /[\s"'"]/.test(host)) return false;
+    return true;
+  }
+  if (u.split("/").includes("..")) return false;
+  return /^[A-Za-z0-9_./-]+$/.test(u);
+}
+const URL_OK = urlOk;
 
 export function checkGraph(doc) {
   const errors = [];
@@ -15,13 +29,14 @@ export function checkGraph(doc) {
   for (const c of claims) {
     if (!c || typeof c.id !== "string" || !c.id) { errors.push("claim with missing id"); continue; }
     if (byId.has(c.id)) errors.push(`${c.id}: duplicate id`);
-    if (!KINDS.includes(c.kind)) errors.push(`${c.id}: unknown kind ${JSON.stringify(c.kind)}`);
+    if (typeof c.kind !== "string" || !KINDS.includes(c.kind)) errors.push(`${c.id}: unknown kind ${JSON.stringify(c.kind)} (R1)`);
     if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(c.id)) errors.push(`${c.id}: id must match ^[A-Za-z][A-Za-z0-9_-]*$ (R1)`);
     if (typeof c.title !== "string" || !c.title.trim()) errors.push(`${c.id}: missing title (R1)`);
     if (typeof c.statement !== "string" || !c.statement.trim()) errors.push(`${c.id}: missing statement (R1)`);
-    if (!SECTIONS.includes(c.section)) errors.push(`${c.id}: unknown section ${JSON.stringify(c.section)} (R1)`);
-    if (!Object.hasOwn(TIER_RANK, c.asserted_tier)) errors.push(`${c.id}: unknown tier ${JSON.stringify(c.asserted_tier)}`);
+    if (typeof c.section !== "string" || !SECTIONS.includes(c.section)) errors.push(`${c.id}: unknown section ${JSON.stringify(c.section)} (R1)`);
+    if (typeof c.asserted_tier !== "string" || !Object.hasOwn(TIER_RANK, c.asserted_tier)) errors.push(`${c.id}: unknown tier ${JSON.stringify(c.asserted_tier)} (R1)`);
     if (!Array.isArray(c.depends_on)) errors.push(`${c.id}: depends_on is not a list`);
+    if (Object.hasOwn(c, "evidence") && !Array.isArray(c.evidence)) errors.push(`${c.id}: evidence is not a list (R2)`);
     byId.set(c.id, c);
   }
   for (const c of claims) {
@@ -29,6 +44,7 @@ export function checkGraph(doc) {
     for (const d of Array.isArray(c.depends_on) ? c.depends_on : []) {
       if (!byId.has(d)) errors.push(`${c.id}: depends on missing claim ${JSON.stringify(d)}`);
     }
+    if (Object.hasOwn(c, "evidence") && !Array.isArray(c.evidence)) continue;
     const ev = Array.isArray(c.evidence) ? c.evidence : [];
     for (const e of ev) {
       if (!e || typeof e !== "object" || typeof e.label !== "string" || !e.label.trim() || !URL_OK(e.url)) {
@@ -68,14 +84,15 @@ export function checkGraph(doc) {
   const computed = Object.create(null);
   for (const id of order) {
     const c = byId.get(id);
-    const asserted = TIER_RANK[c.asserted_tier];
+  const tierKey = c.asserted_tier;
+  const asserted = typeof tierKey === "string" ? TIER_RANK[tierKey] : undefined;
     if (asserted === undefined) { computed[id] = "OPEN"; continue; }
     let allowed = asserted;
     if (c.kind !== "axiom" && c.kind !== "definition") {
       const depTiers = (Array.isArray(c.depends_on) ? c.depends_on : [])
         .filter((d) => byId.has(d)).map((d) => ({ id: d, tier: computed[d], rank: TIER_RANK[computed[d]] }));
       if (depTiers.some((d) => d.rank <= 1)) allowed = Math.min(allowed, 1);
-      if (c.asserted_tier === "PROVEN") {
+      if (tierKey === "PROVEN") {
         const weak = depTiers.filter((d) => {
           const k = byId.get(d.id).kind;
           return !(d.rank >= 3 || k === "axiom" || k === "definition");
@@ -84,10 +101,10 @@ export function checkGraph(doc) {
       }
     }
     if (asserted > allowed) {
-      errors.push(`${id}: asserted ${c.asserted_tier} exceeds allowed tier (R3)`);
+      errors.push(`${id}: asserted ${tierKey} exceeds allowed tier (R3)`);
       computed[id] = "OPEN";
     } else {
-      computed[id] = c.asserted_tier;
+      computed[id] = tierKey;
     }
   }
   const open = order.filter((id) => byId.get(id).kind === "obligation" && computed[id] === "OPEN");
