@@ -7,6 +7,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkGraph } from "../docs/assets/proof-core.js";
 
+/** R-Text expectation helper (must match RULES.md / both checkers). */
+const ASCII_WS = new Set("\t\n\v\f\r ");
+function isBlankText(s) {
+  if (typeof s !== "string" || s.length === 0) return true;
+  for (const c of s) {
+    if (!ASCII_WS.has(c)) return false;
+  }
+  return true;
+}
+
 const claims = JSON.parse(readFileSync(new URL("../docs/data/claims.json", import.meta.url), "utf8"));
 const ROOT = new URL("..", import.meta.url).pathname;
 const VERIFY = ["python3", "-I", "-B", join(ROOT, "tools/verify.py"), "--claims"];
@@ -108,14 +118,67 @@ const parityCases = [
     mutate: (d) => { d.claims.find((c) => c.id === "A1").id = {}; },
     expectRules: ["R1"],
   },
+  {
+    name: "evidence label BOM only (R-Text)",
+    mutate: (d) => { d.claims.find((c) => c.id === "L1").evidence[0].label = "\uFEFF"; },
+    expectOk: true,
+  },
+  {
+    name: "evidence label FS only (R-Text)",
+    mutate: (d) => { d.claims.find((c) => c.id === "L1").evidence[0].label = "\u001C"; },
+    expectOk: true,
+  },
 ];
 
-for (const { name, mutate, expectRules } of parityCases) {
-  test(`parity reject: ${name}`, () => {
+for (const { name, mutate, expectRules, expectOk } of parityCases) {
+  const reject = expectOk !== true;
+  test(`parity ${reject ? "reject" : "accept"}: ${name}`, () => {
     const doc = structuredClone(claims);
     mutate(doc);
-    assertParity(name, doc, { expectOk: false, expectRules });
+    assertParity(name, doc, {
+      expectOk: reject ? false : true,
+      expectRules: reject ? expectRules : null,
+    });
   });
+}
+
+const BLANK_FUZZ_CHARS = (() => {
+  const out = [];
+  for (let cp = 0x1c; cp <= 0x1f; cp++) out.push(String.fromCodePoint(cp));
+  out.push(
+    "\x85", "\xa0", "\u1680",
+    ...Array.from({ length: 12 }, (_, i) => String.fromCodePoint(0x2000 + i)),
+    "\u2028", "\u2029", "\u202f", "\u205f", "\u3000", "\ufeff",
+    "\t", "\n", "\v", "\f", "\r", " ",
+  );
+  return out;
+})();
+
+const TEXT_FIELDS = [
+  { field: "title", cid: "A1", rule: "R1", set: (doc, v) => { doc.claims.find((c) => c.id === "A1").title = v; } },
+  { field: "statement", cid: "A1", rule: "R1", set: (doc, v) => { doc.claims.find((c) => c.id === "A1").statement = v; } },
+  {
+    field: "label", cid: "L1", rule: "R2",
+    set: (doc, v) => { doc.claims.find((c) => c.id === "L1").evidence[0].label = v; },
+  },
+];
+
+for (const ch of BLANK_FUZZ_CHARS) {
+  const tag = `U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}`;
+  for (const { field, rule, set } of TEXT_FIELDS) {
+    for (const mode of ["whole", "padded"]) {
+      const value = mode === "whole" ? ch : `${ch}x${ch}`;
+      const expectOk = !isBlankText(value);
+      test(`parity R-Text ${field} ${tag} ${mode}`, () => {
+        const doc = structuredClone(claims);
+        set(doc, value);
+        assertParity(`${field} ${tag} ${mode}`, doc, {
+          expectOk,
+          expectRules: expectOk ? null : [rule],
+        });
+      });
+    }
+  }
 }
 
 const FIELDS = [

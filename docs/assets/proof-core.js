@@ -31,6 +31,20 @@ export function urlOk(u) {
   return REL_URL_RE.test(u);
 }
 const URL_OK = urlOk;
+const ASCII_WS = new Set("\t\n\v\f\r ");
+
+/** R-Text: same rule as tools/verify.py has_text / is_blank_text. */
+export function isBlankText(s) {
+  if (typeof s !== "string" || s.length === 0) return true;
+  for (const c of s) {
+    if (!ASCII_WS.has(c)) return false;
+  }
+  return true;
+}
+
+export function hasText(s) {
+  return typeof s === "string" && !isBlankText(s);
+}
 
 export function checkGraph(doc) {
   const errors = [];
@@ -42,8 +56,8 @@ export function checkGraph(doc) {
     if (byId.has(c.id)) errors.push(`${c.id}: duplicate id`);
     if (typeof c.kind !== "string" || !KINDS.includes(c.kind)) errors.push(`${c.id}: unknown kind ${JSON.stringify(c.kind)} (R1)`);
     if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(c.id)) errors.push(`${c.id}: id must match ^[A-Za-z][A-Za-z0-9_-]*$ (R1)`);
-    if (typeof c.title !== "string" || !c.title.trim()) errors.push(`${c.id}: missing title (R1)`);
-    if (typeof c.statement !== "string" || !c.statement.trim()) errors.push(`${c.id}: missing statement (R1)`);
+    if (!hasText(c.title)) errors.push(`${c.id}: missing title (R1)`);
+    if (!hasText(c.statement)) errors.push(`${c.id}: missing statement (R1)`);
     if (typeof c.section !== "string" || !SECTIONS.includes(c.section)) errors.push(`${c.id}: unknown section ${JSON.stringify(c.section)} (R1)`);
     if (typeof c.asserted_tier !== "string" || !Object.hasOwn(TIER_RANK, c.asserted_tier)) errors.push(`${c.id}: unknown tier ${JSON.stringify(c.asserted_tier)} (R1)`);
     if (!Array.isArray(c.depends_on)) errors.push(`${c.id}: depends_on is not a list`);
@@ -58,7 +72,7 @@ export function checkGraph(doc) {
     if (Object.hasOwn(c, "evidence") && !Array.isArray(c.evidence)) continue;
     const ev = Array.isArray(c.evidence) ? c.evidence : [];
     for (const e of ev) {
-      if (!e || typeof e !== "object" || typeof e.label !== "string" || !e.label.trim() || !URL_OK(e.url)) {
+      if (!e || typeof e !== "object" || !hasText(e.label) || !URL_OK(e.url)) {
         errors.push(`${c.id}: evidence must be {label, https-or-relative url} (R2)`);
       }
     }

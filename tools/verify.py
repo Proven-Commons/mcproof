@@ -24,6 +24,18 @@ ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 HOST_RE = re.compile(r"^[A-Za-z0-9.-]+(:[0-9]+)?$", re.ASCII)
 HTTPS_TAIL_RE = re.compile(r"^(/[A-Za-z0-9_./:@%?&=-]*)?([?#][A-Za-z0-9_./:@%?&=-]*)?$", re.ASCII)
 REL_URL_RE = re.compile(r"^[A-Za-z0-9_./-]+$", re.ASCII)
+ASCII_WS = frozenset("\t\n\v\f\r ")
+
+
+def is_blank_text(s):
+    """R-Text: same rule as proof-core.js isBlankText."""
+    if not isinstance(s, str) or not s:
+        return True
+    return all(c in ASCII_WS for c in s)
+
+
+def has_text(s):
+    return isinstance(s, str) and not is_blank_text(s)
 
 
 def url_ok(url):
@@ -100,9 +112,9 @@ def check(doc):
             errors.append(f"{cid}: unknown tier {tier!r} (R1)")
         if not ID_RE.match(cid):
             errors.append(f"{cid}: id must match ^[A-Za-z][A-Za-z0-9_-]*$ (R1)")
-        if not isinstance(c.get("title"), str) or not c["title"].strip():
+        if not has_text(c.get("title")):
             errors.append(f"{cid}: missing title (R1)")
-        if not isinstance(c.get("statement"), str) or not c["statement"].strip():
+        if not has_text(c.get("statement")):
             errors.append(f"{cid}: missing statement (R1)")
         section = c.get("section")
         if not isinstance(section, str) or section not in SECTIONS:
@@ -132,7 +144,7 @@ def check(doc):
                 continue
             label = e.get("label")
             url = e.get("url")
-            if not (isinstance(label, str) and label.strip() and url_ok(url)):
+            if not (has_text(label) and url_ok(url)):
                 errors.append(f"{cid}: evidence must be {{label, https-or-relative url}} (R2)")
         if c.get("asserted_tier") in ("VERIFIED", "PROVEN") and not ev:
             errors.append(f"{cid}: asserted {c['asserted_tier']} with no evidence (R2)")

@@ -3,20 +3,20 @@
 Both checkers implement exactly these rules and nothing else:
 `tools/verify.py` (Python, run in CI) and `docs/assets/proof-core.js`
 (JavaScript, run in CI under Node and again in your browser). They share
-no code. A disagreement fails the build.
+no code. A disagreement fails the build. Duplicate JSON keys are
+rejected when Python loads `claims.json`; the browser's `JSON.parse`
+keeps the last value for a repeated key, so CI fails first.
 
 Tiers, weakest to strongest: `OPEN < CONJECTURE < KNOWN < VERIFIED < PROVEN`.
 
 - **R1 Shape.** Claim ids are unique and match `^[A-Za-z][A-Za-z0-9_-]*$`
   (so `__proto__` and friends can never be ids). Every claim has a
-  non-empty title, statement, and a known section. Every `depends_on`
-  entry is a string naming an existing claim. The list is non-empty and
-  the dependency graph has no cycle. Duplicate JSON keys are rejected
-  by the Python checker at parse time; the browser detects any byte
-  change, duplicate keys included, as a certificate hash mismatch.
+  non-empty title, statement, and a known section (**R-Text**). Every
+  `depends_on` entry is a string naming an existing claim. The list is
+  non-empty and the dependency graph has no cycle.
 - **R2 Evidence.** `evidence`, when present, must be a list. A claim
   asserted `VERIFIED` or `PROVEN` carries at least one evidence link.
-  Every evidence entry is an object with a non-empty label and a URL
+  Every evidence entry is an object with a non-empty label (**R-Text**) and a URL
   that passes **R2-URL** (checked with a full-string match, not a prefix):
   - `https://` only (not `http://`). After the scheme, the **authority**
     (characters before the first `/`, `?`, or `#`, or end) must match
@@ -32,6 +32,12 @@ Tiers, weakest to strongest: `OPEN < CONJECTURE < KNOWN < VERIFIED < PROVEN`.
   An `obligation` asserted `OPEN` carries none.
   String fields (`kind`, `asserted_tier`, `section`) must be strings
   before they are validated; wrong types fail R1 or R2, never crash.
+- **R-Text (shared).** Title, statement, and evidence label count as
+  blank only if the value is missing, not a string, or every character
+  is ASCII whitespace: tab, newline, vertical tab, form feed, carriage
+  return, and space (`\t\n\v\f\r `). Any other character, including
+  Unicode whitespace or BOM, makes the field non-blank. Do not use
+  `str.strip`, `isspace`, `\s`, or `trim()` for this test.
 - **R3 No tier inflation.** Compute each claim's allowed tier:
   - `axiom` and `definition`: allowed equals asserted (they are the
     stated trust base, listed under "What you must trust").
