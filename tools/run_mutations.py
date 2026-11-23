@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Planted-bug suite: corrupt the claim graph seventeen ways and require
+"""Planted-bug suite: corrupt the claim graph many ways and require
 tools/verify.py to reject every corruption. Modeled on the f0 gate
 corruption suite. A checker that passes a corrupted graph is the bug.
 """
