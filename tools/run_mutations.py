@@ -42,6 +42,12 @@ def mutations(doc):
     yield m("missing title", lambda d: claim(d, "L1").pop("title"))
     yield m("unknown section vanishes claim", lambda d: claim(d, "L1").update(section="appendix"))
     yield m("prototype-name tier", lambda d: claim(d, "L1").update(asserted_tier="constructor"))
+    yield m("empty evidence URL", lambda d: claim(d, "L1")["evidence"].append({"label": "empty", "url": ""}))
+    yield m("kind as list", lambda d: claim(d, "A1").update(kind=["axiom"]))
+    yield m("bare https evidence", lambda d: claim(d, "L1")["evidence"].append({"label": "bare", "url": "https://"}))
+    yield m("dotdot relative evidence", lambda d: claim(d, "L1")["evidence"].append(
+        {"label": "traversal", "url": "../../../../etc/passwd"}))
+    yield m("non-list evidence", lambda d: claim(d, "O1").update(evidence="not-a-list"))
 
 
 def claim(doc, cid):
