@@ -1,0 +1,10 @@
+{
+  "lede": "mcproof is a domain where models produce proofs and checkers, judged by deterministic programs. Models propose. They never approve.",
+  "howto": "This page is a proof: numbered claims, tiers and evidence, recomputed by two independent checkers. Break the graph and the seal turns red.",
+  "mixer": "Colour comes from Eido: style as a draggable point. Its first position derives from the claim graph hash.",
+  "axioms": "Four stated commitments. Disagree with them by name.",
+  "baseline": "Specs, oracles and layers 2 to 5 exist and were run. The end-to-end claim is T0, still a conjecture.",
+  "obligations": "Five open goals stand between the baseline and T0. While any is open, T0 stays CONJECTURE.",
+  "hazards": "Seven seams where proof, prose and style could corrupt each other, each with its guard.",
+  "verify": "Run the gates yourself: two checkers, twelve planted bugs, a byte-identical rebuild. No proof, no publish."
+}

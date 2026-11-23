@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>mcproof · a formal domain models cannot talk their way out of</title>
+<meta name="description" content="mcproof is the formal verification MDE: a domain where models produce proofs and checkers that deterministic oracles accept or reject. This site is written as a proof. Every claim is typed, tiered, and recomputed by two checkers that share no code.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="mcproof">
+<meta property="og:description" content="A formal verification domain for models. The site itself is a checkable claim graph: read it as a proof, recompute it in your browser.">
+<meta property="og:url" content="https://proven-commons.github.io/mcproof/">
+<meta property="og:site_name" content="mcproof">
+<meta property="og:image" content="https://proven-commons.github.io/mcproof/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:alt" content="mcproof wordmark with a turnstile symbol, the line &quot;A formal verification domain for models.&quot; and a green Q.E.D. square, on a pale green card over the site's claim graph: green axiom and lemma nodes on the left, red open obligations and an amber theorem node on the right.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="mcproof">
+<meta name="twitter:description" content="A formal verification domain for models. The site itself is a checkable claim graph: read it as a proof, recompute it in your browser.">
+<meta name="twitter:image" content="https://proven-commons.github.io/mcproof/assets/og.png">
+<meta name="twitter:image:alt" content="mcproof wordmark with a turnstile symbol, the line &quot;A formal verification domain for models.&quot; and a green Q.E.D. square, on a pale green card over the site's claim graph: green axiom and lemma nodes on the left, red open obligations and an amber theorem node on the right.">
+<link rel="canonical" href="https://proven-commons.github.io/mcproof/">
+<meta name="theme-color" content="#0a0f14" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f1e8" media="(prefers-color-scheme: light)">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="stylesheet" href="assets/site.css">
+<script>
+/* theme + motion bootstrap, before paint: ?theme=dark|light, ?motion=on|off */
+(function(){var d=document.documentElement;d.classList.add('js');try{var q=new URLSearchParams(location.search),t=q.get('theme')||localStorage.getItem('mcproof-theme'),m=q.get('motion')||localStorage.getItem('mcproof-motion');if(t==='dark'||t==='light')d.setAttribute('data-theme',t);if(m==='on'||m==='off')d.setAttribute('data-motion-pref',m);}catch(e){}var r=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches,p=d.getAttribute('data-motion-pref');d.setAttribute('data-motion',p?p:(r?'off':'on'));})();
+</script>
+<script type="module" src="assets/site.js"></script>
+</head>
+<body data-page="home">
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-head">
+  <div class="wrap">
+    <a class="brand" href="./" aria-label="mcproof home"><span class="turnstile" aria-hidden="true">&#8866;</span>mcproof</a>
+    <nav class="nav" aria-label="Main">
+      <a href="#axioms">Axioms</a><a href="#baseline">Baseline</a><a href="#theorem">Theorem</a><a href="#obligations">Obligations</a><a href="#hazards">Hazards</a><a href="#verify">Verify</a>
+    </nav>
+    <div class="tools">
+      <button class="tbtn" type="button" data-condense-toggle aria-pressed="false">Condense</button>
+      <button class="tbtn" type="button" data-motion-toggle aria-pressed="true">Motion</button>
+      <button class="tbtn" type="button" data-theme-toggle>Theme</button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero" aria-labelledby="hero-title">
+    <canvas id="weave" aria-hidden="true"></canvas>
+    <div class="wrap hero-grid">
+      <div class="hero-text">
+        <p class="kicker">Proven Commons &middot; the formal verification MDE</p>
+        <h1 id="hero-title">A domain a model cannot talk its way out of.</h1>
+        <p class="lede" data-condense="lede">mcproof gives AI models a working domain where results are proofs and checkers, judged by programs that give the same answer every run. A model may propose. It may never approve its own work. The goal is the one Foundation-0 set: put models to work on open science and mathematics, with every step on the record and checkable.</p>
+        <p data-condense="howto">This page is written as a proof. Each claim below is a numbered record with a kind (axiom, lemma, obligation), a certainty tier, the claims it uses, and its evidence. Nothing here is labelled by hand: two checkers that share no code recompute every tier from one data file, once in CI before this page could publish, and once in your browser as you read. If the graph breaks, the seal turns red.</p>
+        <div class="cta">
+          <a class="btn primary" href="#theorem">Read the theorem</a>
+          <a class="btn" href="#verify">Check this page</a>
+        </div>
+        <dl class="stats" aria-label="The claim graph in numbers"><!--prerender:stats--><div class="stat"><dt>claims in the graph</dt><dd>26</dd></div><div class="stat"><dt>verified lemmas (the baseline)</dt><dd>5</dd></div><div class="stat"><dt>open obligations</dt><dd>5</dd></div><div class="stat"><dt>main theorem T0</dt><dd>Conjecture</dd></div><!--/prerender:stats--></dl>
+        <div class="prov">
+          <a class="chip" href="data/claims.json">live from data/claims.json</a>
+          <a class="chip" href="data/certificate.json">certificate.json</a>
+          <span class="chip" data-seal><!--prerender:seal--><span class="seal-hash">claims sha256:b473432464387ac7…</span> <span class="seal-hash">graph sha256:8db78bc6bcc69042…</span><!--/prerender:seal--></span>
+        </div>
+      </div>
+
+      <figure class="dag frame" aria-labelledby="dag-title">
+        <span class="corner tl" id="dag-title">The Derivation // claim graph</span>
+        <span class="corner tr" data-dag-readout>drawn from claims.json</span>
+        <canvas id="dag-canvas" role="img" aria-label="The claim graph: axioms and definitions at the left, verified lemmas in the middle, open obligations and the main theorem at the right. The same claims follow as a list."></canvas>
+        <figcaption>One node per claim on this page, one edge per &ldquo;uses&rdquo;. Position is computed from the graph alone, so the figure is identical on every visit. Colour is the computed tier: green verified, plain known, amber conjecture, red still open. Point at a node to find its claim below.</figcaption>
+        <noscript><p class="noscript-note">JavaScript is off, so the figure is not drawn. Every claim is printed in full below, and <a href="data/claims.json">data/claims.json</a> holds the graph.</p></noscript>
+      </figure>
+    </div>
+  </section>
+
+  <section class="sec" id="status" aria-labelledby="status-h">
+    <div class="wrap">
+      <div class="sec-head"><p class="sec-label"><b>&#8866;</b><i>//</i>Proof state of this page</p><span class="chip">recomputed in your browser</span></div>
+      <h2 id="status-h">Checked as you read.</h2>
+      <div class="verdict" data-verdict role="status">
+        <p class="verdict-line"><span class="qed" data-qed>&#8718;</span> <span data-verdict-text>Reading data/claims.json and recomputing every tier&hellip;</span></p>
+        <ul class="verdict-facts" data-verdict-facts></ul>
+        <p class="verdict-actions">
+          <button class="tbtn" type="button" data-tamper>Break the proof (add a cycle)</button>
+          <button class="tbtn" type="button" data-restore hidden>Restore claims.json</button>
+        </p>
+        <p class="fine" data-tamper-note hidden>The break happens in memory only, in this tab. The file on the server is untouched. Reload restores it too. This is Hazard-grade tampering, and both checkers reject it: the same corruption is one of the seventeen planted bugs CI runs before publishing.</p>
+      </div>
+      <div class="mixer frame">
+        <div class="mixer-text">
+          <h3>Style is a point, and the point is pinned to the proof</h3>
+          <p data-condense="mixer">The page takes its colour from Eido, the design language of ML Weft, where a style is a point in a continuous space rather than a fixed theme. Drag the point in the triangle: Formal, Loom, and Radiant blend with barycentric weights, and hue blends on the circle so red plus red never turns cyan. On load, the point sits where the claim graph puts it: its first position is derived from the graph hash, so the page looks the way its own proof says it should. Moving it is yours to do, and yours to undo with the reset.</p>
+          <p class="mixer-out"><output data-mixer-out for="simplex">weights derive from the graph hash on load</output>
+          <button class="tbtn" type="button" data-mixer-reset>Reset to the proof point</button></p>
+        </div>
+        <svg id="simplex" viewBox="0 0 220 200" role="slider" tabindex="0" aria-label="Style point, Formal weight. Arrow keys move it between Formal, Loom and Radiant." aria-valuemin="0" aria-valuemax="100" aria-valuenow="33" aria-valuetext="">
+          <polygon points="110,14 14,178 206,178" class="tri"></polygon>
+          <text x="110" y="10" text-anchor="middle">Formal</text>
+          <text x="16" y="194">Loom</text>
+          <text x="204" y="194" text-anchor="end">Radiant</text>
+          <circle data-simplex-dot r="7" cx="110" cy="123"></circle>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec alt" id="axioms" aria-labelledby="axioms-h">
+    <div class="wrap">
+      <div class="sec-head"><p class="sec-label"><b>00</b><i>//</i>Axioms</p><span class="chip">the trust base, stated not proved</span></div>
+      <h2 id="axioms-h">Four rules everything else stands on.</h2>
+      <p class="lede" data-condense="axioms">An axiom here is a design commitment, not a discovered fact. Each one is listed so a reader can disagree with it by name. The checkers treat axioms as given, and the section What you must trust repeats them without decoration.</p>
+      <div class="claims"><!--prerender:claims-axioms-->
+<article class="claim" id="claim-A1" data-claim="A1" data-kind="axiom" data-tier="KNOWN" data-eido-skip>
+<header><span class="cid">Axiom A1</span><span class="tier"><span class="ladder" data-r="2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Known</span></header>
+<h3>Model weights never hold authority</h3>
+<p>A trained adapter may carry habits. It may never carry the right to approve a spec, admit a proof, or overrule a checker. Approval stays with named people; enforcement stays with programs anyone can rerun.</p>
+<div class="evid"><span>Evidence</span><ul><li><a href="https://github.com/siliconcordat/mde/issues/4">Blueprint, three-tier placement</a></li></ul></div></article>
+<article class="claim" id="claim-A2" data-claim="A2" data-kind="axiom" data-tier="KNOWN" data-eido-skip>
+<header><span class="cid">Axiom A2</span><span class="tier"><span class="ladder" data-r="2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Known</span></header>
+<h3>When in doubt, refuse</h3>
+<p>Every gate in the stack fails closed. A stale manifest, a forged certificate, or a contested rule stops the load instead of guessing. A refusal is a valid result; a silent pass is not.</p>
+<div class="evid"><span>Evidence</span><ul><li><a href="https://github.com/siliconcordat/mde/issues/4">Blueprint, hard vetoes</a></li></ul></div></article>
+<article class="claim" id="claim-A3" data-claim="A3" data-kind="axiom" data-tier="KNOWN" data-eido-skip>
+<header><span class="cid">Axiom A3</span><span class="tier"><span class="ladder" data-r="2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Known</span></header>
+<h3>Exact arithmetic in exact checkers</h3>
+<p>A checker for exact mathematics uses integers and fractions only. No floating point value may decide whether an exact claim passes, because rounding can turn a false claim true.</p>
+<div class="evid"><span>Evidence</span><ul><li><a href="https://github.com/Foundation-0/finite-state-proofs/blob/main/verify.py">finite-state-proofs verify.py, the reference checker</a></li></ul></div></article>
+<article class="claim" id="claim-A4" data-claim="A4" data-kind="axiom" data-tier="KNOWN" data-eido-skip>
+<header><span class="cid">Axiom A4</span><span class="tier"><span class="ladder" data-r="2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Known</span></header>
+<h3>Say what is not proved</h3>
+<p>Every formal write-up states what it does not prove and what a reader must trust without proof. A result with no stated boundary is treated as a claim with no stated scope, and does not pass the bar.</p>
+<div class="evid"><span>Evidence</span><ul><li><a href="https://github.com/Proven-Commons/mission/blob/main/playbook/verified-bar.md">The verified bar, Proven-Commons/mission</a></li></ul></div></article>
+<!--/prerender:claims-axioms--></div>
+    </div>
+  </section>
+
+  <section class="sec" id="definitions" aria-labelledby="defs-h">
+    <div class="wrap">
+      <div class="sec-head"><p class="sec-label"><b>01</b><i>//</i>Definitions</p></div>
+      <h2 id="defs-h">Words, pinned down.</h2>
+      <div class="claims"><!--prerender:claims-definitions-->
+<article class="claim" id="claim-D1" data-claim="D1" data-kind="definition" data-tier="KNOWN" data-eido-skip>
+<header><span class="cid">Definition D1</span><span class="tier"><span class="ladder" data-r="2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Known</span></header>
+<h3>A zone is a span of text with one set of rules</h3>
+<p>A Multi-Domain Editing (MDE) zone marks a span, such as a proof block or a JSON record, and names which rules govern it. Precedence runs formal proof, then condensed JSON, then interface code, then ordinary code, then prose.</p>
+<div class="evid"><span>Evidence</span><ul><li><a href="https://github.com/siliconcordat/mde/blob/main/schemas/zone-manifest.v0.1.json">zone-manifest.v0.1.json</a></li></ul></div></article>
+<article class="claim" id="claim-D2" data-claim="D2" data-kind="definition" data-tier="KNOWN" data-eido-skip>
+<header><span class="cid">Definition D2</span><span class="tier"><span class="ladder" data-r="2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Known</span></header>
+<h3>Five words for how sure we are</h3>
+<p>OPEN means nobody has discharged it yet. CONJECTURE means stated, not proved. KNOWN means established prior work or a stated axiom. VERIFIED means a named checker was run and passed. PROVEN means a proof checker accepted a complete proof with no escape hatches.</p>
+<div class="evid"><span>Evidence</span><ul><li><a href="https://github.com/Foundation-0/.github/blob/main/REPO-STANDARD.md">Foundation-0 REPO-STANDARD.md</a></li></ul></div></article>
+<article class="claim" id="claim-D3" data-claim="D3" data-kind="definition" data-tier="KNOWN" data-eido-skip>
+<header><span class="cid">Definition D3</span><span class="tier"><span class="ladder" data-r="2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Known</span></header>
+<h3>A deterministic oracle gives the same answer every run</h3>
+<p>An oracle here is a program, never a language model, whose verdict on the same input is byte-identical on every run: a Lean build, an auditor script, a schema check. If a verdict can drift between runs, it cannot gate anything.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-A3">A3</a></p><div class="evid"><span>Evidence</span><ul><li><a href="https://github.com/siliconcordat/mde/issues/4">Blueprint, oracle catalog</a></li></ul></div></article>
+<!--/prerender:claims-definitions--></div>
+    </div>
+  </section>
+
+  <section class="sec alt" id="baseline" aria-labelledby="base-h">
+    <div class="wrap">
+      <div class="sec-head"><p class="sec-label"><b>02</b><i>//</i>Lemmas: the verified baseline</p><span class="chip">source: blueprint issue, commits pinned</span></div>
+      <h2 id="base-h">What already stands, layer by layer.</h2>
+      <p class="lede" data-condense="baseline">Five pieces exist today and have been run: the source specs with their oracles, and layers 2 to 5 of the stack that compiles, loads, routes, and audits model adapters. Each lemma names its commit. VERIFIED here means the blueprint records a checker run against that artifact; it does not mean the end-to-end claim holds. That claim is T0, and it is still a conjecture.</p>
+      <div class="claims"><!--prerender:claims-baseline-->
+<article class="claim" id="claim-L1" data-claim="L1" data-kind="lemma" data-tier="VERIFIED" data-eido-skip>
+<header><span class="cid">Lemma L1</span><span class="tier"><span class="ladder" data-r="4" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Verified</span></header>
+<h3>The source specs and oracles exist and are public</h3>
+<p>About 32.7k tokens of formal-verification source specs sit in public repositories, with working oracles: the soko auditors, bar/check.py, and f0/scripts/gate.py. The formal-claims-audit ledger holds zero verdicts so far, and its reviewer list is empty.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-D3">D3</a></p><div class="evid"><span>Evidence</span><ul><li><a href="https://github.com/ahrazzle/soko">soko auditors</a></li><li><a href="https://github.com/Foundation-0/f0/blob/main/scripts/gate.py">f0 claim gate</a></li><li><a href="https://github.com/Foundation-0/proven-commons">18-package Lean v4.35.0 anthology</a></li></ul></div></article>
+<article class="claim" id="claim-L2" data-claim="L2" data-kind="lemma" data-tier="VERIFIED" data-eido-skip>
+<header><span class="cid">Lemma L2</span><span class="tier"><span class="ladder" data-r="4" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Verified</span></header>
+<h3>Layer 5 classifies zones and audits generated code</h3>
+<p>The mde tool carries a canonical zone manifest (sha256 4e00656c...) and a native guard that rejects bare asserts, silent exception swallows, and duplicate JSON keys in generated verifiers.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-D1">D1</a>, <a href="#claim-D3">D3</a></p><div class="evid"><span>Evidence</span><ul><li><a href="https://github.com/siliconcordat/mde/commit/52ce0178854a67490eb718544961ba6cff710f22">siliconcordat/mde at 52ce0178</a></li></ul></div></article>
+<article class="claim" id="claim-L3" data-claim="L3" data-kind="lemma" data-tier="VERIFIED" data-eido-skip>
+<header><span class="cid">Lemma L3</span><span class="tier"><span class="ladder" data-r="4" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Verified</span></header>
+<h3>Layer 4 routes proof spans to the proof adapter only</h3>
+<p>The exo router sends a formal_proof span to the formal-verification adapter at weight 1.0 and to the prose and style packs at 0.0. Unit tests cover all seven cross-domain interference rules.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-D1">D1</a></p><div class="evid"><span>Evidence</span><ul><li><a href="https://github.com/siliconcordat/exo/commit/9d52aa1f28272753ddf83dbe02864d05989b74d2">siliconcordat/exo at 9d52aa1f</a></li></ul></div></article>
+<article class="claim" id="claim-L4" data-claim="L4" data-kind="lemma" data-tier="VERIFIED" data-eido-skip>
+<header><span class="cid">Lemma L4</span><span class="tier"><span class="ladder" data-r="4" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Verified</span></header>
+<h3>Layer 3 loads adapters through four fail-closed stages</h3>
+<p>The warp-modeld daemon checks binding, an integer certificate, a shadow load with verifier-owned canaries, and a constant-time kill switch, in that order. It was live-verified against llama-server with 54 of 54 tests passing.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-A2">A2</a>, <a href="#claim-D3">D3</a></p><div class="evid"><span>Evidence</span><ul><li><a href="https://github.com/siliconcordat/warp/commit/28f56549a8bb59b723281afa31831df0824e7dec">siliconcordat/warp at 28f56549</a></li></ul></div></article>
+<article class="claim" id="claim-L5" data-claim="L5" data-kind="lemma" data-tier="VERIFIED" data-eido-skip>
+<header><span class="cid">Lemma L5</span><span class="tier"><span class="ladder" data-r="4" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Verified</span></header>
+<h3>Layer 2 compiles adapters you can rebuild byte for byte</h3>
+<p>The weft compiler solves its edit in CPU float64, packs it into a checked container, and certifies the packed result with integer arithmetic. Experiments E1 to E7 cover composition, tamper rejection, packing, and a live server load. The composition runs so far are synthetic.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-A2">A2</a>, <a href="#claim-A3">A3</a></p><div class="evid"><span>Evidence</span><ul><li><a href="https://github.com/siliconcordat/weft/commit/3d66f07e5ee67863a7e6c1029e7473c9c8c11b08">siliconcordat/weft at 3d66f07e</a></li></ul></div></article>
+<!--/prerender:claims-baseline--></div>
+    </div>
+  </section>
+
+  <section class="sec theorem-sec" id="theorem" aria-labelledby="thm-h">
+    <div class="wrap">
+      <div class="sec-head"><p class="sec-label"><b>03</b><i>//</i>Theorems</p></div>
+      <h2 id="thm-h">One conjecture worth testing. One theorem about this page.</h2>
+      <div class="claims"><!--prerender:claims-theorem-->
+<article class="claim" id="claim-T0" data-claim="T0" data-kind="theorem" data-tier="CONJECTURE" data-eido-skip>
+<header><span class="cid">Theorem T0</span><span class="tier"><span class="ladder" data-r="1" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Conjecture</span></header>
+<h3>A model can work inside a formal domain it cannot talk its way out of</h3>
+<p>A model fitted with the formal-verification adapter, mounted through layers 2 to 5, produces proofs and checkers that pass deterministic oracles at rates the bare model does not reach, while every authority stays outside the weights. This is the claim mcproof exists to test. It is not proved, and this site will not call it proved until O1 to O4 are discharged.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-L1">L1</a>, <a href="#claim-L2">L2</a>, <a href="#claim-L3">L3</a>, <a href="#claim-L4">L4</a>, <a href="#claim-L5">L5</a>, <a href="#claim-O1">O1</a>, <a href="#claim-O2">O2</a>, <a href="#claim-O3">O3</a>, <a href="#claim-O4">O4</a></p><div class="evid"><span>Evidence</span><ul><li><a href="https://github.com/siliconcordat/mde/issues/4">Blueprint issue, siliconcordat/mde#4</a></li></ul></div></article>
+<article class="claim" id="claim-T1" data-claim="T1" data-kind="theorem" data-tier="VERIFIED" data-eido-skip>
+<header><span class="cid">Theorem T1</span><span class="tier"><span class="ladder" data-r="4" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Verified</span></header>
+<h3>This page checks its own claims</h3>
+<p>The claim graph behind this page is acyclic, every tier on it follows the tier rules, and two checkers that share no code (one Python, one JavaScript running in your browser) recompute the same verdict from the same file. The panel below shows the live result. Break the graph with the tamper button and the verdict turns red.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-D2">D2</a>, <a href="#claim-D3">D3</a></p><div class="evid"><span>Evidence</span><ul><li><a href="data/certificate.json">docs/data/certificate.json, generated by tools/verify.py</a></li></ul></div></article>
+<!--/prerender:claims-theorem--></div>
+    </div>
+  </section>
+  <section class="sec alt" id="obligations" aria-labelledby="obl-h">
+    <div class="wrap">
+      <div class="sec-head"><p class="sec-label"><b>04</b><i>//</i>Obligations</p><span class="chip">open until discharged, in the open</span></div>
+      <h2 id="obl-h">The proof obligations, still open.</h2>
+      <p class="lede" data-condense="obligations">In a proof assistant, an unfinished proof lists its remaining goals. Same here: five obligations stand between the verified baseline and Theorem T0. Each states what would discharge it. The checkers cap T0 at CONJECTURE while any of them is open, so this page cannot quietly upgrade itself.</p>
+      <div class="claims"><!--prerender:claims-obligations-->
+<article class="claim" id="claim-O1" data-claim="O1" data-kind="obligation" data-tier="OPEN" data-eido-skip>
+<header><span class="cid">Obligation O1</span><span class="tier"><span class="ladder" data-r="0" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Open</span></header>
+<h3>Freeze a 240-prompt test set with a private holdout</h3>
+<p>Assemble 240 prompts in four families (Lean proofs, exact checkers, claim-tier traps, mixed-zone documents), split 96 compile, 48 validation, 96 untouched private holdout, and pin every record by SHA-256. Status: open pull requests in this repository (#3, #6) contain a candidate corpus with recomputing sums, but nothing is merged to main and the private split is not in this public repo, so the obligation stays open. Discharge: the frozen manifest merged, with its sums recomputing from a fresh clone.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-L1">L1</a></p></article>
+<article class="claim" id="claim-O2" data-claim="O2" data-kind="obligation" data-tier="OPEN" data-eido-skip>
+<header><span class="cid">Obligation O2</span><span class="tier"><span class="ladder" data-r="0" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Open</span></header>
+<h3>Compile a real 1.7B to 4B adapter and score it live</h3>
+<p>Build the formal-verification adapter for a real open checkpoint and score it against the Lean compiler and the soko, bar, and f0 oracles, with the bare model and the full-spec prompt as matched arms. Status: pull request #3 reports such runs and a negative result (0 of 96 on the holdout across arms) in committed receipts that this page has not rerun and that are not merged. Discharge: scored runs merged with enough artifacts for an independent rerun.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-O1">O1</a>, <a href="#claim-L5">L5</a></p></article>
+<article class="claim" id="claim-O3" data-claim="O3" data-kind="obligation" data-tier="OPEN" data-eido-skip>
+<header><span class="cid">Obligation O3</span><span class="tier"><span class="ladder" data-r="0" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Open</span></header>
+<h3>Meet the pre-registered pass and kill criteria</h3>
+<p>Pass means at least 50 percent fewer oracle failures than the bare model on the private holdout, at least 80 percent of the full-spec ceiling, all safety canaries green, and zero corrupted proof blocks. Status: pull request #3 records a kill verdict against its own candidate (REJECTED for negative efficacy), disclosed in its verification report; the obligation therefore stays open for a future candidate, and the negative result stands on the record. Discharge: the scored table merged, published either way, with gates unchanged.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-O2">O2</a>, <a href="#claim-L4">L4</a></p></article>
+<article class="claim" id="claim-O4" data-claim="O4" data-kind="obligation" data-tier="OPEN" data-eido-skip>
+<header><span class="cid">Obligation O4</span><span class="tier"><span class="ladder" data-r="0" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Open</span></header>
+<h3>Compose with prose and style packs without interference</h3>
+<p>Run the proof adapter beside a prose pack and the Eido style system under gates T-C1 to T-C5: solo gains kept, zones isolated, base ability retained, order-invariant composition, and a serving budget. Discharge: all five gates scored on a real checkpoint.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-O3">O3</a>, <a href="#claim-L3">L3</a></p></article>
+<article class="claim" id="claim-O5" data-claim="O5" data-kind="obligation" data-tier="OPEN" data-eido-skip>
+<header><span class="cid">Obligation O5</span><span class="tier"><span class="ladder" data-r="0" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Open</span></header>
+<h3>Seat the human bar</h3>
+<p>Name spec reviewers in bar/reviewers.toml and record the first verdicts in formal-claims-audit. Until then the human tier of the system is specified but unstaffed, and no library counts as admitted. Discharge: a non-empty reviewer list and at least one recorded verdict.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-A1">A1</a></p></article>
+<!--/prerender:claims-obligations--></div>
+      <figure class="gates frame">
+        <figcaption class="gates-cap"><b>Pass and kill criteria for O3, registered before any adapter is compiled.</b> A miss is published as a negative result. The gates do not move after the runs.</figcaption>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="Pass and kill criteria">
+        <table>
+          <thead><tr><th scope="col">Gate</th><th scope="col">Measure</th><th scope="col">Pass</th></tr></thead>
+          <tbody>
+            <tr><td>Primary gain</td><td>Oracle failures on 96 private holdouts</td><td>at least 50% fewer than the bare model</td></tr>
+            <tr><td>Ceiling ratio</td><td>Holdout pass rate vs the full-spec prompt</td><td>at least 80% of it</td></tr>
+            <tr><td>Token savings</td><td>Spec tokens injected per turn</td><td>at least 90% fewer</td></tr>
+            <tr><td>Safety canaries</td><td>Verifier-owned canary prompts</td><td>8 of 8</td></tr>
+            <tr><td>General retention</td><td>100 untouched coding, maths, refusal prompts</td><td>drop of at most 1.0 point</td></tr>
+            <tr><td>Mixed integrity</td><td>30 mixed prose and proof prompts</td><td>0 corrupted proof blocks</td></tr>
+            <tr><td>Rebuild</td><td>Independent rebuild of the adapter bytes</td><td>0-byte difference</td></tr>
+            <tr><td>Tamper defence</td><td>Forged or stale or sabotaged adapters</td><td>100% rejected</td></tr>
+            <tr><td>Rollback</td><td>Output drift after the kill switch</td><td>exactly 0.0</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p class="fine">Source: the blueprint issue, phase 5. <a href="https://github.com/siliconcordat/mde/issues/4">siliconcordat/mde#4</a>.</p>
+      </figure>
+    </div>
+  </section>
+
+  <section class="sec" id="hazards" aria-labelledby="haz-h">
+    <div class="wrap">
+      <div class="sec-head"><p class="sec-label"><b>05</b><i>//</i>Hazard guards</p><span class="chip">counterexamples, each with its guard</span></div>
+      <h2 id="haz-h">Seven ways the domains could corrupt each other.</h2>
+      <p class="lede" data-condense="hazards">Put a proof domain beside a prose domain and a style domain and the seams are where things break: a style rule edits a proof, a summary trims a disclaimer. Each known seam is recorded as a hazard with the guard that closes it. Precedence when rules collide: human authority, then repository policy, then the specialist pack inside its own zone, then the base prose pack.</p>
+      <div class="claims"><!--prerender:claims-hazards-->
+<article class="claim" id="claim-H1" data-claim="H1" data-kind="hazard" data-tier="KNOWN" data-eido-skip>
+<header><span class="cid">Hazard guard H1</span><span class="tier"><span class="ladder" data-r="2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Known</span></header>
+<h3>A style rule against negative clauses could strip the honesty sections</h3>
+<p>Guard: inside a formal_proof zone the prose pack weight is 0.0 and negative disclaimers are explicitly allowed, so What is not proved survives every style pass.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-A4">A4</a>, <a href="#claim-D1">D1</a></p></article>
+<article class="claim" id="claim-H2" data-claim="H2" data-kind="hazard" data-tier="KNOWN" data-eido-skip>
+<header><span class="cid">Hazard guard H2</span><span class="tier"><span class="ladder" data-r="2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Known</span></header>
+<h3>Readability rules could rewrite axioms and commit hashes</h3>
+<p>Guard: protect_axioms and protect_sha_digests pin exact identifiers. A 40-character verdict hash is never shortened to please a style rule.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-D1">D1</a></p></article>
+<article class="claim" id="claim-H3" data-claim="H3" data-kind="hazard" data-tier="KNOWN" data-eido-skip>
+<header><span class="cid">Hazard guard H3</span><span class="tier"><span class="ladder" data-r="2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Known</span></header>
+<h3>Two vocabularies for certainty could blur into each other</h3>
+<p>Guard: claim-tier words are locked per repository by policy, outside the weights. Tested and deployed never silently become VERIFIED or PROVEN.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-D2">D2</a></p></article>
+<article class="claim" id="claim-H4" data-claim="H4" data-kind="hazard" data-tier="KNOWN" data-eido-skip>
+<header><span class="cid">Hazard guard H4</span><span class="tier"><span class="ladder" data-r="2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Known</span></header>
+<h3>Prose grammar rules could mangle terse machine records</h3>
+<p>Guard: a condensed_json zone with no formal claims zeroes the prose pack, so grammar rules never reach inside a data record.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-D1">D1</a></p></article>
+<article class="claim" id="claim-H5" data-claim="H5" data-kind="hazard" data-tier="KNOWN" data-eido-skip>
+<header><span class="cid">Hazard guard H5</span><span class="tier"><span class="ladder" data-r="2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Known</span></header>
+<h3>Two delivery styles could each claim the same page</h3>
+<p>Guard: a contested delivery choice fails closed with ContestedPreferenceError until a human-written precedence override names the winner.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-A1">A1</a>, <a href="#claim-A2">A2</a></p></article>
+<article class="claim" id="claim-H6" data-claim="H6" data-kind="hazard" data-tier="KNOWN" data-eido-skip>
+<header><span class="cid">Hazard guard H6</span><span class="tier"><span class="ladder" data-r="2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Known</span></header>
+<h3>A floating-point picture could pose as an exact result</h3>
+<p>Guard: research pages forbid floats inside exact verifiers and require every illustrative figure to carry an illustrative tag and a link to its certificate.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-A3">A3</a></p></article>
+<article class="claim" id="claim-H7" data-claim="H7" data-kind="hazard" data-tier="KNOWN" data-eido-skip>
+<header><span class="cid">Hazard guard H7</span><span class="tier"><span class="ladder" data-r="2" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>Known</span></header>
+<h3>Automatic shortening could cut the hedges off a claim</h3>
+<p>Guard: condensing refuses any block marked data-eido-skip. On this page the condense switch shortens plain prose and visibly refuses every proof block. Try it in the header.</p>
+<p class="deps"><span>Uses</span> <a href="#claim-A4">A4</a>, <a href="#claim-D1">D1</a></p></article>
+<!--/prerender:claims-hazards--></div>
+    </div>
+  </section>
+
+  <section class="sec alt" id="boundary" aria-labelledby="bnd-h">
+    <div class="wrap boundary-grid">
+      <div>
+        <div class="sec-head"><p class="sec-label"><b>06</b><i>//</i>Boundary</p></div>
+        <h2 id="bnd-h">What is not proved.</h2>
+        <ul class="boundary-list">
+          <li>Theorem T0. No end-to-end run on a real checkpoint exists yet; composition evidence so far is synthetic.</li>
+          <li>That a compiled adapter can carry deep proof search, as opposed to surface habits such as exact arithmetic and honest tiers. The blueprint records this as the likely failure line in advance.</li>
+          <li>Any admission to the Proven Commons bar. The reviewer list is empty and the verdict ledger holds zero verdicts (Obligation O5).</li>
+          <li>The lemmas rest on runs recorded in the blueprint issue. They were not rerun for this page; the commits are pinned so anyone can rerun them.</li>
+          <li>This page proves a property of its own claim graph (T1), nothing about any model.</li>
+        </ul>
+      </div>
+      <div>
+        <h2>What you must trust.</h2>
+        <ul class="boundary-list">
+          <li>Axioms A1 to A4. They are commitments, and the system is only as good as they are.</li>
+          <li>The oracles themselves: the Lean toolchain, and the auditor scripts named in L1. A bug in an oracle is a bug in every verdict it gates.</li>
+          <li>For this page: your browser's SHA-256, and that the two checkers in the repository are the ones CI ran. Both are short and readable.</li>
+          <li>GitHub, to serve the files the repository holds. The certificate lets you detect any difference, but not prevent it.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="verify" aria-labelledby="ver-h">
+    <div class="wrap">
+      <div class="sec-head"><p class="sec-label"><b>07</b><i>//</i>Verify</p><span class="chip">no proof, no publish</span></div>
+      <h2 id="ver-h">Do not take this page's word for it.</h2>
+      <p class="lede" data-condense="verify">Clone the repository and run the same gates CI runs. The Python checker runs three ways, including with optimisations and warnings as errors. The JavaScript checker runs under Node and must agree with the Python certificate claim by claim. Seventeen planted corruptions of the graph must all be rejected. The page is then built twice and the two builds must be byte-identical. Only if all of that passes does the publish job run.</p>
+      <pre class="code"><code>git clone https://github.com/Proven-Commons/mcproof
+cd mcproof
+python3 -I -B   tools/verify.py --write-certificate
+python3 -I -O -B tools/verify.py
+python3 -I -B -W error tools/verify.py
+python3 -I -B tools/run_mutations.py     # 17 planted bugs, all must be rejected
+node --test "test/*.test.mjs"            # JS checker vs the Python certificate
+python3 -I -B tools/build.py --verify    # deterministic prerender</code></pre>
+      <p>To add or change a claim, edit <a href="data/claims.json">docs/data/claims.json</a>, keep the tier rules in <a href="data/RULES.md">RULES.md</a>, and rerun the gates. The page text, the figure, the stats, and the seal all rebuild from that one file.</p>
+      <aside class="agent-box">
+        <p class="c-k">Bring your AI agent</p>
+        <p>Paste this line into your coding agent. It reads the claim graph and the rules, then reports to you before it changes anything.</p>
+        <p class="ab-prompt" id="agent-prompt">Read https://raw.githubusercontent.com/Proven-Commons/mcproof/main/docs/data/RULES.md and docs/data/claims.json, run the gates in the Verify section, and report the proof state to me before proposing any change.</p>
+        <p><button class="tbtn" type="button" data-copy="agent-prompt">Copy the line</button> <span class="ab-said" role="status"></span></p>
+      </aside>
+    </div>
+  </section>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <p><span class="turnstile" aria-hidden="true">&#8866;</span> mcproof &middot; Proven Commons. Blueprint: <a href="https://github.com/siliconcordat/mde/issues/4">siliconcordat/mde#4</a>. Method and record: <a href="https://github.com/Foundation-0/f0">Foundation-0/f0</a>. Design language: <a href="https://github.com/Moissanite-Labs/weft-eido">Eido</a> by Moissanite Labs.</p>
+      <p class="fine">Q.E.D. stands at the top of this page only when the live checker says so. <span data-foot-seal></span></p>
+    </div>
+  </footer>
+</main>
+</body>
+</html>
