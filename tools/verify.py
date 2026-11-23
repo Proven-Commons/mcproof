@@ -21,26 +21,36 @@ RANK = {"OPEN": 0, "CONJECTURE": 1, "KNOWN": 2, "VERIFIED": 3, "PROVEN": 4}
 KINDS = {"axiom", "definition", "lemma", "theorem", "obligation", "hazard"}
 SECTIONS = {"axioms", "definitions", "baseline", "theorem", "obligations", "hazards"}
 ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
-REL_URL_RE = re.compile(r"^[A-Za-z0-9_./-]+$")
+HOST_RE = re.compile(r"^[A-Za-z0-9.-]+(:[0-9]+)?$", re.ASCII)
+HTTPS_TAIL_RE = re.compile(r"^(/[A-Za-z0-9_./:@%?&=-]*)?([?#][A-Za-z0-9_./:@%?&=-]*)?$", re.ASCII)
+REL_URL_RE = re.compile(r"^[A-Za-z0-9_./-]+$", re.ASCII)
 
 
 def url_ok(url):
-    """R2-URL: same rule as docs/assets/proof-core.js URL_OK."""
+    """R2-URL: same rule as docs/assets/proof-core.js urlOk."""
     if not isinstance(url, str) or not url:
         return False
     if url.startswith("//"):
         return False
     if url.startswith("https://"):
         rest = url[8:]
-        if not rest or rest.startswith("/"):
+        if not rest:
             return False
-        host = rest.split("/")[0]
-        if not host or any(c in host for c in " \t\n\"'"):
+        auth_end = len(rest)
+        for sep in "/?#":
+            i = rest.find(sep)
+            if i != -1:
+                auth_end = min(auth_end, i)
+        authority = rest[:auth_end]
+        if not authority or not HOST_RE.fullmatch(authority):
+            return False
+        tail = rest[auth_end:]
+        if tail and not HTTPS_TAIL_RE.fullmatch(tail):
             return False
         return True
     if ".." in url.split("/"):
         return False
-    return bool(REL_URL_RE.match(url))
+    return REL_URL_RE.fullmatch(url) is not None
 
 
 def fail(errors):
@@ -77,7 +87,7 @@ def check(doc):
     by_id = {}
     for c in claims:
         if not isinstance(c, dict) or not isinstance(c.get("id"), str) or not c.get("id"):
-            errors.append("claim with missing id")
+            errors.append("claim with missing id (R1)")
             continue
         cid = c["id"]
         if cid in by_id:
@@ -103,15 +113,16 @@ def check(doc):
             errors.append(f"{cid}: evidence is not a list (R2)")
         by_id[cid] = c
     for c in claims:
-        if not isinstance(c, dict) or c.get("id") not in by_id:
+        cid_raw = c.get("id") if isinstance(c, dict) else None
+        if not isinstance(c, dict) or not isinstance(cid_raw, str) or cid_raw not in by_id:
             continue
-        cid = c["id"]
+        cid = cid_raw
         deps = c["depends_on"] if isinstance(c.get("depends_on"), list) else []
         for d in deps:
             if not isinstance(d, str):
                 errors.append(f"{cid}: depends_on entries must be strings (R1)")
             elif d not in by_id:
-                errors.append(f"{cid}: depends on missing claim {d!r}")
+                errors.append(f"{cid}: depends on missing claim {d!r} (R1)")
         if "evidence" in c and not isinstance(c.get("evidence"), list):
             continue
         ev = c["evidence"] if isinstance(c.get("evidence"), list) else []

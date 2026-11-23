@@ -17,12 +17,18 @@ Tiers, weakest to strongest: `OPEN < CONJECTURE < KNOWN < VERIFIED < PROVEN`.
 - **R2 Evidence.** `evidence`, when present, must be a list. A claim
   asserted `VERIFIED` or `PROVEN` carries at least one evidence link.
   Every evidence entry is an object with a non-empty label and a URL
-  that passes **R2-URL**:
-  - `https://` followed by a non-empty host (at least one character
-    before the first `/` or end of string); bare `https://` is invalid.
-  - or a non-empty relative path matching `^[A-Za-z0-9_./-]+$` that does
-    not start with `//`, does not use `..` as a path segment, and is not
-    a scheme such as `javascript:` or `data:`.
+  that passes **R2-URL** (checked with a full-string match, not a prefix):
+  - `https://` only (not `http://`). After the scheme, the **authority**
+    (characters before the first `/`, `?`, or `#`, or end) must match
+    `^[A-Za-z0-9.-]+(:[0-9]+)?$` using ASCII rules only (no Unicode
+    whitespace or other non-ASCII in the host). Bare `https://` or
+    `https:///` is invalid. Anything after the authority, if present,
+    must match
+    `^(/[A-Za-z0-9_./:@%?&=-]*)?([?#][A-Za-z0-9_./:@%?&=-]*)?$` (ASCII).
+  - or a non-empty relative path whose entire string matches
+    `^[A-Za-z0-9_./-]+$` (ASCII), does not start with `//`, does not
+    use `..` as a path segment, and is not another scheme such as
+    `javascript:` or `data:`.
   An `obligation` asserted `OPEN` carries none.
   String fields (`kind`, `asserted_tier`, `section`) must be strings
   before they are validated; wrong types fail R1 or R2, never crash.

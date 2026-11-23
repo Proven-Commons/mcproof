@@ -6,18 +6,29 @@ export const TIER_RANK = { OPEN: 0, CONJECTURE: 1, KNOWN: 2, VERIFIED: 3, PROVEN
 export const KINDS = ["axiom", "definition", "lemma", "theorem", "obligation", "hazard"];
 export const SECTIONS = ["axioms", "definitions", "baseline", "theorem", "obligations", "hazards"];
 /** R2-URL: same rule as tools/verify.py url_ok (docs/data/RULES.md). */
+const HOST_RE = /^[A-Za-z0-9.-]+(:[0-9]+)?$/;
+const HTTPS_TAIL_RE = /^(\/[A-Za-z0-9_./:@%?&=-]*)?([?#][A-Za-z0-9_./:@%?&=-]*)?$/;
+const REL_URL_RE = /^[A-Za-z0-9_./-]+$/;
+
 export function urlOk(u) {
   if (typeof u !== "string" || !u) return false;
   if (u.startsWith("//")) return false;
   if (u.startsWith("https://")) {
     const rest = u.slice(8);
-    if (!rest || rest.startsWith("/")) return false;
-    const host = rest.split("/")[0];
-    if (!host || /[\s"'"]/.test(host)) return false;
+    if (!rest) return false;
+    let authEnd = rest.length;
+    for (const sep of ["/", "?", "#"]) {
+      const i = rest.indexOf(sep);
+      if (i !== -1) authEnd = Math.min(authEnd, i);
+    }
+    const authority = rest.slice(0, authEnd);
+    if (!authority || !HOST_RE.test(authority)) return false;
+    const tail = rest.slice(authEnd);
+    if (tail && !HTTPS_TAIL_RE.test(tail)) return false;
     return true;
   }
   if (u.split("/").includes("..")) return false;
-  return /^[A-Za-z0-9_./-]+$/.test(u);
+  return REL_URL_RE.test(u);
 }
 const URL_OK = urlOk;
 
@@ -27,7 +38,7 @@ export function checkGraph(doc) {
   if (!claims || claims.length === 0) return { ok: false, errors: ["claims: missing, not a list, or empty (R1)"], computed: Object.create(null), order: [], openObligations: [] };
   const byId = new Map();
   for (const c of claims) {
-    if (!c || typeof c.id !== "string" || !c.id) { errors.push("claim with missing id"); continue; }
+    if (!c || typeof c.id !== "string" || !c.id) { errors.push("claim with missing id (R1)"); continue; }
     if (byId.has(c.id)) errors.push(`${c.id}: duplicate id`);
     if (typeof c.kind !== "string" || !KINDS.includes(c.kind)) errors.push(`${c.id}: unknown kind ${JSON.stringify(c.kind)} (R1)`);
     if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(c.id)) errors.push(`${c.id}: id must match ^[A-Za-z][A-Za-z0-9_-]*$ (R1)`);
@@ -40,9 +51,9 @@ export function checkGraph(doc) {
     byId.set(c.id, c);
   }
   for (const c of claims) {
-    if (!c || !byId.has(c.id)) continue;
+    if (!c || typeof c.id !== "string" || !byId.has(c.id)) continue;
     for (const d of Array.isArray(c.depends_on) ? c.depends_on : []) {
-      if (!byId.has(d)) errors.push(`${c.id}: depends on missing claim ${JSON.stringify(d)}`);
+      if (!byId.has(d)) errors.push(`${c.id}: depends on missing claim ${JSON.stringify(d)} (R1)`);
     }
     if (Object.hasOwn(c, "evidence") && !Array.isArray(c.evidence)) continue;
     const ev = Array.isArray(c.evidence) ? c.evidence : [];

@@ -48,6 +48,11 @@ def mutations(doc):
     yield m("dotdot relative evidence", lambda d: claim(d, "L1")["evidence"].append(
         {"label": "traversal", "url": "../../../../etc/passwd"}))
     yield m("non-list evidence", lambda d: claim(d, "O1").update(evidence="not-a-list"))
+    yield m("relative url trailing newline", lambda d: claim(d, "L1")["evidence"].append(
+        {"label": "nl", "url": "docs/x\n"}))
+    yield m("https host carriage return", lambda d: claim(d, "L1")["evidence"].append(
+        {"label": "cr", "url": "https://a\rb/x"}))
+    yield m("claim id as list", lambda d: claim(d, "A1").update(id=[]))
 
 
 def claim(doc, cid):
