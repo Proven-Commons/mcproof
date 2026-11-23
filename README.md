@@ -25,11 +25,18 @@ its own headline. The page figure, stats, colours, and background weave
 are all deterministic functions of the claim graph and its SHA-256.
 
 CI is the gate: the Pages workflow runs the Python checker three ways,
-rejects seventeen planted corruptions of the graph
-(`tools/run_mutations.py`), checks the JavaScript checker against the
-certificate (`node --test "test/*.test.mjs"`), and builds the page twice
-to prove the output is byte-identical. The deploy job runs only if all
-of that passes. No proof, no publish.
+rejects planted corruptions of the graph (`tools/run_mutations.py`),
+checks the JavaScript checker against the certificate and runs checker
+parity tests (`node --test "test/*.test.mjs"`), and builds the page twice
+to prove the output is byte-identical. Upload and deploy run only on
+`main` when the repository variable `PAGES_ENABLED` is set to `true`
+(Settings → Secrets and variables → Actions → Variables); until then
+verify still runs on every push but Pages is not published. No proof, no
+publish.
+
+`tools/build.py --verify` rebuilds prerendered regions from
+`claims.json`; the workflow's `git diff` step is what catches edits
+outside those regions.
 
 Work on it locally:
 
