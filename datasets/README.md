@@ -26,7 +26,7 @@ All 144 `PUB-` prompts stay strictly inside four reserved public subtopics so th
 
 - **Family A (`formal_proof`, 24 compile / 12 validation)**: stock-`Init` Lean `v4.35.0` proofs and `WeakStatement` vacuous-hypothesis traps checked across all six kernels of `lake comparator --paranoid`, `leanchecker`, `collectAxioms`, and `soko` `lean4_auditor.py`.
 - **Family B (`code`, 24 compile / 12 validation)**: exact `int` and `Fraction` Python certificate verifiers (`def verify(inst, cert) -> bool`) audited for distinct AST alpha-skeletons, zero `float` or `/` coercion, zero `assert` under `mde guard --code-audit`, clean `python3 -O -B -W error` execution, and 100% planted-bug mutation kills (`>= 80%` floor).
-- **Family C (`formal_proof`, 24 compile / 12 validation)**: epistemic claim-tier hygiene and refusal traps checked by `mcproof`, `mission/bar/check.py`, `formal-claims-audit/scripts/check_verdicts.py`, and `f0/scripts/gate.py`.
+- **Family C (`formal_proof`, 24 compile / 12 validation)**: epistemic claim-tier hygiene and refusal traps checked by `mcproof`, `mission/bar/check.py`, `formal-claims-audit/scripts/check_verdicts.py`, and `f0/scripts/gate.py`. The `bar_check` oracle is the one that builds a Lean project from pinned `spec_meta.statements`. `PUB-C-V02` is a `verdict_audit` item and does not use that path.
 - **Family D (`formal_proof`, 24 compile / 12 validation)**: mixed-register technical notes combining plain prose (`check-prose.py` and `--dupes`), `<div class="formal-claim" data-eido-skip>` protection, full 40-character verdict SHAs, kernel-checked Lean 4 blocks, and mandatory boundary sections.
 
 ## Re-check Commands

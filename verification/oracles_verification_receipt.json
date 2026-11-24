@@ -15,8 +15,8 @@
       "float_true_division_cheat": {
         "actual_pass": false,
         "expected_pass": false,
-        "kill_fraction": "5/5",
-        "kill_rate_bps": 10000,
+        "kill_fraction": null,
+        "kill_rate_bps": null,
         "matched_expectation": true,
         "rules": [
           "FLOAT_DIVISION_IN_EXACT_CHECKER",
@@ -177,7 +177,7 @@
       "native_decide_cheat": {
         "caught": true,
         "nonstandard_axioms": [
-          "t_native._native.native_decide.ax_1_1"
+          "t_native._native.native_decide.ax_1"
         ],
         "rules": [
           "UNVERIFIED_NATIVE_DECIDE",
@@ -265,6 +265,7 @@
       ],
       "challenge_sorry_whitelisted_module": "Mcproof.Spec",
       "findings": [],
+      "host_resource_exhausted": false,
       "nonstandard_axioms": [],
       "paranoid_kernels_run": [
         "lean-paranoid",
@@ -285,7 +286,28 @@
         "Mcproof.Spec.ratLeCross_sound",
         "Mcproof.Spec.ratLeCross_refl_pos",
         "Mcproof.Spec.cleanSegments_safe",
-        "Mcproof.Spec.cleanSegments_singleton"
+        "Mcproof.Spec.cleanSegments_singleton",
+        "Mcproof.Spec.quotientHeuristic_step_consistent",
+        "Mcproof.Spec.quotientHeuristic_admissible",
+        "Mcproof.Spec.prefundedHeuristic_admissible_and_goal",
+        "Mcproof.Spec.prefundedHeuristic_step_consistent",
+        "Mcproof.Spec.prefundedVal_bounded_drop_witness",
+        "Mcproof.Spec.operatorCounting_dual_scaled_sound",
+        "Mcproof.Spec.operatorCounting_dual_div_admissible",
+        "Mcproof.Spec.dualFloorNat_sound_and_witness",
+        "Mcproof.Spec.cyclicSwitchTax_triangle",
+        "Mcproof.Spec.cyclicSwitchDist_metric_and_witness",
+        "Mcproof.Spec.conservation_harvest_potential_repair",
+        "Mcproof.Spec.vertexSplit_unit_flow_horizon_bound",
+        "Mcproof.Spec.zeroSelfLoop_deficit_composition",
+        "Mcproof.Spec.ceilDiv_step_consistent_and_admissible",
+        "Mcproof.Spec.rmsnorm_tangent_orthogonal",
+        "Mcproof.Spec.rmsnorm_orthogonal_stack_norm_inflation",
+        "Mcproof.Spec.multilayer_quadratic_shrinkage_reduction",
+        "Mcproof.Spec.swiglu_gate_metric_and_counterexample",
+        "Mcproof.Spec.swiglu_radial_null_orthogonality",
+        "Mcproof.Spec.scalar_projection_retention_illusion",
+        "Mcproof.Spec.rmsnorm_rational_shrinkage_sandwich"
       ],
       "toolchain": "leanprover/lean4:v4.35.0"
     },
@@ -317,7 +339,7 @@
       "bytes": 106763,
       "control_bytes": [],
       "lineage_details": {
-        "corpus_tree_sha256": "5bdb7f30363b956e82947f668f98c48f99876e87fb5ed4f785b873e4f4f98305",
+        "corpus_tree_sha256": "93624aae09eea99c3d35ebfa2e9acde1f9ac9c675167461652486850f206b642",
         "deps_checkouts_verified": true,
         "deps_manifest_verified": true,
         "findings": [],
@@ -333,15 +355,16 @@
       "sha256": "49beff2a0185cfa4032170b614a543c0d67541494e858803d21cfb837111b230"
     },
     "prose_gate": {
-      "check_dupes_out": "check-prose --dupes: clean (11 file(s))",
+      "check_dupes_out": "check-prose --dupes: clean (12 file(s))",
       "check_dupes_rc": 0,
-      "check_prose_out": "check-prose: clean (11 file(s), 2422 lines)",
+      "check_prose_out": "check-prose: clean (12 file(s), 2546 lines)",
       "check_prose_rc": 0,
       "files": [
         "README.md",
         "compile/README.md",
         "datasets/README.md",
         "docs/CONTINUITY.md",
+        "docs/CROSS_POLLINATION.md",
         "lean/README.md",
         "lean/SPEC.md",
         "lean/tests/TEST-RESULTS.md",
@@ -353,24 +376,24 @@
     },
     "pytest_strict": {
       "counts": {
-        "executed_total": 34,
+        "executed_total": 53,
         "failed": 0,
-        "passed": 34,
-        "skipped": 0
+        "passed": 53,
+        "skipped": 1
       },
       "returncode": 0,
       "summary_tail": [
-        "../../../Work/mcproof-lab/repo/tests/test_lean_harness.py ...........    [ 73%]",
-        "../../../Work/mcproof-lab/repo/tests/test_lineage_prose_and_cli.py ..... [ 88%]",
-        "....                                                                     [100%]",
+        "tests/test_lean_harness.py ....s........                                 [ 70%]",
+        "tests/test_lineage_prose_and_cli.py .........                            [ 87%]",
+        "tests/test_neon_audit_regressions.py .......                             [100%]",
         "",
-        "======================== 34 passed in 137.54s (0:02:17) ========================"
+        "================== 53 passed, 1 skipped in 148.14s (0:02:28) ==================="
       ]
     },
     "readme_top_lines": [
       "# mcproof",
       "`mcproof` is the verification harness, Plane 1 rulebook, dataset suite, weight compiler, and serving benchmark for the Siliconcordat Formal Verification MDE. It checks Lean 4.35.0 proofs across six kernels, grades exact-math checkers against planted bugs, compiles `weft` adapters, and audits live `warp-modeld` mounts. Proof authors, verifiers, and researchers use it to test formal reasoning without weakening deterministic gates.",
-      "Blueprint and gates live in [siliconcordat/mde issue 4](https://github.com/siliconcordat/mde/issues/4) under the [Master Plan](https://github.com/siliconcordat/.github/blob/main/MASTER-PLAN.md). Companion serving changes live in [siliconcordat/exo](https://github.com/siliconcordat/exo/tree/feat/mde4-phase4-phase6-stack) and [siliconcordat/warp PR 5](https://github.com/siliconcordat/warp/pull/5)."
+      "Blueprint and gates live in [siliconcordat/mde issue 4](https://github.com/siliconcordat/mde/issues/4) under the [Master Plan](https://github.com/siliconcordat/.github/blob/main/MASTER-PLAN.md). Companion serving changes live in [siliconcordat/exo](https://github.com/siliconcordat/exo/tree/feat/mde4-phase4-phase6-stack) and [siliconcordat/warp](https://github.com/siliconcordat/warp/tree/feat/mde4-phase4-live-gate)."
     ],
     "siliconcordat_clean": {
       "exo": "",

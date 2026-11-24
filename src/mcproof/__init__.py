@@ -2,12 +2,28 @@
 
 from __future__ import annotations
 
+from .domain_protocol import (
+    BudgetLedger,
+    DomainDiagnostic,
+    DomainGradeResult,
+    DomainOracle,
+    FormalVerificationDomainOracle,
+    audit_portfolio_bounds,
+    audit_transition_certificate,
+    loads_strict_certificate_json,
+    run_restricted_sandbox_cell,
+    verify_dual_product_parity,
+    verify_minimal_goal_stopping,
+    verify_rational_lp_certificate,
+)
 from .lean_harness import (
     LeanVerificationResult,
     audit_weak_statements,
     lint_lean4_source,
+    scrub_challenge_artifacts,
     verify_lean4_project_comparator,
     verify_lean4_source,
+    verify_pinned_lean_defs,
 )
 from .lineage import (
     CANONICAL_ZONE_MANIFEST_ID,
@@ -40,11 +56,30 @@ from .oracles import (
     run_soko_integrity_and_evidence_oracle,
     run_verdicts_oracle,
 )
+from .repair_loop import (
+    compute_candidate_state_hash,
+    compute_failure_signature,
+    default_inference_oracle,
+    evaluate_early_stop_eligibility,
+    format_diagnostics,
+    make_llama_server_generator,
+    retrieve_plane1_excerpt,
+    retrieve_plane1_sections,
+    run_repair_item,
+    run_repair_split,
+    sanitize_oracle_diagnostics,
+    summarize_oracle_grader_gap,
+)
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
+    "BudgetLedger",
     "CANONICAL_ZONE_MANIFEST_ID",
+    "DomainDiagnostic",
+    "DomainGradeResult",
+    "DomainOracle",
+    "FormalVerificationDomainOracle",
     "KILL_FLOOR_DEN",
     "KILL_FLOOR_NUM",
     "LeanVerificationResult",
@@ -53,11 +88,22 @@ __all__ = [
     "OracleReceipt",
     "StaleLineageError",
     "__version__",
+    "audit_portfolio_bounds",
+    "audit_transition_certificate",
     "audit_weak_statements",
     "build_lineage_manifest",
+    "compute_candidate_state_hash",
+    "compute_failure_signature",
+    "default_inference_oracle",
+    "evaluate_early_stop_eligibility",
     "find_forbidden_control_bytes",
+    "format_diagnostics",
     "grade_family_completion",
     "lint_lean4_source",
+    "loads_strict_certificate_json",
+    "make_llama_server_generator",
+    "retrieve_plane1_excerpt",
+    "retrieve_plane1_sections",
     "run_all_reference_selftests",
     "run_checker_oracle",
     "run_claim_hygiene_oracle",
@@ -69,9 +115,19 @@ __all__ = [
     "run_mission_bar_oracle",
     "run_prose_and_mixed_zone_oracle",
     "run_python_strict",
+    "run_repair_item",
+    "run_repair_split",
+    "run_restricted_sandbox_cell",
     "run_soko_integrity_and_evidence_oracle",
     "run_verdicts_oracle",
+    "sanitize_oracle_diagnostics",
+    "scrub_challenge_artifacts",
+    "summarize_oracle_grader_gap",
+    "verify_dual_product_parity",
     "verify_lean4_project_comparator",
     "verify_lean4_source",
     "verify_lineage_manifest",
+    "verify_minimal_goal_stopping",
+    "verify_pinned_lean_defs",
+    "verify_rational_lp_certificate",
 ]

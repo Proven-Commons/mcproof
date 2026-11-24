@@ -3,6 +3,9 @@
   Uses stock Lean 4 Init only, with zero floats and zero escape hatches.
 -/
 
+import Mcproof.TransitionBounds
+import Mcproof.AdapterBounds
+
 namespace Mcproof
 
 /-- Move `x` into the closed natural-number interval `[lo, hi]`. -/

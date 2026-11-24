@@ -462,8 +462,10 @@ def main() -> int:
     st_dir = _resolve_safetensors_dir()
     npz_path = _resolve_activations_npz()
 
-    # Load independent Plane 1 lineage and zone manifest
-    lineage_doc = json.loads((REPO_ROOT / "spec" / "lineage.json").read_text(encoding="utf-8"))
+    # Load independent Plane 1 lineage and zone manifest (using frozen v0.1 snapshot when verifying v0.1 P2-B)
+    v01_snap = EXPECTED_P2B_DIR / "v01_plane1_snapshot"
+    lineage_src = (v01_snap / "spec" / "lineage.json") if (v01_snap / "spec" / "lineage.json").is_file() else (REPO_ROOT / "spec" / "lineage.json")
+    lineage_doc = json.loads(lineage_src.read_text(encoding="utf-8"))
     zone_doc = json.loads((REPO_ROOT / "schemas" / "zone-manifest.v0.1.json").read_text(encoding="utf-8"))
     zone_manifest_id = str(zone_doc["manifest_id"])
     if not hmac.compare_digest(zone_manifest_id, str(lineage_doc["zone_manifest_id"])):
@@ -586,7 +588,10 @@ def main() -> int:
 
     # 6. Independent 5-layer BindingManifest
     ident = identify_checkpoint_independent(st_dir)
-    p1_hashes = {rel: sha256_file(REPO_ROOT / rel) for rel in sorted(PLANE1_RELPATHS)}
+    p1_hashes = {
+        rel: sha256_file((v01_snap / rel) if (v01_snap / rel).is_file() else (REPO_ROOT / rel))
+        for rel in sorted(PLANE1_RELPATHS)
+    }
     recipe = {
         "compiler": "weft/0.1.0",
         "harvested_activations_meta_sha256": meta_sha256,

@@ -30,7 +30,7 @@ from mcproof.lineage import (  # noqa: E402
 
 
 def _clone_at_exact_sha(url: str, commit: str, dest: Path) -> None:
-    if not COMMIT_RE.match(commit):
+    if not COMMIT_RE.fullmatch(commit):
         raise ValueError(f"refusing non-40-hex commit pin {commit!r} for {url}")
     if (dest / ".git").exists():
         head = subprocess.run(

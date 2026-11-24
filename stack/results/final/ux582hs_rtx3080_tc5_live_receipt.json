@@ -1,0 +1,613 @@
+{
+  "deviations_and_caveats": [
+    "The full `MCPROOF_LIVE_LLAMA_TESTS=1 pytest stack/tests/test_stack_suite.py` end-to-end live test (Phase 4 + full Phase 6 T-C1..T-C5) was NOT run. It needs lab-host prerequisites that the UX582HS host doesn't have (siliconcordat `mde` Rust binary, `exo`, `warp_modeld`, `weft` sibling repos, and the LlamaServerClient they provide); its lab tests self-skip. T-C5 was replayed instead with a standalone harness that reproduces the exact T-C5 server flags, prompt, sampling and interleaving. phase6_receipt.json and docs/CONTINUITY.md in the repo were not modified (no push).",
+    "llama.cpp build is b12549 (version string 1.0.0-dev); the issue requires >= 0.5.0. The M1 Max reference used llama-server 0.5.0, so absolute tok/s are not comparable across hosts.",
+    "Measured peak VRAM is well above the analytical baselines in the issue (Q8_0 4.9451 headless / 6.1451 WDDM GiB; Q4_K_M 3.4034 / 4.6034 GiB). Main cause: hardware_probe.compute_rtx3080_vram_fit and the phase6 projection count F16 KV for ONE 8192-token sequence (0.25 GiB), but the T-C5 server config (-np 8, -c 65536, kv_unified=false) allocates KV for 8 x 8192 tokens (about 2.0 GiB), plus 8 recurrent-state copies and the CUDA context. The analytical +1.20 GiB WDDM desktop allowance did not materialize (the dGPU drives no display). Q8_0 headroom under the 7.2 GiB gate is 0.35 GiB.",
+    "8-slot overhead is an extra measurement (the issue checklist mentions single-slot / 8-slot). The original harness only measures single-slot on the np8 instance. Both are gated here.",
+    "KV residency stress filled each slot to 7486/8192 tokens (91.4%), not the full 8192; KV is preallocated at boot, so VRAM did not change materially (+10 MiB) under load.",
+    "A preliminary Q8_0 run (runs/q8_0_prelim.json, before the content-hash LoRA check was added) gave matching numbers: peak 7017 MiB, single-slot overhead -0.22%, 8-slot -1.01%."
+  ],
+  "environment": {
+    "gpu_idle_desktop_vram_mib": 0,
+    "gpu_nvidia_smi": "NVIDIA GeForce RTX 3080 Laptop GPU, 566.07, 8192 MiB, WDDM, 00000000:01:00.0",
+    "host": "ASUS ZenBook Pro Duo UX582HS",
+    "llama_cpp_release": "ggml-org/llama.cpp b12549 (llama-b12549-bin-win-cuda-12.4-x64.zip sha256 05053794f7b5557ac860fbe0572e5b29aee92727f61324899c9641a5d3a6849b + cudart-llama-bin-win-cuda-12.4-x64.zip sha256 8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6, both matching GitHub release digests)",
+    "llama_server_version": [
+      "version: 1.0.0-dev (build 12549, commit 8af68d486)",
+      "built with Clang 22.1.8 for Windows x86_64"
+    ],
+    "note_wddm": "dGPU runs under WDDM but drives no display (idle memory.used = 0 MiB); per-process used_memory is N/A under WDDM, so device-wide memory.used is reported.",
+    "nvidia_smi_cuda_line": "| NVIDIA-SMI 566.07                 Driver Version: 566.07         CUDA Version: 12.7     |",
+    "os": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.10"
+  },
+  "inputs": {
+    "gguf_source": "huggingface.co/unsloth/Qwen3.5-4B-GGUF (pinned repo in hardware_probe.py); HF LFS oids equal expected sha256",
+    "loras": {
+      "corpus": {
+        "bytes": 189184,
+        "llama_adapter_id": 0,
+        "manifest_sha256": "d81bab6b8c5555674dbbe29e38566435fedc1828d652fbfbf12f35f9562ea640",
+        "match": true,
+        "path_in_repo": "compile/artifacts/composition/corpus.f16.gguf",
+        "sha256": "d81bab6b8c5555674dbbe29e38566435fedc1828d652fbfbf12f35f9562ea640"
+      },
+      "formal-verification": {
+        "bytes": 189408,
+        "llama_adapter_id": 2,
+        "manifest_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+        "match": true,
+        "path_in_repo": "compile/artifacts/composition/formal-verification.f16.gguf",
+        "sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5"
+      },
+      "weft-eido": {
+        "bytes": 189184,
+        "llama_adapter_id": 1,
+        "manifest_sha256": "71bedfeee40d0b11a559f73d1c720822a1281452859f43a250bf86bc2755bb86",
+        "match": true,
+        "path_in_repo": "compile/artifacts/composition/weft-eido.f16.gguf",
+        "sha256": "71bedfeee40d0b11a559f73d1c720822a1281452859f43a250bf86bc2755bb86"
+      }
+    },
+    "mcproof_branch": "feat/formal-verification-mde-v0.1",
+    "mcproof_commit": "45528746556e4236dcb4a8d10d6fed5b26673c57"
+  },
+  "issue": "Proven-Commons/mcproof#4",
+  "methodology": {
+    "eight_slot_protocol": "same prompt and sampling; 8 simultaneous requests (id_slot 0..7, all slots erased first), n_predict 96, 1 warmup per arm (n_predict 64), 5 interleaved trials; tok/s = total predicted tokens / wall-clock",
+    "gpu_contention_check": "harness refuses to start unless nvidia-smi shows <= 600 MiB used and <= 20% util; both runs started at 0 MiB / 0% with no compute apps",
+    "harness": "tc5_replay.py (stdlib only), a line-by-line replica of the T-C5 block in stack/src/mcproof_stack/phase6_composition.py (~L2217-2335) and LiveLlamaProcess.build_command in runtime.py",
+    "kv_gate": "GET /slots: raw_slots[0].n_ctx is int >= 8192 (extract_verified_slot_n_ctx), plus all 8 slots report 8192. Additional stress test: 8 concurrent requests with 7454-token prompts + 32 generated tokens (7486 tokens resident per slot, 91.4% of 8192) under triple LoRA, with peak VRAM sampled during it",
+    "lora_effect_sanity": "the stack arm's greedy output differs from W0's on every trial (content sha256 recorded), so adapters were actually applied",
+    "overhead_formula": "(median_w0 - median_stack)/median_w0*100; benchmark_anomaly if < -5.0; gate passes if not anomaly and <= 15.0 (compute_latency_overhead_metrics)",
+    "server_launch": "llama-server -m <gguf> --host 127.0.0.1 -c 65536 (=8192*8) -ngl 99 -np 8 --cache-type-k f16 --cache-type-v f16 --slots --slot-save-path <dir> --no-cache-idle-slots --slot-prompt-similarity 0.0 --ctx-checkpoints 0 --chat-template-kwargs {\"enable_thinking\":false} --lora-scaled corpus:0.0,weft-eido:0.0,formal-verification:0.0 --lora-init-without-apply; server log confirms n_slots=8, n_ctx_slot=8192, kv_unified=false",
+    "single_slot_protocol": "POST /completion with BENCH_PROMPT from phase6_composition.py, temperature 0, top_p 1, seed 42, cache_prompt false, id_slot 0. 1 warmup per arm (n_predict 64), then 5 interleaved trials (even: W0 then stack; odd: stack then W0), slot 0 erased before each, n_predict 96. tok/s = timings.predicted_per_second",
+    "stack_definition": "same server instance, per-request lora=[{id:0,scale:1},{id:1,scale:1},{id:2,scale:1}]",
+    "vram": "nvidia-smi --query-gpu=memory.used polled about every 100 ms from before server launch until after shutdown (boot, both benchmarks, KV stress); peak = max sample, device-wide (includes CUDA context and cuBLAS workspace)",
+    "w0_definition": "same server instance, per-request lora=[] (all three adapters loaded at scale 0, not applied)"
+  },
+  "models": {
+    "Q4_K_M": {
+      "all_gates_passed": true,
+      "analytical_projection_from_hardware_probe_py": {
+        "cuda_context_and_compute_overhead_gib": 0.55,
+        "deltanet_recurrent_state_gib": 0.0502,
+        "estimated_total_vram_gib": 3.4034,
+        "estimated_total_vram_windows_wddm_gib": 4.6034,
+        "fits_8gib_rtx3080_budget": true,
+        "fits_8gib_rtx3080_windows_wddm_budget": true,
+        "kv_cache_8k_f16_gib": 0.25,
+        "measurement_kind": "analytical_projection_not_live_nvml",
+        "model_weights_gib": 2.5527,
+        "rtx3080_budget_gib": 7.2,
+        "three_f16_rank8_loras_gib": 0.000526,
+        "windows_wddm_desktop_overhead_gib": 1.2
+      },
+      "boot_s": 2.29,
+      "bytes": 2740937888,
+      "eight_slot_concurrent": {
+        "anomaly_floor_pct": -5.0,
+        "benchmark_anomaly": false,
+        "latency_overhead_pct": 0.48,
+        "max_allowed_overhead_pct": 15.0,
+        "metric": "aggregate generated tokens / wall-clock s across 8 concurrent requests",
+        "overhead_gate_passed": true,
+        "triple_lora_median_tok_per_s": 344.89,
+        "triple_lora_samples_tok_per_s": [
+          341.04,
+          345.83,
+          344.89,
+          339.34,
+          345.14
+        ],
+        "w0_median_tok_per_s": 346.55,
+        "w0_samples_tok_per_s": [
+          349.16,
+          346.7,
+          346.55,
+          344.43,
+          339.48
+        ]
+      },
+      "finished_utc": "2026-11-19T21:34:40.524167+00:00",
+      "gates": {
+        "kv_8slot_8192_residency": {
+          "min_required_n_ctx": 8192,
+          "passed": true,
+          "slots_n_ctx": [
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192
+          ],
+          "stress_all_8_slots_concurrent": true,
+          "stress_prompt_tokens_per_slot": 7454,
+          "stress_server_alive_after": true,
+          "stress_tokens_resident_per_slot_at_end": 7486
+        },
+        "peak_vram_le_7_2_gib": {
+          "limit_gib": 7.2,
+          "measured_peak_gib": 5.2314,
+          "measured_peak_mib": 5357,
+          "passed": true
+        },
+        "tok_s_overhead_8slot_le_15pct": {
+          "benchmark_anomaly": false,
+          "overhead_pct": 0.48,
+          "passed": true
+        },
+        "tok_s_overhead_single_slot_le_15pct": {
+          "benchmark_anomaly": false,
+          "overhead_pct": 0.47,
+          "passed": true
+        }
+      },
+      "gguf": "Qwen3.5-4B-Q4_K_M.gguf",
+      "kv_residency_stress": {
+        "aggregate_tok_per_s": 13.252724465069475,
+        "lora": [
+          {
+            "id": 0,
+            "scale": 1.0
+          },
+          {
+            "id": 1,
+            "scale": 1.0
+          },
+          {
+            "id": 2,
+            "scale": 1.0
+          }
+        ],
+        "n_predict": 32,
+        "per_slot_predicted_per_second": [
+          1.9836884498268241,
+          2.2552528658625794,
+          2.6114800832944205,
+          3.277384156892397,
+          4.407019215883238,
+          5.998689963514419,
+          11.539198844591187,
+          44.03390326461677
+        ],
+        "predicted_tokens": 256,
+        "prompt_n": [
+          7454,
+          7454,
+          7454,
+          7454,
+          7454,
+          7454,
+          7454,
+          7454
+        ],
+        "prompt_tokens_per_slot": 7454,
+        "server_alive_after": true,
+        "slots_used": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "tokens_resident_per_slot_at_end": 7486,
+        "wall_s": 19.31678280000051
+      },
+      "lora_adapters_at_boot": [
+        {
+          "id": 0,
+          "path": "repo\\Proven-Commons-mcproof-4552874\\compile\\artifacts\\composition\\corpus.f16.gguf",
+          "prompt_prefix": "",
+          "scale": 0.0,
+          "task_name": ""
+        },
+        {
+          "id": 1,
+          "path": "repo\\Proven-Commons-mcproof-4552874\\compile\\artifacts\\composition\\weft-eido.f16.gguf",
+          "prompt_prefix": "",
+          "scale": 0.0,
+          "task_name": ""
+        },
+        {
+          "id": 2,
+          "path": "repo\\Proven-Commons-mcproof-4552874\\compile\\artifacts\\composition\\formal-verification.f16.gguf",
+          "prompt_prefix": "",
+          "scale": 0.0,
+          "task_name": ""
+        }
+      ],
+      "post_shutdown_nvidia_smi": {
+        "memory_total_mib": 8192,
+        "memory_used_mib": 0,
+        "power_w": "27.52",
+        "sm_clock_mhz": "210",
+        "temp_c": "71",
+        "util_pct": "0"
+      },
+      "pre_run_nvidia_smi": {
+        "memory_total_mib": 8192,
+        "memory_used_mib": 0,
+        "power_w": "23.51",
+        "sm_clock_mhz": "1245",
+        "temp_c": "69",
+        "util_pct": "0"
+      },
+      "raw_run_file": "runs/q4_k_m.json",
+      "raw_run_file_sha256": "0fbdc15e28943b0cd6a70bb4f661449092dc62ca98fdda68a94a957e9d271e42",
+      "server_cmd": [
+        "llama\\llama-server.exe",
+        "-m",
+        "models\\Qwen3.5-4B-Q4_K_M.gguf",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "53994",
+        "-c",
+        "65536",
+        "-ngl",
+        "99",
+        "-np",
+        "8",
+        "--cache-type-k",
+        "f16",
+        "--cache-type-v",
+        "f16",
+        "--slots",
+        "--slot-save-path",
+        "runs\\q4_k_m_slots",
+        "--no-cache-idle-slots",
+        "--slot-prompt-similarity",
+        "0.0",
+        "--ctx-checkpoints",
+        "0",
+        "--chat-template-kwargs",
+        "{\"enable_thinking\":false}",
+        "--lora-scaled",
+        "repo\\Proven-Commons-mcproof-4552874\\compile\\artifacts\\composition\\corpus.f16.gguf:0.0,repo\\Proven-Commons-mcproof-4552874\\compile\\artifacts\\composition\\weft-eido.f16.gguf:0.0,repo\\Proven-Commons-mcproof-4552874\\compile\\artifacts\\composition\\formal-verification.f16.gguf:0.0",
+        "--lora-init-without-apply"
+      ],
+      "sha256_expected": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+      "sha256_match": true,
+      "sha256_measured": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+      "single_slot_tc5_protocol": {
+        "anomaly_floor_pct": -5.0,
+        "benchmark_anomaly": false,
+        "latency_overhead_pct": 0.47,
+        "lora_effect_check": {
+          "stack_distinct_outputs": 1,
+          "stack_output_differs_from_w0": true,
+          "w0_distinct_outputs": 1
+        },
+        "max_allowed_overhead_pct": 15.0,
+        "overhead_gate_passed": true,
+        "triple_lora_median_tok_per_s": 85.86,
+        "triple_lora_samples_tok_per_s": [
+          86.04,
+          85.91,
+          85.86,
+          85.42,
+          85.62
+        ],
+        "w0_median_tok_per_s": 86.27,
+        "w0_samples_tok_per_s": [
+          86.53,
+          86.4,
+          86.27,
+          86.2,
+          85.91
+        ]
+      },
+      "started_utc": "2026-11-19T21:33:33.771074+00:00",
+      "vram_detail": {
+        "idle_baseline_mib": 0,
+        "n_samples": 425,
+        "peak_minus_baseline_mib": 5357,
+        "peak_used_gib": 5.2314,
+        "peak_used_mib": 5357,
+        "phase_peaks_mib": {
+          "boot": 5345,
+          "eight_slot_bench": 5353,
+          "idle_after": 5357,
+          "init": 0,
+          "kv_residency_stress": 5357,
+          "single_slot_bench": 5351
+        },
+        "sampling": "nvidia-smi --query-gpu=memory.used every ~100 ms over server lifetime"
+      }
+    },
+    "Q8_0": {
+      "all_gates_passed": true,
+      "analytical_projection_from_hardware_probe_py": {
+        "cuda_context_and_compute_overhead_gib": 0.55,
+        "deltanet_recurrent_state_gib": 0.0502,
+        "estimated_total_vram_gib": 5.0253,
+        "estimated_total_vram_windows_wddm_gib": 6.2253,
+        "fits_8gib_rtx3080_budget": true,
+        "fits_8gib_rtx3080_windows_wddm_budget": true,
+        "kv_cache_8k_f16_gib": 0.25,
+        "measurement_kind": "analytical_projection_not_live_nvml",
+        "model_weights_gib": 4.1746,
+        "rtx3080_budget_gib": 7.2,
+        "three_f16_rank8_loras_gib": 0.000526,
+        "windows_wddm_desktop_overhead_gib": 1.2
+      },
+      "boot_s": 2.94,
+      "bytes": 4482403488,
+      "eight_slot_concurrent": {
+        "anomaly_floor_pct": -5.0,
+        "benchmark_anomaly": false,
+        "latency_overhead_pct": -0.66,
+        "max_allowed_overhead_pct": 15.0,
+        "metric": "aggregate generated tokens / wall-clock s across 8 concurrent requests",
+        "overhead_gate_passed": true,
+        "triple_lora_median_tok_per_s": 284.65,
+        "triple_lora_samples_tok_per_s": [
+          285.32,
+          283.57,
+          284.65,
+          282.25,
+          285.52
+        ],
+        "w0_median_tok_per_s": 282.78,
+        "w0_samples_tok_per_s": [
+          282.78,
+          275.82,
+          287.44,
+          286.64,
+          282.22
+        ]
+      },
+      "finished_utc": "2026-11-19T21:33:28.548342+00:00",
+      "gates": {
+        "kv_8slot_8192_residency": {
+          "min_required_n_ctx": 8192,
+          "passed": true,
+          "slots_n_ctx": [
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192,
+            8192
+          ],
+          "stress_all_8_slots_concurrent": true,
+          "stress_prompt_tokens_per_slot": 7454,
+          "stress_server_alive_after": true,
+          "stress_tokens_resident_per_slot_at_end": 7486
+        },
+        "peak_vram_le_7_2_gib": {
+          "limit_gib": 7.2,
+          "measured_peak_gib": 6.8525,
+          "measured_peak_mib": 7017,
+          "passed": true
+        },
+        "tok_s_overhead_8slot_le_15pct": {
+          "benchmark_anomaly": false,
+          "overhead_pct": -0.66,
+          "passed": true
+        },
+        "tok_s_overhead_single_slot_le_15pct": {
+          "benchmark_anomaly": false,
+          "overhead_pct": 0.38,
+          "passed": true
+        }
+      },
+      "gguf": "Qwen3.5-4B-Q8_0.gguf",
+      "kv_residency_stress": {
+        "aggregate_tok_per_s": 13.576640016216954,
+        "lora": [
+          {
+            "id": 0,
+            "scale": 1.0
+          },
+          {
+            "id": 1,
+            "scale": 1.0
+          },
+          {
+            "id": 2,
+            "scale": 1.0
+          }
+        ],
+        "n_predict": 32,
+        "per_slot_predicted_per_second": [
+          1.968550563205491,
+          2.3201651239065475,
+          2.6777080373998072,
+          3.3477357966909254,
+          4.475282509426605,
+          6.044151552225856,
+          11.263311144610379,
+          36.77024409511395
+        ],
+        "predicted_tokens": 256,
+        "prompt_n": [
+          7454,
+          7454,
+          7454,
+          7454,
+          7454,
+          7454,
+          7454,
+          7454
+        ],
+        "prompt_tokens_per_slot": 7454,
+        "server_alive_after": true,
+        "slots_used": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "tokens_resident_per_slot_at_end": 7486,
+        "wall_s": 18.855917200000476
+      },
+      "lora_adapters_at_boot": [
+        {
+          "id": 0,
+          "path": "repo\\Proven-Commons-mcproof-4552874\\compile\\artifacts\\composition\\corpus.f16.gguf",
+          "prompt_prefix": "",
+          "scale": 0.0,
+          "task_name": ""
+        },
+        {
+          "id": 1,
+          "path": "repo\\Proven-Commons-mcproof-4552874\\compile\\artifacts\\composition\\weft-eido.f16.gguf",
+          "prompt_prefix": "",
+          "scale": 0.0,
+          "task_name": ""
+        },
+        {
+          "id": 2,
+          "path": "repo\\Proven-Commons-mcproof-4552874\\compile\\artifacts\\composition\\formal-verification.f16.gguf",
+          "prompt_prefix": "",
+          "scale": 0.0,
+          "task_name": ""
+        }
+      ],
+      "post_shutdown_nvidia_smi": {
+        "memory_total_mib": 8192,
+        "memory_used_mib": 0,
+        "power_w": "13.40",
+        "sm_clock_mhz": "210",
+        "temp_c": "72",
+        "util_pct": "0"
+      },
+      "pre_run_nvidia_smi": {
+        "memory_total_mib": 8192,
+        "memory_used_mib": 0,
+        "power_w": "19.78",
+        "sm_clock_mhz": "1245",
+        "temp_c": "61",
+        "util_pct": "0"
+      },
+      "raw_run_file": "runs/q8_0.json",
+      "raw_run_file_sha256": "96920b45e86d4f611edbe821b666de43fb38ef08878c8e323250812bcf4c5b94",
+      "server_cmd": [
+        "llama\\llama-server.exe",
+        "-m",
+        "models\\Qwen3.5-4B-Q8_0.gguf",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "51309",
+        "-c",
+        "65536",
+        "-ngl",
+        "99",
+        "-np",
+        "8",
+        "--cache-type-k",
+        "f16",
+        "--cache-type-v",
+        "f16",
+        "--slots",
+        "--slot-save-path",
+        "runs\\q8_0_slots",
+        "--no-cache-idle-slots",
+        "--slot-prompt-similarity",
+        "0.0",
+        "--ctx-checkpoints",
+        "0",
+        "--chat-template-kwargs",
+        "{\"enable_thinking\":false}",
+        "--lora-scaled",
+        "repo\\Proven-Commons-mcproof-4552874\\compile\\artifacts\\composition\\corpus.f16.gguf:0.0,repo\\Proven-Commons-mcproof-4552874\\compile\\artifacts\\composition\\weft-eido.f16.gguf:0.0,repo\\Proven-Commons-mcproof-4552874\\compile\\artifacts\\composition\\formal-verification.f16.gguf:0.0",
+        "--lora-init-without-apply"
+      ],
+      "sha256_expected": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1",
+      "sha256_match": true,
+      "sha256_measured": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1",
+      "single_slot_tc5_protocol": {
+        "anomaly_floor_pct": -5.0,
+        "benchmark_anomaly": false,
+        "latency_overhead_pct": 0.38,
+        "lora_effect_check": {
+          "stack_distinct_outputs": 1,
+          "stack_output_differs_from_w0": true,
+          "w0_distinct_outputs": 1
+        },
+        "max_allowed_overhead_pct": 15.0,
+        "overhead_gate_passed": true,
+        "triple_lora_median_tok_per_s": 63.91,
+        "triple_lora_samples_tok_per_s": [
+          63.89,
+          64.18,
+          63.96,
+          63.88,
+          63.91
+        ],
+        "w0_median_tok_per_s": 64.16,
+        "w0_samples_tok_per_s": [
+          64.48,
+          63.76,
+          64.33,
+          64.1,
+          64.16
+        ]
+      },
+      "started_utc": "2026-11-19T21:32:12.181135+00:00",
+      "vram_detail": {
+        "idle_baseline_mib": 0,
+        "n_samples": 492,
+        "peak_minus_baseline_mib": 7017,
+        "peak_used_gib": 6.8525,
+        "peak_used_mib": 7017,
+        "phase_peaks_mib": {
+          "boot": 7007,
+          "eight_slot_bench": 7013,
+          "idle_after": 7017,
+          "init": 0,
+          "kv_residency_stress": 7017,
+          "single_slot_bench": 7013
+        },
+        "sampling": "nvidia-smi --query-gpu=memory.used every ~100 ms over server lifetime"
+      }
+    }
+  },
+  "overall_passed": true,
+  "receipt": "ux582hs-tc5-rtx3080-live-replay",
+  "repo_unit_tests": {
+    "command": "python -m unittest tests.test_stack_suite -v (stack/, PYTHONPATH=src)",
+    "log": "stack_unittest.log",
+    "result": "13 run: 10 passed, 0 failed, 3 skipped"
+  },
+  "summary": {
+    "Q4_K_M": {
+      "eight_slot_overhead_pct": 0.48,
+      "kv_8slot_8192_residency": true,
+      "peak_vram_gib": 5.2314,
+      "peak_vram_le_7_2_gib": true,
+      "single_slot_overhead_pct": 0.47,
+      "stack_single_slot_tok_s": 85.86,
+      "tok_s_overhead_8slot_le_15pct": true,
+      "tok_s_overhead_single_slot_le_15pct": true,
+      "w0_single_slot_tok_s": 86.27
+    },
+    "Q8_0": {
+      "eight_slot_overhead_pct": -0.66,
+      "kv_8slot_8192_residency": true,
+      "peak_vram_gib": 6.8525,
+      "peak_vram_le_7_2_gib": true,
+      "single_slot_overhead_pct": 0.38,
+      "stack_single_slot_tok_s": 63.91,
+      "tok_s_overhead_8slot_le_15pct": true,
+      "tok_s_overhead_single_slot_le_15pct": true,
+      "w0_single_slot_tok_s": 64.16
+    }
+  },
+  "task": "Stage 1 Task 1: live T-C5 serving-budget replay on 8 GiB RTX 3080 Laptop GPU"
+}

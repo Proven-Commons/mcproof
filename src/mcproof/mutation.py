@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass
 import json
 import os
@@ -16,6 +17,234 @@ from .paths import dep_repo
 
 KILL_FLOOR_NUM = 4
 KILL_FLOOR_DEN = 5  # Exact 4/5 = 80% rational floor (checked via killed * 5 >= total * 4)
+
+ALLOWLISTED_CHECKER_MODULES: frozenset[str] = frozenset(
+    {
+        "__future__",
+        "bisect",
+        "collections",
+        "copy",
+        "dataclasses",
+        "decimal",
+        "enum",
+        "fractions",
+        "functools",
+        "heapq",
+        "itertools",
+        "math",
+        "numbers",
+        "operator",
+        "re",
+        "string",
+        "typing",
+    }
+)
+
+FORBIDDEN_CHECKER_BUILTINS: frozenset[str] = frozenset(
+    {
+        "__import__",
+        "breakpoint",
+        "compile",
+        "delattr",
+        "eval",
+        "exec",
+        "getattr",
+        "globals",
+        "input",
+        "locals",
+        "open",
+        "setattr",
+        "vars",
+    }
+)
+
+FORBIDDEN_CHECKER_DUNDERS: frozenset[str] = frozenset(
+    {
+        "__bases__",
+        "__builtins__",
+        "__class__",
+        "__code__",
+        "__dict__",
+        "__globals__",
+        "__loader__",
+        "__mro__",
+        "__spec__",
+        "__subclasses__",
+        "ag_frame",
+        "cr_frame",
+        "f_back",
+        "f_builtins",
+        "f_code",
+        "f_globals",
+        "f_locals",
+        "gi_frame",
+        "tb_frame",
+    }
+)
+
+FORBIDDEN_MODULE_HOP_ATTRS: frozenset[str] = frozenset(
+    {
+        "_builtins",
+        "_frozen_importlib",
+        "_imp",
+        "_io",
+        "_os",
+        "_posixsubprocess",
+        "_sys",
+        "builtins",
+        "codecs",
+        "importlib",
+        "io",
+        "modules",
+        "nt",
+        "open",
+        "os",
+        "pathlib",
+        "posix",
+        "shutil",
+        "socket",
+        "subprocess",
+        "sys",
+    }
+)
+
+
+def _is_negative_int_expr(node: ast.AST) -> bool:
+    if isinstance(node, ast.Constant) and type(node.value) is int and node.value < 0:
+        return True
+    if (
+        isinstance(node, ast.UnaryOp)
+        and isinstance(node.op, ast.USub)
+        and isinstance(node.operand, ast.Constant)
+        and type(node.operand.value) is int
+        and node.operand.value > 0
+    ):
+        return True
+    return False
+
+
+def audit_exact_checker_ast(
+    source: str,
+    *,
+    strict_exact_math: bool = True,
+) -> list[dict[str, Any]]:
+    """Fail-closed pure-math AST allowlist for candidate Python checkers (closes NEON-C1 & NEON-D1)."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as exc:
+        return [
+            {
+                "rule": "PYTHON_SYNTAX_ERROR",
+                "line": exc.lineno or 1,
+                "message": str(exc),
+            }
+        ]
+
+    findings: list[dict[str, Any]] = []
+    for node in ast.walk(tree):
+        line_no = getattr(node, "lineno", 1) or 1
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                top = alias.name.split(".")[0]
+                if top not in ALLOWLISTED_CHECKER_MODULES:
+                    findings.append(
+                        {
+                            "rule": "FORBIDDEN_CHECKER_IMPORT",
+                            "line": line_no,
+                            "message": f"disallowed module import {alias.name!r} in exact checker (pure-math allowlist only)",
+                        }
+                    )
+        elif isinstance(node, ast.ImportFrom):
+            top = (node.module or "").split(".")[0]
+            if (node.level or 0) > 0 or top not in ALLOWLISTED_CHECKER_MODULES:
+                findings.append(
+                    {
+                        "rule": "FORBIDDEN_CHECKER_IMPORT",
+                        "line": line_no,
+                        "message": f"disallowed from-import {node.module or '.'!r} in exact checker (pure-math allowlist only)",
+                    }
+                )
+            else:
+                for alias in node.names:
+                    imp_name = alias.name
+                    if imp_name == "*" or imp_name.startswith("_") or imp_name in FORBIDDEN_MODULE_HOP_ATTRS:
+                        findings.append(
+                            {
+                                "rule": "FORBIDDEN_CHECKER_IMPORT",
+                                "line": line_no,
+                                "message": f"disallowed symbol import {imp_name!r} from {node.module!r}",
+                            }
+                        )
+        elif isinstance(node, ast.Attribute):
+            if node.attr in FORBIDDEN_CHECKER_DUNDERS or (node.attr.startswith("__") and node.attr.endswith("__")):
+                findings.append(
+                    {
+                        "rule": "FORBIDDEN_CHECKER_DUNDER",
+                        "line": line_no,
+                        "message": f"disallowed dunder attribute {node.attr!r} in exact checker",
+                    }
+                )
+            elif node.attr in FORBIDDEN_MODULE_HOP_ATTRS or node.attr in (
+                "write_text",
+                "write_bytes",
+                "unlink",
+                "rmdir",
+                "mkdir",
+                "popen",
+                "system",
+                "urlopen",
+            ):
+                findings.append(
+                    {
+                        "rule": "FORBIDDEN_CHECKER_IO_ATTR",
+                        "line": line_no,
+                        "message": f"disallowed module-hop or host I/O attribute {node.attr!r} in exact checker",
+                    }
+                )
+        elif isinstance(node, ast.Name) and node.id in FORBIDDEN_CHECKER_BUILTINS:
+            findings.append(
+                {
+                    "rule": "FORBIDDEN_CHECKER_BUILTIN",
+                    "line": line_no,
+                    "message": f"disallowed builtin reference {node.id!r} in exact checker",
+                }
+            )
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            fn_id = node.func.id
+            if fn_id in FORBIDDEN_CHECKER_BUILTINS:
+                findings.append(
+                    {
+                        "rule": "FORBIDDEN_CHECKER_BUILTIN",
+                        "line": line_no,
+                        "message": f"disallowed builtin {fn_id!r} in exact checker",
+                    }
+                )
+            elif strict_exact_math and fn_id == "float":
+                findings.append(
+                    {
+                        "rule": "FLOAT_COERCION_CALL",
+                        "line": line_no,
+                        "message": "explicit float(...) coercion forbidden in exact int/Fraction checker",
+                    }
+                )
+            elif strict_exact_math and fn_id == "pow" and len(node.args) == 2 and _is_negative_int_expr(node.args[1]):
+                findings.append(
+                    {
+                        "rule": "NEGATIVE_POW_FLOAT_COERCION",
+                        "line": line_no,
+                        "message": "2-argument pow() with negative exponent produces float in exact checker",
+                    }
+                )
+        elif strict_exact_math and isinstance(node, ast.BinOp) and isinstance(node.op, ast.Pow):
+            if _is_negative_int_expr(node.right):
+                findings.append(
+                    {
+                        "rule": "NEGATIVE_POW_FLOAT_COERCION",
+                        "line": line_no,
+                        "message": "negative integer exponent `**` produces float in exact checker",
+                    }
+                )
+    return findings
 
 
 def strict_python_env(extra: Mapping[str, str] | None = None) -> dict[str, str]:
@@ -210,21 +439,48 @@ def synthesize_adversarial_mutations(valid_cases: Sequence[Mapping[str, Any]]) -
 
 
 _MUTATION_DRIVER_CODE = """from __future__ import annotations
-import importlib.util
-import json
-import sys
+import bisect, collections, copy, dataclasses, decimal, enum, fractions, functools
+import heapq, importlib.util, io, itertools, json, math, numbers, operator, re, string, sys, typing
 from pathlib import Path
+import builtins as _builtins
+
+_ALLOWLIST = frozenset({
+    "__future__", "bisect", "collections", "copy", "dataclasses", "decimal",
+    "enum", "fractions", "functools", "heapq", "itertools", "math", "numbers",
+    "operator", "re", "string", "typing",
+})
 
 payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 mod_path = Path(payload["checker_path"])
 fn_name = payload["entry_fn"]
+result_path_str = str(payload["result_path"])
+_raw_open = io.open
 
-spec = importlib.util.spec_from_file_location("candidate_checker_mod", mod_path)
-if spec is None or spec.loader is None:
-    raise RuntimeError("cannot load candidate checker module")
-mod = importlib.util.module_from_spec(spec)
+mod_src = mod_path.read_text(encoding="utf-8")
+code_obj = _builtins.compile(mod_src, str(mod_path), "exec")
+mod = type(sys)("candidate_checker_mod")
 sys.modules["candidate_checker_mod"] = mod
-spec.loader.exec_module(mod)
+
+_orig_import = _builtins.__import__
+def _guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+    if level and level > 0:
+        raise ImportError("relative imports are forbidden in candidate checker")
+    top = str(name).split(".")[0]
+    if top not in _ALLOWLIST:
+        raise ImportError(f"module {top!r} is not in pure-math checker allowlist")
+    return _orig_import(name, globals, locals, fromlist, level)
+
+_safe_b = dict(_builtins.__dict__)
+_safe_b["__import__"] = _guarded_import
+for _bad_b in ("open", "eval", "exec", "compile", "input", "breakpoint"):
+    _safe_b.pop(_bad_b, None)
+mod.__dict__["__builtins__"] = _safe_b
+_out_fh = _raw_open(result_path_str, "w", encoding="utf-8", newline="\\n")
+def _audit_hook(ev, _args):
+    if ev in ("open", "os.system", "os.mkdir", "os.remove", "os.unlink", "os.rmdir", "os.rename") or ev.startswith(("subprocess.", "socket.")):
+        raise PermissionError(f"forbidden runtime event in exact checker: {ev}")
+sys.addaudithook(_audit_hook)
+_builtins.exec(code_obj, mod.__dict__)
 
 if not hasattr(mod, fn_name):
     raise AttributeError(f"candidate checker missing function {fn_name!r}")
@@ -253,11 +509,10 @@ for idx, item in enumerate(payload["mutations"]):
     except (ValueError, TypeError, KeyError, ArithmeticError, LookupError, RuntimeError) as exc:
         mutation_outcomes.append({"name": name, "killed": True, "returned": None, "error": f"{type(exc).__name__}: {exc}"})
 
-result_path = Path(payload["result_path"])
-result_path.write_text(
-    json.dumps({"valid_outcomes": valid_outcomes, "mutation_outcomes": mutation_outcomes}),
-    encoding="utf-8",
-)
+try:
+    _out_fh.write(json.dumps({"valid_outcomes": valid_outcomes, "mutation_outcomes": mutation_outcomes}))
+finally:
+    _out_fh.close()
 """
 
 
@@ -305,6 +560,23 @@ def run_checker_mutation_suite(
     """Execute candidate checker under `python3 -I -O -B -W error` against valid inputs and planted mutations."""
     findings: list[dict[str, Any]] = []
     floor_bps = (kill_floor_num * 10000) // kill_floor_den
+
+    ast_sec = audit_exact_checker_ast(checker_source, strict_exact_math=False)
+    if ast_sec:
+        findings.extend(ast_sec)
+        return MutationKillReport(
+            passed=False,
+            good_cases_total=len(valid_cases),
+            good_cases_passed=0,
+            mutations_total=0,
+            mutations_killed=0,
+            kill_fraction="0/0",
+            kill_rate_bps=0,
+            kill_floor_bps=floor_bps,
+            survived_mutations=(),
+            findings=tuple(findings),
+            python_sandboxed=False,
+        )
 
     if not valid_cases:
         findings.append({
