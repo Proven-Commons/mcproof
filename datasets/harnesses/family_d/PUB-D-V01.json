@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-V01",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDV01\ndef isEven (z : Int) : Prop := \u2203 k : Int, z = 2 * k\ntheorem even_mul_any (a b : Int) (ha : isEven a) : isEven (a * b) := by sorry\nend PubDV01\n",
+    "module_title": "MulEvenLeft",
+    "positive_lean": "namespace PubDV01\n\ndef isEven (z : Int) : Prop := \u2203 k : Int, z = 2 * k\n\ntheorem even_mul_any (a b : Int) (ha : isEven a) : isEven (a * b) := by\n  cases ha with\n  | intro k hk =>\n    refine \u27e8k * b, ?_\u27e9\n    rw [hk, Int.mul_assoc]\n\nend PubDV01\n",
+    "theorem_names": [
+      "PubDV01.even_mul_any"
+    ],
+    "verdict_sha": "69b17b1e8a211d70567ba27bd46ed83ddf1065a7"
+  }
+}

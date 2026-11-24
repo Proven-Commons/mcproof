@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC01\ntheorem even_mul_succ (n : Nat) : \u2203 k : Nat, n * (n + 1) = 2 * k := by sorry\nend PubAC01\n",
+  "family": "A",
+  "id": "PUB-A-C01",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC01.even_mul_succ",
+  "trap_kind": "anti_bypass_induction"
+}

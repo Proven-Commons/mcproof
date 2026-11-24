@@ -1,0 +1,144 @@
+{
+  "_meta": {
+    "gg.siliconcordat/mde": {
+      "adapter_class": "class1_rederivable",
+      "hard_vetoes_enforced": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "l1_bank_tag": 3,
+      "primary_zone": "formal_proof",
+      "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
+    }
+  },
+  "domain": "formal-verification",
+  "plane1_spec_bytes": 106763,
+  "plane1_spec_path": "spec/plane1_formal_spec.md",
+  "plane1_spec_sha256": "49beff2a0185cfa4032170b614a543c0d67541494e858803d21cfb837111b230",
+  "plane1_spec_token_stats": {
+    "char_div4_estimate": 26690,
+    "cl100k_base_tokens": 30873,
+    "cl100k_tokenizer": "tiktoken/0.14.0:cl100k_base",
+    "qwen35_tokenizer": "Qwen/Qwen3.5-4B (tokenizer.json sha256:5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42)",
+    "qwen35_tokens": 32216,
+    "utf8_bytes": 106763,
+    "words": 15791
+  },
+  "schema": "mcproof-lineage/v0.1",
+  "siliconcordat_commits": {
+    "siliconcordat/exo": "9d52aa1f28272753ddf83dbe02864d05989b74d2",
+    "siliconcordat/mde": "52ce0178854a67490eb718544961ba6cff710f22",
+    "siliconcordat/warp": "28f56549a8bb59b723281afa31831df0824e7dec",
+    "siliconcordat/weft": "3d66f07e5ee67863a7e6c1029e7473c9c8c11b08"
+  },
+  "source_lineage": {
+    "contested_heads": [],
+    "corpus_tree_sha256": "93624aae09eea99c3d35ebfa2e9acde1f9ac9c675167461652486850f206b642",
+    "domain_commits": {
+      "corpus": "7b22e542f0db0f3013ab1439cf5d1947676a5083",
+      "formal-verification": "49beff2a0185cfa4032170b614a543c0d6754149",
+      "weft-eido": "be27665255d9aa2553060d275f7d1b1b3306c703"
+    }
+  },
+  "tracked_plane1_files": {
+    "lean/Mcproof.lean": "e629ec64b3f433ad01d39efc5c61701a4aec10c612a0786a9bdaeeb1805bf03b",
+    "lean/Mcproof/AdapterBounds.lean": "d1152e3b37dd9fb078bae07419e92b3aeec9ddfae49c6ccd57fb6b0b8d86519a",
+    "lean/Mcproof/Proofs.lean": "09bbd22fe5b6fcb5fd1a7899fdb156f0b49f4953a49cacec10af2ec5042063df",
+    "lean/Mcproof/Spec.lean": "9baf38612b0443614b086efaf214ec7b6abbcf196019090e51d9173fc8a11304",
+    "lean/Mcproof/TransitionBounds.lean": "5d6c3a4efefc2c84b034ebabadb6e59965932158d1964b7d27e8947d056aaf6b",
+    "lean/comparator.json": "47121f42a035fd2f023a06bcc88c8580d9a6f8e06c51cf9625d2bbb0a630a9f1",
+    "lean/lakefile.toml": "8540e8392738181588c16176e164496608dc5c89e1d359150d991d6f18c3d0ec",
+    "lean/lean-toolchain": "ca5f1f601d34c49079e38d7e7041eb0f2a9c227fbc1df0f404820069a052330c",
+    "schemas/dataset-record.v0.1.schema.json": "5891b56778196ac7d9a2ea30c5d673c2f7a3f5daa1da0da34c91518a482cbbea",
+    "schemas/lineage.v0.1.schema.json": "1872cc74c04ca505ab6de39a197a77a839423384da0f6059f2e61d3a937341fb",
+    "schemas/oracle-receipt.v0.1.schema.json": "9a1758658537c7d6d1c14e6cc1b6680eb7eddebe9e59c9c35255a839d0c53f80",
+    "schemas/zone-manifest.v0.1.json": "496ab13ac619e4dce959ae23c0f4ff06c8b74afb36869b0a226b9b8e9d0dcc1d",
+    "spec/plane1_formal_spec.md": "49beff2a0185cfa4032170b614a543c0d67541494e858803d21cfb837111b230"
+  },
+  "upstream_repos": {
+    "Foundation-0/.github": {
+      "commit": "81f83c38918382b4ca142b81debd3cc5ccf61d3a",
+      "roles": [
+        "REPO-STANDARD.md"
+      ],
+      "url": "https://github.com/Foundation-0/.github"
+    },
+    "Foundation-0/f0": {
+      "commit": "9a37134750174339c53121939838ce62ab8af630",
+      "roles": [
+        "scripts/gate.py",
+        "tests/run_gate_corruptions.py"
+      ],
+      "url": "https://github.com/Foundation-0/f0"
+    },
+    "Foundation-0/finite-state-proofs": {
+      "commit": "9eeb3da2cdd6ba6b100ac24d23b32c369c0db8ec",
+      "roles": [
+        "verify.py"
+      ],
+      "url": "https://github.com/Foundation-0/finite-state-proofs"
+    },
+    "Foundation-0/formal-claims-audit": {
+      "commit": "bacf05953c10bf5105fa1209a127392d395e2f92",
+      "roles": [
+        "scripts/check_verdicts.py"
+      ],
+      "url": "https://github.com/Foundation-0/formal-claims-audit"
+    },
+    "Foundation-0/incentre-lattices": {
+      "commit": "2d374fff2a59cc9331566733043a4bb25c1040bf",
+      "roles": [
+        "README.md",
+        "docs/audit.md"
+      ],
+      "url": "https://github.com/Foundation-0/incentre-lattices"
+    },
+    "Foundation-0/proven-commons": {
+      "commit": "903c1858be856776de21675cf5c4e26fb9eebcdf",
+      "roles": [
+        "README.md",
+        "scripts/audit.py"
+      ],
+      "url": "https://github.com/Foundation-0/proven-commons"
+    },
+    "Moissanite-Labs/siliquant": {
+      "commit": "67b29a4e18cd5d93e1f3701a34030f2e089e7312",
+      "roles": [
+        "Phase 3 loud-column outlier-protection & noise-imatrix reference"
+      ],
+      "url": "https://github.com/Moissanite-Labs/siliquant"
+    },
+    "Moissanite-Labs/weft-eido": {
+      "commit": "be27665255d9aa2553060d275f7d1b1b3306c703",
+      "roles": [
+        "Multi-MDE Phase 6 WCAG contrast & UI module reference"
+      ],
+      "url": "https://github.com/Moissanite-Labs/weft-eido"
+    },
+    "Proven-Commons/mission": {
+      "commit": "7b22e542f0db0f3013ab1439cf5d1947676a5083",
+      "roles": [
+        "playbook/verified-bar.md",
+        "bar/check.py",
+        "bar/reviewers.toml",
+        "reviews/tar/evidence/WeakStatement.lean"
+      ],
+      "url": "https://github.com/Proven-Commons/mission"
+    },
+    "ahrazzle/soko": {
+      "commit": "3165e20e7a16c0035cab2fd01231e78e4e1d7f86",
+      "roles": [
+        "soko_mcp/lean4_auditor.py",
+        "soko_mcp/checker_auditor.py",
+        "soko_mcp/integrity.py",
+        "soko_mcp/evidence.py",
+        "docs/verified-systems-loop.md"
+      ],
+      "url": "https://github.com/ahrazzle/soko"
+    }
+  },
+  "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
+}

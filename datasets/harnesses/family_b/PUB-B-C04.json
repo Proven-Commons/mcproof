@@ -1,0 +1,168 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    a, m = inst['a'], inst['m']\n    d, cur = 1, a % m\n    while cur != 1:\n        cur = (cur * a) % m\n        d += 1\n    tmp, pdivs, f = d, [], 2\n    while f <= tmp:\n        if tmp % f == 0:\n            pdivs.append(f)\n            while tmp % f == 0:\n                tmp //= f\n        f += 1\n    return {'order': d, 'prime_divisors': pdivs}\n",
+  "id": "PUB-B-C04",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "a": 2,
+          "m": 15
+        },
+        {
+          "order": 8,
+          "prime_divisors": [
+            2
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c04_mut_1"
+    },
+    {
+      "args": [
+        {
+          "a": 3,
+          "m": 7
+        },
+        {
+          "order": 6,
+          "prime_divisors": [
+            2
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c04_mut_2"
+    },
+    {
+      "args": [
+        {
+          "a": 3,
+          "m": 7
+        },
+        {
+          "order": 3,
+          "prime_divisors": [
+            3
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c04_mut_3"
+    },
+    {
+      "args": [
+        {
+          "a": 2,
+          "m": 13
+        },
+        {
+          "order": 12,
+          "prime_divisors": [
+            3,
+            2
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c04_mut_4"
+    },
+    {
+      "args": [
+        {
+          "a": 2,
+          "m": 13
+        },
+        {
+          "order": 12,
+          "prime_divisors": [
+            2,
+            6
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c04_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "a": 3,
+          "m": 7
+        },
+        {
+          "order": 6,
+          "prime_divisors": [
+            2,
+            3
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 2,
+          "m": 15
+        },
+        {
+          "order": 4,
+          "prime_divisors": [
+            2
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 5,
+          "m": 18
+        },
+        {
+          "order": 6,
+          "prime_divisors": [
+            2,
+            3
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 2,
+          "m": 13
+        },
+        {
+          "order": 12,
+          "prime_divisors": [
+            2,
+            3
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "a": 1,
+          "m": 11
+        },
+        {
+          "order": 1,
+          "prime_divisors": []
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

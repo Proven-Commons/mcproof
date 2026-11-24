@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-V09",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDV09\ntheorem dual_witness_pos_scale (k s : Int) (hk : 0 < k) (hs : s < 0) : k * s < 0 := by sorry\nend PubDV09\n",
+    "module_title": "FarkasConeScale",
+    "positive_lean": "namespace PubDV09\n\ntheorem dual_witness_pos_scale (k s : Int) (hk : 0 < k) (hs : s < 0) : k * s < 0 := by\n  have hpos : 0 < k * (-s) := Int.mul_pos hk (by omega)\n  rw [Int.mul_neg] at hpos\n  omega\n\nend PubDV09\n",
+    "theorem_names": [
+      "PubDV09.dual_witness_pos_scale"
+    ],
+    "verdict_sha": "a75d59a99f43e5999227e5241b7b3031e0c3a0d0"
+  }
+}

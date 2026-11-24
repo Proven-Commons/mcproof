@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C18",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC18\ntheorem interval_pos_scale (k lo hi x : Int) (hk : 0 \u2264 k) (hx : lo \u2264 x \u2227 x \u2264 hi) : k * lo \u2264 k * x \u2227 k * x \u2264 k * hi := by sorry\nend PubDC18\n",
+    "module_title": "ScaleIvPos",
+    "positive_lean": "namespace PubDC18\n\ntheorem interval_pos_scale (k lo hi x : Int) (hk : 0 \u2264 k) (hx : lo \u2264 x \u2227 x \u2264 hi) :\n    k * lo \u2264 k * x \u2227 k * x \u2264 k * hi := by\n  exact \u27e8Int.mul_le_mul_of_nonneg_left hx.1 hk, Int.mul_le_mul_of_nonneg_left hx.2 hk\u27e9\n\nend PubDC18\n",
+    "theorem_names": [
+      "PubDC18.interval_pos_scale"
+    ],
+    "verdict_sha": "743892ca2ab1f0d3ebd27b75fe726e28f2068229"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "corpus": {
+    "adapter_id": "mde:corpus",
+    "binding_sha256": "94faecc462bcc6167a8679bc4cf6a3aff3cd0cd6f06376a14612ce91869fdeb4",
+    "certificate": {
+      "factor_digest": "8ab08cf7f235b881ea92e9f0e73c37fe8a00e3cdae379023514157773d324366",
+      "frobenius_sq_scaled": 6999698,
+      "leakage_energy_scaled": 8997463,
+      "max_safety_dot_sq_scaled": 565,
+      "projector_epoch": 1,
+      "quant_dtype": "f16",
+      "radix_scale_exp2": 24,
+      "spectral_norm_sq_scaled": 2494419
+    },
+    "certificate_sha256": "315a36a3ab1fcd965eb1bcf5ef89c1e77dc3d831703665b8b3d39df5423d974e",
+    "gguf_path": "compile/artifacts/composition/corpus.f16.gguf",
+    "gguf_sha256": "d81bab6b8c5555674dbbe29e38566435fedc1828d652fbfbf12f35f9562ea640",
+    "llama_adapter_id": 0,
+    "slab_path": "compile/artifacts/composition/corpus.f16.wfsl",
+    "slab_sha256": "aa900f370d443f2dacdcdb99c037460ba42b756a3bcc6168a95a5614f746f79a",
+    "warp_bundle_path": "compile/artifacts/composition/corpus.warp_bundle.json"
+  },
+  "formal-verification": {
+    "adapter_id": "mde:formal-verification",
+    "gguf_path": "compile/artifacts/composition/formal-verification.f16.gguf",
+    "gguf_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
+    "llama_adapter_id": 2,
+    "warp_bundle_path": "compile/artifacts/composition/formal-verification.warp_bundle.json"
+  },
+  "weft-eido": {
+    "adapter_id": "mde:weft-eido",
+    "binding_sha256": "109251e654cdad696e79f6d32529496e8740dfeacfc55c65c051683c85989d2b",
+    "certificate": {
+      "factor_digest": "8a765a344493f8846f73da4f77d7630a4658e75c92d334a972e42302c73fff2b",
+      "frobenius_sq_scaled": 6149746,
+      "leakage_energy_scaled": 8291719,
+      "max_safety_dot_sq_scaled": 878,
+      "projector_epoch": 1,
+      "quant_dtype": "f16",
+      "radix_scale_exp2": 24,
+      "spectral_norm_sq_scaled": 1941403
+    },
+    "certificate_sha256": "3bd61454a59ddc4511c81b19aeee12c8565de08df1e56436d8b29255de91af3d",
+    "gguf_path": "compile/artifacts/composition/weft-eido.f16.gguf",
+    "gguf_sha256": "71bedfeee40d0b11a559f73d1c720822a1281452859f43a250bf86bc2755bb86",
+    "llama_adapter_id": 1,
+    "slab_path": "compile/artifacts/composition/weft-eido.f16.wfsl",
+    "slab_sha256": "615f893f0c28663d029ebd27e83c037d286c6808e6cdf8690710253476786c93",
+    "warp_bundle_path": "compile/artifacts/composition/weft-eido.warp_bundle.json"
+  }
+}

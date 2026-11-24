@@ -1,0 +1,61 @@
+{
+  "corpus_tree_sha256": "5bdb7f30363b956e82947f668f98c48f99876e87fb5ed4f785b873e4f4f98305",
+  "counts": {
+    "compile_by_family": {
+      "A": 24,
+      "B": 24,
+      "C": 24,
+      "D": 24
+    },
+    "compile_total": 96,
+    "hybrid_k0_seeded_noise": 2048,
+    "hybrid_k0_total": 2072,
+    "hybrid_k0_y0_anchors": 24,
+    "public_eval_total": 144,
+    "validation_by_family": {
+      "A": 12,
+      "B": 12,
+      "C": 12,
+      "D": 12
+    },
+    "validation_total": 48
+  },
+  "files": {
+    "compile.jsonl": {
+      "bytes": 331736,
+      "sha256": "067059259c5d2238a8ab3f6a6b01ebcedeed2dc0d19d2f7a02a3e170f52f7f31"
+    },
+    "hybrid_k0.jsonl": {
+      "bytes": 954492,
+      "sha256": "ba2e9b277eeb8d9ea5965b27d73ca8efc6c55c732ad800ee2bdfea41266eeeae"
+    },
+    "validation.jsonl": {
+      "bytes": 159682,
+      "sha256": "7e403727c8c02bd75c319f85042dc6a1bc6166c731681644237e4eaa3a4ae621"
+    }
+  },
+  "hybrid_k0": {
+    "anchor_zones": [
+      "prose",
+      "condensed_json",
+      "ui_module",
+      "code"
+    ],
+    "copyright_free": true,
+    "rng": "numpy.random.default_rng(20261119).integers(0, 2**31 - 1, size=(2048, 8), dtype=int64)",
+    "seed": 20261119,
+    "seq_len": 8
+  },
+  "id_prefix": "PUB-",
+  "issue": "siliconcordat/mde#4",
+  "plane1_spec_sha256": "49beff2a0185cfa4032170b614a543c0d67541494e858803d21cfb837111b230",
+  "record_sha256_rule": "sha256(json.dumps(record_without_sha256, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8'))",
+  "reserved_public_subtopics": [
+    "elementary_number_theory",
+    "finite_combinatorics",
+    "rational_interval_linalg",
+    "finite_state_protocols"
+  ],
+  "schema": "mcproof-datasets-manifest/v0.1",
+  "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
+}

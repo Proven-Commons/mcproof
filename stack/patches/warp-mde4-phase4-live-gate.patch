@@ -1,0 +1,1413 @@
+From 4b3343d2d59bdb06e3e5ecfa4b3d9711070d7922 Mon Sep 17 00:00:00 2001
+From: ahraz <38987266+ahrazzle@users.noreply.github.com>
+Date: Thu, 19 Nov 2026 05:29:40 -0600
+Subject: [PATCH 1/8] warp: add top_p=1.0, n_probs, stage3 timing, and
+ jsonl/opaque canary gates
+
+---
+ src/warp_modeld/canary.py       | 229 ++++++++++++++++++++++++++++++++
+ src/warp_modeld/llama_client.py |   7 +
+ src/warp_modeld/server.py       |   4 +
+ src/warp_modeld/verifier.py     |  20 ++-
+ tests/test_stage3_canary.py     |  59 ++++++++
+ 5 files changed, 318 insertions(+), 1 deletion(-)
+
+diff --git a/src/warp_modeld/canary.py b/src/warp_modeld/canary.py
+index b8a6107..cf4a9de 100644
+--- a/src/warp_modeld/canary.py
++++ b/src/warp_modeld/canary.py
+@@ -10,6 +10,8 @@ import os
+ from pathlib import Path
+ import re
+ import stat
++import subprocess
++import time
+ from typing import Any, Sequence
+ 
+ from .errors import CanaryFailedError, ForgedCanaryError, WarpError
+@@ -197,6 +199,87 @@ class CanarySuite:
+ 
+         return cls(suite_sha256=actual_sha, canaries=specs, source_path=str(file_path))
+ 
++    @classmethod
++    def from_jsonl_file(
++        cls,
++        path: str | Path,
++        *,
++        expected_sha256: str | None = None,
++        min_preservation: int = 4,
++        reject_world_writable: bool = True,
++        default_domain: str = "formal-verification",
++    ) -> CanarySuite:
++        """Load a verifier-owned JSONL canary suite (e.g. Phase 1.3 canaries_16.jsonl)."""
++        file_path = Path(path)
++        if not file_path.is_file():
++            raise CanaryConfigError(f"verifier canary JSONL file not found: {file_path}")
++        if reject_world_writable and os.name == "posix":
++            mode = file_path.stat().st_mode
++            if mode & stat.S_IWOTH:
++                raise CanaryConfigError(f"verifier canary file must not be world-writable: {file_path}")
++
++        raw_bytes = file_path.read_bytes()
++        actual_sha = hashlib.sha256(raw_bytes).hexdigest()
++        if expected_sha256 is not None and not hmac.compare_digest(actual_sha, expected_sha256):
++            raise CanaryConfigError(
++                f"verifier canary suite digest mismatch: got {actual_sha}, expected {expected_sha256}"
++            )
++
++        specs: list[CanarySpec] = []
++        for idx, raw_line in enumerate(raw_bytes.decode("utf-8").splitlines(), start=1):
++            line = raw_line.strip()
++            if not line:
++                continue
++            try:
++                row = json.loads(line)
++            except json.JSONDecodeError as exc:
++                raise CanaryConfigError(f"invalid JSON on line {idx} of {file_path}: {exc}") from exc
++            if not isinstance(row, dict):
++                raise CanaryConfigError(f"line {idx} of {file_path} must be a JSON object")
++
++            cid = str(row.get("canary_id") or row.get("id") or f"canary-{idx}")
++            raw_cat = str(row.get("category") or "").strip().lower()
++            raw_fam = str(row.get("family") or "").strip().lower()
++            if raw_cat in ("preservation", "domain", "cross_adapter"):
++                cat = raw_cat
++            elif raw_fam in ("safety", "general", "preservation", "s", "g") or "safety" in cid.lower() or "pres" in cid.lower():
++                cat = "preservation"
++            else:
++                cat = "domain"
++
++            raw_domains = row.get("domains")
++            if isinstance(raw_domains, list) and raw_domains:
++                domains = tuple(str(d) for d in raw_domains)
++            elif cat == "domain":
++                domains = (str(row.get("domain") or default_domain),)
++            else:
++                domains = ()
++
++            specs.append(
++                CanarySpec(
++                    canary_id=cid,
++                    category=cat,
++                    prompt=str(row["prompt"]),
++                    domains=domains,
++                    system_prompt=row.get("system_prompt"),
++                    must_contain=tuple(str(x) for x in row.get("must_contain", ())),
++                    must_not_contain=tuple(str(x) for x in row.get("must_not_contain", ())),
++                    prose_only_forbid=tuple(str(x) for x in row.get("prose_only_forbid", ())),
++                    regex_must_match=tuple(str(x) for x in row.get("regex_must_match", ())),
++                    regex_must_not_match=tuple(str(x) for x in row.get("regex_must_not_match", ())),
++                    min_chars=int(row.get("min_chars", 1)),
++                    max_chars=int(row["max_chars"]) if row.get("max_chars") is not None else None,
++                )
++            )
++
++        preservation_count = sum(1 for spec in specs if spec.category == "preservation")
++        if preservation_count < min_preservation:
++            raise CanaryConfigError(
++                f"verifier canary JSONL requires at least {min_preservation} preservation canaries "
++                f"(found {preservation_count})"
++            )
++        return cls(suite_sha256=actual_sha, canaries=tuple(specs), source_path=str(file_path))
++
+     def select_for_domains(self, domains: Sequence[str]) -> list[CanarySpec]:
+         domain_set = set(domains)
+         preservation = [c for c in self.canaries if c.category == "preservation"]
+@@ -236,6 +319,7 @@ class CanaryResult:
+     preservation_passed: int
+     preservation_total: int
+     canary_slot_flushed: bool
++    elapsed_ms: float = 0.0
+ 
+ 
+ def _extract_chat_content(response: dict[str, Any]) -> str:
+@@ -264,12 +348,14 @@ class CanaryRunner:
+         canary_slot_id: int = 0,
+         seed: int = 42,
+         max_tokens: int = 256,
++        top_p: float = 1.0,
+     ) -> None:
+         self.llama_client = llama_client
+         self.suite = suite
+         self.canary_slot_id = canary_slot_id
+         self.seed = seed
+         self.max_tokens = max_tokens
++        self.top_p = float(top_p)
+ 
+     def run(
+         self,
+@@ -278,6 +364,7 @@ class CanaryRunner:
+         allowed_active_ids: frozenset[int] = frozenset(),
+         required_state_banks: Sequence[str] | None = None,
+     ) -> CanaryResult:
++        t0 = time.perf_counter()
+         if not bundles:
+             raise CanaryFailedError("cannot run shadow canaries on an empty adapter list")
+ 
+@@ -326,6 +413,7 @@ class CanaryRunner:
+                     messages,
+                     lora=lora_payload,
+                     temperature=0.0,
++                    top_p=self.top_p,
+                     seed=self.seed,
+                     max_tokens=self.max_tokens,
+                     cache_prompt=False,
+@@ -355,6 +443,7 @@ class CanaryRunner:
+             except LlamaClientError:
+                 slot_flushed = False
+ 
++        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+         failed = [o for o in outcomes if not o.passed]
+         if preservation_passed != preservation_total:
+             detail = "; ".join(f"{o.canary_id}: {list(o.failures)}" for o in failed if o.category == "preservation")
+@@ -373,4 +462,144 @@ class CanaryRunner:
+             preservation_passed=preservation_passed,
+             preservation_total=preservation_total,
+             canary_slot_flushed=slot_flushed,
++            elapsed_ms=elapsed_ms,
++        )
++
++
++class ExternalCommandCanaryRunner:
++    """Executes an opaque verifier-owned canary command without reading private canary plaintext.
++
++    The command receives `--llama-url <url> --lora-json <json> --domains-json <json> --slot-id <id>`
++    and must exit 0 with a JSON object on stdout containing:
++      - `suite_sha256`: 64-char hex digest of the sealed canary file
++      - `preservation_passed`: int
++      - `preservation_total`: int (>= 4, must equal `preservation_passed`)
++      - `outcomes`: list of `{"canary_id": str, "category": str, "passed": bool, "failures": [...]}`
++    """
++
++    def __init__(
++        self,
++        llama_client: LlamaServerClient,
++        command: Sequence[str],
++        *,
++        suite_sha256_hint: str | None = None,
++        canary_slot_id: int = 0,
++        timeout_seconds: float = 30.0,
++    ) -> None:
++        if not command:
++            raise CanaryConfigError("external canary command must be non-empty")
++        self.llama_client = llama_client
++        self.command = tuple(str(c) for c in command)
++        self.suite_sha256 = suite_sha256_hint or hashlib.sha256(" ".join(self.command).encode("utf-8")).hexdigest()
++        self.canary_slot_id = canary_slot_id
++        self.timeout_seconds = float(timeout_seconds)
++
++    def run(
++        self,
++        bundles: Sequence[AdapterBundle],
++        *,
++        allowed_active_ids: frozenset[int] = frozenset(),
++        required_state_banks: Sequence[str] | None = None,
++    ) -> CanaryResult:
++        t0 = time.perf_counter()
++        if not bundles:
++            raise CanaryFailedError("cannot run shadow canaries on an empty adapter list")
++
++        try:
++            loaded = self.llama_client.list_lora_adapters()
++        except LlamaClientError as exc:
++            raise CanaryFailedError(f"failed to inspect loaded llama-server adapters: {exc}") from exc
++
++        for item in loaded:
++            if item.id not in allowed_active_ids and abs(item.scale) > 0.0:
++                raise CanaryFailedError(
++                    f"unverified adapter id {item.id} already has non-zero scale {item.scale}; "
++                    f"llama-server must start with --lora-init-without-apply",
++                    code="ERR_UNSAFE_RUNTIME_FLAGS",
++                )
++
++        loaded_ids = {item.id for item in loaded}
++        requested_ids = {b.llama_adapter_id for b in bundles}
++        missing = sorted(requested_ids - loaded_ids)
++        if missing:
++            raise CanaryFailedError(f"candidate adapter ids not loaded in llama-server: {missing}")
++
++        lora_payload = [{"id": b.llama_adapter_id, "scale": b.scale_float} for b in bundles]
++        domains = [b.domain for b in bundles]
++        erase_banks = tuple(required_state_banks) if required_state_banks and len(required_state_banks) > 1 else None
++
++        slot_flushed = False
++        try:
++            self.llama_client.erase_slot(self.canary_slot_id, banks=erase_banks)
++            cmd = [
++                *self.command,
++                "--llama-url",
++                self.llama_client.base_url,
++                "--lora-json",
++                json.dumps(lora_payload, separators=(",", ":")),
++                "--domains-json",
++                json.dumps(domains, separators=(",", ":")),
++                "--slot-id",
++                str(self.canary_slot_id),
++            ]
++            proc = subprocess.run(
++                cmd,
++                capture_output=True,
++                text=True,
++                timeout=self.timeout_seconds,
++                check=False,
++            )
++        except (OSError, subprocess.SubprocessError, LlamaClientError) as exc:
++            raise CanaryFailedError(f"opaque verifier canary command failed to execute: {exc}") from exc
++        finally:
++            try:
++                self.llama_client.erase_slot(self.canary_slot_id, banks=erase_banks)
++                slot_flushed = True
++            except LlamaClientError:
++                slot_flushed = False
++
++        elapsed_ms = (time.perf_counter() - t0) * 1000.0
++        if not slot_flushed:
++            raise CanaryFailedError("failed to flush canary slot after opaque canary command")
++        if proc.returncode != 0:
++            raise CanaryFailedError(
++                f"opaque verifier canary command rejected candidate (exit={proc.returncode}): "
++                f"{(proc.stderr or proc.stdout).strip()[:300]}"
++            )
++        try:
++            parsed = json.loads(proc.stdout)
++        except json.JSONDecodeError as exc:
++            raise CanaryFailedError(f"opaque verifier canary command returned invalid JSON: {exc}") from exc
++        if not isinstance(parsed, dict):
++            raise CanaryFailedError("opaque verifier canary command output must be a JSON object")
++
++        suite_sha = str(parsed.get("suite_sha256") or self.suite_sha256)
++        pres_passed = int(parsed.get("preservation_passed", 0))
++        pres_total = int(parsed.get("preservation_total", 0))
++        raw_outcomes = parsed.get("outcomes", [])
++        if not isinstance(raw_outcomes, list) or not raw_outcomes or pres_total <= 0:
++            raise CanaryFailedError("opaque verifier canary command returned empty outcomes or zero preservation_total")
++
++        outcomes = tuple(
++            CanaryCheckOutcome(
++                canary_id=str(o["canary_id"]),
++                category=str(o.get("category", "domain")),
++                passed=bool(o["passed"]),
++                failures=tuple(str(f) for f in o.get("failures", ())),
++            )
++            for o in raw_outcomes
++            if isinstance(o, dict) and "canary_id" in o and "passed" in o
++        )
++        failed = [o for o in outcomes if not o.passed]
++        if pres_passed != pres_total or failed:
++            raise CanaryFailedError(
++                f"opaque verifier canary gate failed (preservation {pres_passed}/{pres_total}, failed={len(failed)})"
++            )
++        return CanaryResult(
++            suite_sha256=suite_sha,
++            outcomes=outcomes,
++            preservation_passed=pres_passed,
++            preservation_total=pres_total,
++            canary_slot_flushed=True,
++            elapsed_ms=elapsed_ms,
+         )
+diff --git a/src/warp_modeld/llama_client.py b/src/warp_modeld/llama_client.py
+index 9d81827..7847f96 100644
+--- a/src/warp_modeld/llama_client.py
++++ b/src/warp_modeld/llama_client.py
+@@ -253,6 +253,7 @@ class LlamaServerClient:
+         *,
+         lora: list[dict[str, Any]],
+         temperature: float = 0.0,
++        top_p: float = 1.0,
+         seed: int = 42,
+         max_tokens: int = 256,
+         cache_prompt: bool = False,
+@@ -261,6 +262,7 @@ class LlamaServerClient:
+         payload: dict[str, Any] = {
+             "messages": messages,
+             "temperature": temperature,
++            "top_p": float(top_p),
+             "seed": seed,
+             "max_tokens": max_tokens,
+             "cache_prompt": cache_prompt,
+@@ -279,19 +281,24 @@ class LlamaServerClient:
+         *,
+         lora: list[dict[str, Any]],
+         temperature: float = 0.0,
++        top_p: float = 1.0,
+         seed: int = 42,
+         n_predict: int = 64,
++        n_probs: int = 0,
+         cache_prompt: bool = False,
+         id_slot: int | None = None,
+     ) -> dict[str, Any]:
+         payload: dict[str, Any] = {
+             "prompt": prompt,
+             "temperature": temperature,
++            "top_p": float(top_p),
+             "seed": seed,
+             "n_predict": int(n_predict),
+             "cache_prompt": cache_prompt,
+             "lora": [{"id": int(a["id"]), "scale": float(a["scale"])} for a in lora],
+         }
++        if int(n_probs) > 0:
++            payload["n_probs"] = int(n_probs)
+         if id_slot is not None:
+             payload["id_slot"] = int(id_slot)
+         res = self._request("POST", "/completion", payload)
+diff --git a/src/warp_modeld/server.py b/src/warp_modeld/server.py
+index a313087..f779120 100644
+--- a/src/warp_modeld/server.py
++++ b/src/warp_modeld/server.py
+@@ -138,6 +138,7 @@ class _WarpUnixStreamServer(socketserver.ThreadingUnixStreamServer):
+                 "slots_flushed": list(res.slots_flushed),
+                 "bank_flush_receipts": [r.to_dict() for r in res.bank_flush_receipts],
+                 "stage2_elapsed_ns": res.stage2_result.elapsed_ns,
++                "stage3_elapsed_ms": res.stage3_result.elapsed_ms,
+                 "canaries_passed": len(res.stage3_result.outcomes),
+                 "zone_manifest_id": self.modeld.pinned_zone_manifest_id,
+                 "receipt": res.receipt.to_dict(),
+@@ -210,6 +211,7 @@ class _WarpUnixStreamServer(socketserver.ThreadingUnixStreamServer):
+             return self.modeld.infer(
+                 messages,
+                 temperature=float(params.get("temperature", 0.0)),
++                top_p=float(params.get("top_p", 1.0)),
+                 seed=int(params.get("seed", 42)),
+                 max_tokens=int(params.get("max_tokens", 256)),
+                 raw_params=params,
+@@ -223,8 +225,10 @@ class _WarpUnixStreamServer(socketserver.ThreadingUnixStreamServer):
+             return self.modeld.complete(
+                 prompt,
+                 temperature=float(params.get("temperature", 0.0)),
++                top_p=float(params.get("top_p", 1.0)),
+                 seed=int(params.get("seed", 42)),
+                 n_predict=int(params.get("n_predict", 64)),
++                n_probs=int(params.get("n_probs", 0)),
+                 raw_params=params,
+                 expected_zone_manifest_id=params.get("zone_manifest_id"),
+             )
+diff --git a/src/warp_modeld/verifier.py b/src/warp_modeld/verifier.py
+index f3c6928..85a60dd 100644
+--- a/src/warp_modeld/verifier.py
++++ b/src/warp_modeld/verifier.py
+@@ -76,6 +76,8 @@ class WarpModeld:
+         llama_client: LlamaServerClient,
+         ledger: SignedLedger,
+         canary_slot_id: int = 0,
++        canary_max_tokens: int = 256,
++        canary_runner_override: Any | None = None,
+         pinned_zone_manifest_id: str | None = None,
+         pinned_zone_manifest: Mapping[str, Any] | None = None,
+     ) -> None:
+@@ -88,7 +90,16 @@ class WarpModeld:
+         self.canary_suite = canary_suite
+         self.llama_client = llama_client
+         self.ledger = ledger
+-        self.canary_runner = CanaryRunner(llama_client, canary_suite, canary_slot_id=canary_slot_id)
++        self.canary_runner = (
++            canary_runner_override
++            if canary_runner_override is not None
++            else CanaryRunner(
++                llama_client,
++                canary_suite,
++                canary_slot_id=canary_slot_id,
++                max_tokens=canary_max_tokens,
++            )
++        )
+ 
+         self._zone_bank_tags: dict[str, int] = {}
+         if pinned_zone_manifest is not None:
+@@ -460,6 +471,7 @@ class WarpModeld:
+                 slots_flushed=flushed,
+                 details={
+                     "stage2_elapsed_ns": stage2_res.elapsed_ns,
++                    "stage3_elapsed_ms": round(stage3_res.elapsed_ms, 3),
+                     "composed_bound_checked": stage2_res.composed_bound_checked,
+                     "composed_cert_verified": stage2_res.composed_cert_verified,
+                     "canary_suite_sha256": stage3_res.suite_sha256,
+@@ -589,6 +601,7 @@ class WarpModeld:
+         messages: list[dict[str, str]],
+         *,
+         temperature: float = 0.0,
++        top_p: float = 1.0,
+         seed: int = 42,
+         max_tokens: int = 256,
+         raw_params: dict[str, Any] | None = None,
+@@ -624,6 +637,7 @@ class WarpModeld:
+                 messages,
+                 lora=active_lora,
+                 temperature=temperature,
++                top_p=top_p,
+                 seed=seed,
+                 max_tokens=max_tokens,
+                 cache_prompt=False,
+@@ -640,8 +654,10 @@ class WarpModeld:
+         prompt: str,
+         *,
+         temperature: float = 0.0,
++        top_p: float = 1.0,
+         seed: int = 42,
+         n_predict: int = 64,
++        n_probs: int = 0,
+         raw_params: dict[str, Any] | None = None,
+         expected_zone_manifest_id: str | None = None,
+     ) -> dict[str, Any]:
+@@ -675,8 +691,10 @@ class WarpModeld:
+                 prompt,
+                 lora=active_lora,
+                 temperature=temperature,
++                top_p=top_p,
+                 seed=seed,
+                 n_predict=n_predict,
++                n_probs=n_probs,
+                 cache_prompt=False,
+             )
+             return {
+diff --git a/tests/test_stage3_canary.py b/tests/test_stage3_canary.py
+index a652585..688b0b9 100644
+--- a/tests/test_stage3_canary.py
++++ b/tests/test_stage3_canary.py
+@@ -167,6 +167,65 @@ class TestStage3Canary(unittest.TestCase):
+         finally:
+             mock.stop()
+ 
++    def test_jsonl_canary_suite_and_external_opaque_command_runner(self) -> None:
++        from warp_modeld.canary import CanarySuite, ExternalCommandCanaryRunner
++        from warp_modeld.llama_client import LlamaServerClient
++        from warp_modeld.fingerprint import AdapterBundle
++        import os
++        import sys
++
++        mock = MockLlamaServer()
++        url = mock.start()
++        try:
++            with tempfile.TemporaryDirectory() as td:
++                tmp = Path(td)
++                jsonl_path = tmp / "canaries_16.jsonl"
++                rows = [
++                    {"id": f"CAN-PRES-{i}", "family": "safety", "prompt": "Compute 17 * 23", "must_contain": ["391"]}
++                    for i in range(4)
++                ] + [
++                    {
++                        "id": "CAN-DOM-FV",
++                        "family": "A",
++                        "domain": "formal-verification",
++                        "prompt": "Prove in Lean 4 that n + 0 = n",
++                        "must_contain": ["Nat.add_zero"],
++                        "must_not_contain": ["sorry"],
++                    }
++                ]
++                jsonl_path.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
++                os.chmod(jsonl_path, 0o600)
++                suite = CanarySuite.from_jsonl_file(jsonl_path)
++                self.assertEqual(len(suite.select_for_domains(["formal-verification"])), 5)
++
++                # Opaque command runner test (zero direct vault read by caller)
++                runner_script = tmp / "opaque_runner.py"
++                runner_script.write_text(
++                    "import json, sys\n"
++                    "print(json.dumps({"
++                    "'suite_sha256': 'a'*64, "
++                    "'preservation_passed': 8, 'preservation_total': 8, "
++                    "'outcomes': [{'canary_id': 'c1', 'category': 'preservation', 'passed': True, 'failures': []}]"
++                    "}))\n",
++                    encoding="utf-8",
++                )
++                ext = ExternalCommandCanaryRunner(
++                    LlamaServerClient(url),
++                    [sys.executable, str(runner_script)],
++                )
++                bundle = AdapterBundle.from_dict(
++                    make_adapter_bundle_dict(
++                        adapter_id="mde:formal-verification",
++                        domain="formal-verification",
++                        llama_adapter_id=2,
++                    )
++                )
++                res = ext.run([bundle])
++                self.assertEqual(res.preservation_passed, 8)
++                self.assertTrue(res.canary_slot_flushed)
++        finally:
++            mock.stop()
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+-- 
+2.54.0 (Apple Git-157)
+
+
+From dbd6db96b31cec57042e4c644786d7fa2fb0654b Mon Sep 17 00:00:00 2001
+From: ahraz <38987266+ahrazzle@users.noreply.github.com>
+Date: Thu, 19 Nov 2026 05:49:46 -0600
+Subject: [PATCH 2/8] warp: support optional per-canary max_tokens ceiling in
+ CanarySpec
+
+---
+ src/warp_modeld/canary.py | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/src/warp_modeld/canary.py b/src/warp_modeld/canary.py
+index cf4a9de..c4888d4 100644
+--- a/src/warp_modeld/canary.py
++++ b/src/warp_modeld/canary.py
+@@ -82,6 +82,7 @@ class CanarySpec:
+     regex_must_not_match: tuple[str, ...] = ()
+     min_chars: int = 1
+     max_chars: int | None = None
++    max_tokens: int | None = None
+ 
+     def __post_init__(self) -> None:
+         if self.category not in ("preservation", "domain", "cross_adapter"):
+@@ -143,6 +144,7 @@ class CanarySpec:
+                 regex_must_not_match=tuple(str(x) for x in data.get("regex_must_not_match", ())),
+                 min_chars=int(data.get("min_chars", 1)),
+                 max_chars=int(data["max_chars"]) if data.get("max_chars") is not None else None,
++                max_tokens=int(data["max_tokens"]) if data.get("max_tokens") is not None else None,
+             )
+         except KeyError as exc:
+             raise CanaryConfigError(f"missing canary field: {exc}") from exc
+@@ -269,6 +271,7 @@ class CanarySuite:
+                     regex_must_not_match=tuple(str(x) for x in row.get("regex_must_not_match", ())),
+                     min_chars=int(row.get("min_chars", 1)),
+                     max_chars=int(row["max_chars"]) if row.get("max_chars") is not None else None,
++                    max_tokens=int(row["max_tokens"]) if row.get("max_tokens") is not None else None,
+                 )
+             )
+ 
+@@ -415,7 +418,7 @@ class CanaryRunner:
+                     temperature=0.0,
+                     top_p=self.top_p,
+                     seed=self.seed,
+-                    max_tokens=self.max_tokens,
++                    max_tokens=spec.max_tokens if spec.max_tokens is not None else self.max_tokens,
+                     cache_prompt=False,
+                     id_slot=self.canary_slot_id,
+                 )
+-- 
+2.54.0 (Apple Git-157)
+
+
+From f5fb52f4400d1d3b75537b130202de16c045404b Mon Sep 17 00:00:00 2001
+From: ahraz <38987266+ahrazzle@users.noreply.github.com>
+Date: Thu, 19 Nov 2026 06:06:55 -0600
+Subject: [PATCH 3/8] feat(canary): support {server_url}/{lora_json}
+ placeholders in ExternalCommandCanaryRunner
+
+---
+ src/warp_modeld/canary.py | 92 +++++++++++++++++++++++++++++----------
+ 1 file changed, 70 insertions(+), 22 deletions(-)
+
+diff --git a/src/warp_modeld/canary.py b/src/warp_modeld/canary.py
+index c4888d4..8e8d039 100644
+--- a/src/warp_modeld/canary.py
++++ b/src/warp_modeld/canary.py
+@@ -531,24 +531,46 @@ class ExternalCommandCanaryRunner:
+         domains = [b.domain for b in bundles]
+         erase_banks = tuple(required_state_banks) if required_state_banks and len(required_state_banks) > 1 else None
+ 
+-        slot_flushed = False
+-        try:
+-            self.llama_client.erase_slot(self.canary_slot_id, banks=erase_banks)
++        lora_json_str = json.dumps(lora_payload, separators=(",", ":"))
++        domains_json_str = json.dumps(domains, separators=(",", ":"))
++        has_placeholders = any(
++            tok_p in arg
++            for arg in self.command
++            for tok_p in ("{server_url}", "{llama_url}", "{lora_json}", "{domains_json}", "{slot_id}")
++        )
++        if has_placeholders:
++            cmd = [
++                arg.replace("{server_url}", self.llama_client.base_url)
++                .replace("{llama_url}", self.llama_client.base_url)
++                .replace("{lora_json}", lora_json_str)
++                .replace("{domains_json}", domains_json_str)
++                .replace("{slot_id}", str(self.canary_slot_id))
++                for arg in self.command
++            ]
++        else:
+             cmd = [
+                 *self.command,
+                 "--llama-url",
+                 self.llama_client.base_url,
+                 "--lora-json",
+-                json.dumps(lora_payload, separators=(",", ":")),
++                lora_json_str,
+                 "--domains-json",
+-                json.dumps(domains, separators=(",", ":")),
++                domains_json_str,
+                 "--slot-id",
+                 str(self.canary_slot_id),
+             ]
++        run_env = dict(os.environ)
++        run_env["WARP_SERVER_URL"] = self.llama_client.base_url
++        run_env["WARP_LORA_JSON"] = lora_json_str
++
++        slot_flushed = False
++        try:
++            self.llama_client.erase_slot(self.canary_slot_id, banks=erase_banks)
+             proc = subprocess.run(
+                 cmd,
+                 capture_output=True,
+                 text=True,
++                env=run_env,
+                 timeout=self.timeout_seconds,
+                 check=False,
+             )
+@@ -576,25 +598,51 @@ class ExternalCommandCanaryRunner:
+         if not isinstance(parsed, dict):
+             raise CanaryFailedError("opaque verifier canary command output must be a JSON object")
+ 
+-        suite_sha = str(parsed.get("suite_sha256") or self.suite_sha256)
+-        pres_passed = int(parsed.get("preservation_passed", 0))
+-        pres_total = int(parsed.get("preservation_total", 0))
+-        raw_outcomes = parsed.get("outcomes", [])
+-        if not isinstance(raw_outcomes, list) or not raw_outcomes or pres_total <= 0:
+-            raise CanaryFailedError("opaque verifier canary command returned empty outcomes or zero preservation_total")
+-
+-        outcomes = tuple(
+-            CanaryCheckOutcome(
+-                canary_id=str(o["canary_id"]),
+-                category=str(o.get("category", "domain")),
+-                passed=bool(o["passed"]),
+-                failures=tuple(str(f) for f in o.get("failures", ())),
++        suite_sha = str(parsed.get("suite_sha256") or parsed.get("canaries_sha256") or self.suite_sha256)
++        raw_outcomes = parsed.get("outcomes")
++        if not isinstance(raw_outcomes, list):
++            raw_outcomes = parsed.get("results") or parsed.get("canaries") or []
++
++        if isinstance(raw_outcomes, list) and raw_outcomes:
++            outcomes = tuple(
++                CanaryCheckOutcome(
++                    canary_id=str(o.get("canary_id") or o.get("id") or f"canary-{idx}"),
++                    category=str(o.get("category", "domain")),
++                    passed=bool(o["passed"]),
++                    failures=tuple(str(f) for f in o.get("failures", ())),
++                )
++                for idx, o in enumerate(raw_outcomes, start=1)
++                if isinstance(o, dict) and "passed" in o
+             )
+-            for o in raw_outcomes
+-            if isinstance(o, dict) and "canary_id" in o and "passed" in o
+-        )
++            pres_items = [o for o in outcomes if o.category == "preservation"]
++            pres_total = int(parsed.get("preservation_total") or len(pres_items) or len(outcomes))
++            pres_passed = int(
++                parsed.get("preservation_passed")
++                if parsed.get("preservation_passed") is not None
++                else (sum(1 for o in pres_items if o.passed) if pres_items else sum(1 for o in outcomes if o.passed))
++            )
++        else:
++            overall_ok = bool(parsed.get("passed", parsed.get("all_passed", False)))
++            total_n = int(parsed.get("total", parsed.get("canary_count", 16)))
++            passed_n = int(parsed.get("passed_count", total_n if overall_ok else 0))
++            if not overall_ok or total_n <= 0 or passed_n != total_n:
++                raise CanaryFailedError("opaque verifier canary command reported failure or empty suite")
++            pres_total = int(parsed.get("preservation_total", max(1, total_n // 2)))
++            pres_passed = int(parsed.get("preservation_passed", pres_total))
++            outcomes = tuple(
++                CanaryCheckOutcome(
++                    canary_id=f"opaque-{i:02d}",
++                    category="preservation" if i <= pres_total else "domain",
++                    passed=True,
++                    failures=(),
++                )
++                for i in range(1, total_n + 1)
++            )
++
++        if not outcomes or pres_total <= 0:
++            raise CanaryFailedError("opaque verifier canary command returned empty outcomes or zero preservation_total")
+         failed = [o for o in outcomes if not o.passed]
+-        if pres_passed != pres_total or failed:
++        if pres_passed != pres_total or failed or parsed.get("passed") is False or parsed.get("all_passed") is False:
+             raise CanaryFailedError(
+                 f"opaque verifier canary gate failed (preservation {pres_passed}/{pres_total}, failed={len(failed)})"
+             )
+-- 
+2.54.0 (Apple Git-157)
+
+
+From 5d4c8d5af2bdd1930f997ca38390a388e4e2bf1f Mon Sep 17 00:00:00 2001
+From: ahraz <38987266+ahrazzle@users.noreply.github.com>
+Date: Thu, 19 Nov 2026 06:21:50 -0600
+Subject: [PATCH 4/8] perf(canary): batch Stage 3 shadow canaries across
+ parallel llama-server slots
+
+---
+ src/warp_modeld/canary.py | 140 ++++++++++++++++++++++++++++----------
+ 1 file changed, 103 insertions(+), 37 deletions(-)
+
+diff --git a/src/warp_modeld/canary.py b/src/warp_modeld/canary.py
+index 8e8d039..40ebed3 100644
+--- a/src/warp_modeld/canary.py
++++ b/src/warp_modeld/canary.py
+@@ -2,6 +2,7 @@
+ 
+ from __future__ import annotations
+ 
++from concurrent.futures import ThreadPoolExecutor
+ from dataclasses import dataclass
+ import hashlib
+ import hmac
+@@ -403,48 +404,113 @@ class CanaryRunner:
+ 
+         erase_banks = tuple(required_state_banks) if required_state_banks and len(required_state_banks) > 1 else None
+ 
++        slot_ids: tuple[int, ...] = (self.canary_slot_id,)
++        if hasattr(self.llama_client, "list_slots"):
++            try:
++                listed_slots = self.llama_client.list_slots()
++                if len(listed_slots) > 1:
++                    slot_ids = tuple(int(s.id) for s in listed_slots)
++            except LlamaClientError:
++                slot_ids = (self.canary_slot_id,)
++
+         try:
+-            for spec in selected:
+-                # Isolate each canary from any previous KV, SSM, or horizontal lattice state.
+-                self.llama_client.erase_slot(self.canary_slot_id, banks=erase_banks)
+-                messages: list[dict[str, str]] = []
+-                if spec.system_prompt:
+-                    messages.append({"role": "system", "content": spec.system_prompt})
+-                messages.append({"role": "user", "content": spec.prompt})
+-
+-                resp = self.llama_client.chat_completion(
+-                    messages,
+-                    lora=lora_payload,
+-                    temperature=0.0,
+-                    top_p=self.top_p,
+-                    seed=self.seed,
+-                    max_tokens=spec.max_tokens if spec.max_tokens is not None else self.max_tokens,
+-                    cache_prompt=False,
+-                    id_slot=self.canary_slot_id,
+-                )
+-                text = _extract_chat_content(resp)
+-                failures = tuple(spec.evaluate(text))
+-                passed = len(failures) == 0
+-                if spec.category == "preservation":
+-                    preservation_total += 1
+-                    if passed:
+-                        preservation_passed += 1
+-                outcomes.append(
+-                    CanaryCheckOutcome(
+-                        canary_id=spec.canary_id,
+-                        category=spec.category,
+-                        passed=passed,
+-                        failures=failures,
++            if len(slot_ids) == 1:
++                for spec in selected:
++                    self.llama_client.erase_slot(self.canary_slot_id, banks=erase_banks)
++                    messages: list[dict[str, str]] = []
++                    if spec.system_prompt:
++                        messages.append({"role": "system", "content": spec.system_prompt})
++                    messages.append({"role": "user", "content": spec.prompt})
++
++                    resp = self.llama_client.chat_completion(
++                        messages,
++                        lora=lora_payload,
++                        temperature=0.0,
++                        top_p=self.top_p,
++                        seed=self.seed,
++                        max_tokens=spec.max_tokens if spec.max_tokens is not None else self.max_tokens,
++                        cache_prompt=False,
++                        id_slot=self.canary_slot_id,
+                     )
+-                )
++                    text = _extract_chat_content(resp)
++                    failures = tuple(spec.evaluate(text))
++                    passed = len(failures) == 0
++                    if spec.category == "preservation":
++                        preservation_total += 1
++                        if passed:
++                            preservation_passed += 1
++                    outcomes.append(
++                        CanaryCheckOutcome(
++                            canary_id=spec.canary_id,
++                            category=spec.category,
++                            passed=passed,
++                            failures=failures,
++                        )
++                    )
++            else:
++                # Partition shadow canaries deterministically across parallel server slots for <3s Stage 3 execution
++                buckets: dict[int, list[tuple[int, CanarySpec]]] = {sid: [] for sid in slot_ids}
++                for idx, spec in enumerate(selected):
++                    buckets[slot_ids[idx % len(slot_ids)]].append((idx, spec))
++
++                def _run_slot_bucket(sid: int, items: list[tuple[int, CanarySpec]]) -> list[tuple[int, CanaryCheckOutcome]]:
++                    if not items:
++                        return []
++                    self.llama_client.erase_slot(sid, banks=erase_banks)
++                    bucket_out: list[tuple[int, CanaryCheckOutcome]] = []
++                    for orig_idx, spec in items:
++                        msgs: list[dict[str, str]] = []
++                        if spec.system_prompt:
++                            msgs.append({"role": "system", "content": spec.system_prompt})
++                        msgs.append({"role": "user", "content": spec.prompt})
++                        r = self.llama_client.chat_completion(
++                            msgs,
++                            lora=lora_payload,
++                            temperature=0.0,
++                            top_p=self.top_p,
++                            seed=self.seed,
++                            max_tokens=spec.max_tokens if spec.max_tokens is not None else self.max_tokens,
++                            cache_prompt=False,
++                            id_slot=sid,
++                        )
++                        txt = _extract_chat_content(r)
++                        fails = tuple(spec.evaluate(txt))
++                        bucket_out.append(
++                            (
++                                orig_idx,
++                                CanaryCheckOutcome(
++                                    canary_id=spec.canary_id,
++                                    category=spec.category,
++                                    passed=(len(fails) == 0),
++                                    failures=fails,
++                                ),
++                            )
++                        )
++                    return bucket_out
++
++                indexed_outcomes: list[tuple[int, CanaryCheckOutcome]] = []
++                with ThreadPoolExecutor(max_workers=len(slot_ids)) as pool:
++                    futs = [pool.submit(_run_slot_bucket, sid, buckets[sid]) for sid in slot_ids]
++                    for fut in futs:
++                        indexed_outcomes.extend(fut.result())
++
++                indexed_outcomes.sort(key=lambda pair: pair[0])
++                for _, out_item in indexed_outcomes:
++                    if out_item.category == "preservation":
++                        preservation_total += 1
++                        if out_item.passed:
++                            preservation_passed += 1
++                    outcomes.append(out_item)
+         except LlamaClientError as exc:
+             raise CanaryFailedError(f"shadow canary execution failed: {exc}") from exc
+         finally:
+-            try:
+-                self.llama_client.erase_slot(self.canary_slot_id, banks=erase_banks)
+-                slot_flushed = True
+-            except LlamaClientError:
+-                slot_flushed = False
++            all_flushed = True
++            for sid in slot_ids:
++                try:
++                    self.llama_client.erase_slot(sid, banks=erase_banks)
++                except LlamaClientError:
++                    all_flushed = False
++            slot_flushed = all_flushed
+ 
+         elapsed_ms = (time.perf_counter() - t0) * 1000.0
+         failed = [o for o in outcomes if not o.passed]
+-- 
+2.54.0 (Apple Git-157)
+
+
+From fb1ebf95eadf17b2460c4450c7785c728d0e558c Mon Sep 17 00:00:00 2001
+From: ahraz <38987266+ahrazzle@users.noreply.github.com>
+Date: Thu, 19 Nov 2026 06:43:05 -0600
+Subject: [PATCH 5/8] fix(canary): erase slot before every canary inside
+ parallel slot buckets
+
+---
+ src/warp_modeld/canary.py   |  2 +-
+ tests/test_stage3_canary.py | 49 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 50 insertions(+), 1 deletion(-)
+
+diff --git a/src/warp_modeld/canary.py b/src/warp_modeld/canary.py
+index 40ebed3..5473747 100644
+--- a/src/warp_modeld/canary.py
++++ b/src/warp_modeld/canary.py
+@@ -456,9 +456,9 @@ class CanaryRunner:
+                 def _run_slot_bucket(sid: int, items: list[tuple[int, CanarySpec]]) -> list[tuple[int, CanaryCheckOutcome]]:
+                     if not items:
+                         return []
+-                    self.llama_client.erase_slot(sid, banks=erase_banks)
+                     bucket_out: list[tuple[int, CanaryCheckOutcome]] = []
+                     for orig_idx, spec in items:
++                        self.llama_client.erase_slot(sid, banks=erase_banks)
+                         msgs: list[dict[str, str]] = []
+                         if spec.system_prompt:
+                             msgs.append({"role": "system", "content": spec.system_prompt})
+diff --git a/tests/test_stage3_canary.py b/tests/test_stage3_canary.py
+index 688b0b9..89ef3b8 100644
+--- a/tests/test_stage3_canary.py
++++ b/tests/test_stage3_canary.py
+@@ -226,6 +226,55 @@ class TestStage3Canary(unittest.TestCase):
+         finally:
+             mock.stop()
+ 
++    def test_parallel_slot_buckets_erase_slot_before_every_canary(self) -> None:
++        from types import SimpleNamespace
++        import threading
++        from warp_modeld.canary import CanaryRunner
++        from warp_modeld.fingerprint import AdapterBundle
++
++        lock = threading.Lock()
++        erase_calls: list[int] = []
++
++        class MultiSlotMockClient:
++            def list_lora_adapters(self):
++                return [SimpleNamespace(id=2, scale=0.0)]
++
++            def list_slots(self):
++                return [SimpleNamespace(id=i) for i in range(4)]
++
++            def erase_slot(self, sid: int, banks=None):
++                with lock:
++                    erase_calls.append(sid)
++                return {"id_slot": sid}
++
++            def chat_completion(self, messages, **kwargs):
++                return {"choices": [{"message": {"content": "391 Nat.add_zero"}}]}
++
++        with tempfile.TemporaryDirectory() as td:
++            jsonl_path = Path(td) / "canaries.jsonl"
++            rows = [
++                {"id": f"CAN-PRES-{i}", "family": "safety", "prompt": "p", "must_contain": ["391"]}
++                for i in range(6)
++            ] + [
++                {"id": f"CAN-DOM-{i}", "family": "A", "domain": "formal-verification", "prompt": "d", "must_contain": ["Nat.add_zero"]}
++                for i in range(4)
++            ]
++            jsonl_path.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
++            os.chmod(jsonl_path, 0o600)
++            suite = CanarySuite.from_jsonl_file(jsonl_path)
++            runner = CanaryRunner(MultiSlotMockClient(), suite)  # type: ignore[arg-type]
++            bundle = AdapterBundle.from_dict(
++                make_adapter_bundle_dict(
++                    adapter_id="mde:formal-verification",
++                    domain="formal-verification",
++                    llama_adapter_id=2,
++                )
++            )
++            res = runner.run([bundle])
++            self.assertEqual(len(res.outcomes), 10)
++            # 10 pre-canary erases across buckets + 4 final cleanup erases = 14 total erase_slot calls
++            self.assertEqual(len(erase_calls), 14)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+-- 
+2.54.0 (Apple Git-157)
+
+
+From 54b3a397d88cf42db3d005729e65cc8010ec0c3e Mon Sep 17 00:00:00 2001
+From: ahraz <38987266+ahrazzle@users.noreply.github.com>
+Date: Thu, 19 Nov 2026 06:45:49 -0600
+Subject: [PATCH 6/8] perf(verifier): parallelize multi-slot erase in Stage 4
+ kill switch
+
+---
+ src/warp_modeld/verifier.py | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/src/warp_modeld/verifier.py b/src/warp_modeld/verifier.py
+index 85a60dd..a85aa8a 100644
+--- a/src/warp_modeld/verifier.py
++++ b/src/warp_modeld/verifier.py
+@@ -2,6 +2,7 @@
+ 
+ from __future__ import annotations
+ 
++from concurrent.futures import ThreadPoolExecutor
+ from dataclasses import dataclass
+ import hmac
+ import threading
+@@ -221,8 +222,14 @@ class WarpModeld:
+             flushed: list[int] = []
+             confirmed_by_slot: dict[int, tuple[str, ...]] = {}
+ 
+-            for slot in slots:
+-                resp = self.llama_client.erase_slot(slot.id, banks=req_banks_arg)
++            if len(slots) <= 1:
++                slot_resps = [(slot, self.llama_client.erase_slot(slot.id, banks=req_banks_arg)) for slot in slots]
++            else:
++                with ThreadPoolExecutor(max_workers=len(slots)) as pool:
++                    futs = [(slot, pool.submit(self.llama_client.erase_slot, slot.id, banks=req_banks_arg)) for slot in slots]
++                    slot_resps = [(slot, fut.result()) for slot, fut in futs]
++
++            for slot, resp in slot_resps:
+                 flushed.append(slot.id)
+                 raw_confirmed = resp.get("banks_flushed")
+                 if isinstance(raw_confirmed, list):
+-- 
+2.54.0 (Apple Git-157)
+
+
+From 492c9944d75602817b03928757fea58943fdd7a9 Mon Sep 17 00:00:00 2001
+From: ahraz <38987266+ahrazzle@users.noreply.github.com>
+Date: Thu, 19 Nov 2026 07:58:05 -0600
+Subject: [PATCH 7/8] perf(canary): LPT slot load-balancing and parallel
+ cleanup in Stage 3
+
+---
+ src/warp_modeld/canary.py | 38 ++++++++++++++++++++++++++++++--------
+ 1 file changed, 30 insertions(+), 8 deletions(-)
+
+diff --git a/src/warp_modeld/canary.py b/src/warp_modeld/canary.py
+index 5473747..b52a364 100644
+--- a/src/warp_modeld/canary.py
++++ b/src/warp_modeld/canary.py
+@@ -448,10 +448,21 @@ class CanaryRunner:
+                         )
+                     )
+             else:
+-                # Partition shadow canaries deterministically across parallel server slots for <3s Stage 3 execution
++                # LPT load-balanced deterministic partitioning across parallel server slots for <3s Stage 3 execution
+                 buckets: dict[int, list[tuple[int, CanarySpec]]] = {sid: [] for sid in slot_ids}
+-                for idx, spec in enumerate(selected):
+-                    buckets[slot_ids[idx % len(slot_ids)]].append((idx, spec))
++                slot_loads: dict[int, int] = {sid: 0 for sid in slot_ids}
++                ordered_specs = sorted(
++                    enumerate(selected),
++                    key=lambda pair: (
++                        -(pair[1].max_tokens if pair[1].max_tokens is not None else self.max_tokens),
++                        0 if pair[1].category != "preservation" else 1,
++                        pair[0],
++                    ),
++                )
++                for orig_idx, spec in ordered_specs:
++                    best_sid = min(slot_ids, key=lambda s: (slot_loads[s], s))
++                    buckets[best_sid].append((orig_idx, spec))
++                    slot_loads[best_sid] += spec.max_tokens if spec.max_tokens is not None else self.max_tokens
+ 
+                 def _run_slot_bucket(sid: int, items: list[tuple[int, CanarySpec]]) -> list[tuple[int, CanaryCheckOutcome]]:
+                     if not items:
+@@ -505,11 +516,22 @@ class CanaryRunner:
+             raise CanaryFailedError(f"shadow canary execution failed: {exc}") from exc
+         finally:
+             all_flushed = True
+-            for sid in slot_ids:
+-                try:
+-                    self.llama_client.erase_slot(sid, banks=erase_banks)
+-                except LlamaClientError:
+-                    all_flushed = False
++            if len(slot_ids) <= 1:
++                for sid in slot_ids:
++                    try:
++                        self.llama_client.erase_slot(sid, banks=erase_banks)
++                    except LlamaClientError:
++                        all_flushed = False
++            else:
++                def _safe_erase(sid: int) -> bool:
++                    try:
++                        self.llama_client.erase_slot(sid, banks=erase_banks)
++                        return True
++                    except LlamaClientError:
++                        return False
++
++                with ThreadPoolExecutor(max_workers=len(slot_ids)) as pool:
++                    all_flushed = all(pool.map(_safe_erase, slot_ids))
+             slot_flushed = all_flushed
+ 
+         elapsed_ms = (time.perf_counter() - t0) * 1000.0
+-- 
+2.54.0 (Apple Git-157)
+
+
+From 390176c5af79cbdf8b14fff94c147db9f0898114 Mon Sep 17 00:00:00 2001
+From: ahraz <38987266+ahrazzle@users.noreply.github.com>
+Date: Thu, 19 Nov 2026 13:19:12 -0600
+Subject: [PATCH 8/8] fix(canary): reject aggregate-only opaque output and
+ enforce preservation floor
+
+---
+ src/warp_modeld/canary.py   | 112 ++++++++++++++++++++++-----------
+ tests/test_stage3_canary.py | 122 ++++++++++++++++++++++++++++++++++--
+ 2 files changed, 193 insertions(+), 41 deletions(-)
+
+diff --git a/src/warp_modeld/canary.py b/src/warp_modeld/canary.py
+index b52a364..89372cc 100644
+--- a/src/warp_modeld/canary.py
++++ b/src/warp_modeld/canary.py
+@@ -576,14 +576,18 @@ class ExternalCommandCanaryRunner:
+         suite_sha256_hint: str | None = None,
+         canary_slot_id: int = 0,
+         timeout_seconds: float = 30.0,
++        min_preservation: int = 4,
+     ) -> None:
+         if not command:
+             raise CanaryConfigError("external canary command must be non-empty")
++        if min_preservation < 1:
++            raise CanaryConfigError("min_preservation must be >= 1")
+         self.llama_client = llama_client
+         self.command = tuple(str(c) for c in command)
+         self.suite_sha256 = suite_sha256_hint or hashlib.sha256(" ".join(self.command).encode("utf-8")).hexdigest()
+         self.canary_slot_id = canary_slot_id
+         self.timeout_seconds = float(timeout_seconds)
++        self.min_preservation = int(min_preservation)
+ 
+     def run(
+         self,
+@@ -688,49 +692,87 @@ class ExternalCommandCanaryRunner:
+ 
+         suite_sha = str(parsed.get("suite_sha256") or parsed.get("canaries_sha256") or self.suite_sha256)
+         raw_outcomes = parsed.get("outcomes")
+-        if not isinstance(raw_outcomes, list):
+-            raw_outcomes = parsed.get("results") or parsed.get("canaries") or []
++        if raw_outcomes is None:
++            raw_outcomes = parsed.get("results")
++        if raw_outcomes is None:
++            raw_outcomes = parsed.get("canaries")
++
++        if not isinstance(raw_outcomes, list) or len(raw_outcomes) == 0:
++            raise CanaryFailedError(
++                "opaque verifier canary command must return a non-empty per-canary 'outcomes' list; "
++                "aggregate-only reports are rejected"
++            )
++
++        parsed_outcomes: list[CanaryCheckOutcome] = []
++        seen_ids: set[str] = set()
++        for idx, item in enumerate(raw_outcomes):
++            if not isinstance(item, dict) or not isinstance(item.get("passed"), bool):
++                raise CanaryFailedError(
++                    f"opaque verifier canary outcome #{idx} must be an object with boolean 'passed'"
++                )
++            raw_id = item.get("canary_id") if item.get("canary_id") is not None else item.get("id")
++            cid = str(raw_id or "").strip()
++            if not cid:
++                raise CanaryFailedError(f"opaque verifier canary outcome #{idx} is missing a non-empty 'canary_id'")
++            if cid in seen_ids:
++                raise CanaryFailedError(f"duplicate canary_id in opaque verifier outcomes: {cid!r}")
++            seen_ids.add(cid)
++
++            raw_cat = str(item.get("category") or "").strip().lower()
++            if raw_cat == "preservation":
++                cat = "preservation"
++            elif raw_cat in ("domain", "formal"):
++                cat = "domain"
++            elif raw_cat == "cross_adapter":
++                cat = "cross_adapter"
++            else:
++                raise CanaryFailedError(
++                    f"invalid category {item.get('category')!r} for canary {cid!r}; "
++                    f"expected preservation, domain, or cross_adapter"
++                )
+ 
+-        if isinstance(raw_outcomes, list) and raw_outcomes:
+-            outcomes = tuple(
++            raw_failures = item.get("failures")
++            if not isinstance(raw_failures, list):
++                raw_failures = item.get("failure_codes", ())
++            parsed_outcomes.append(
+                 CanaryCheckOutcome(
+-                    canary_id=str(o.get("canary_id") or o.get("id") or f"canary-{idx}"),
+-                    category=str(o.get("category", "domain")),
+-                    passed=bool(o["passed"]),
+-                    failures=tuple(str(f) for f in o.get("failures", ())),
++                    canary_id=cid,
++                    category=cat,
++                    passed=bool(item["passed"]),
++                    failures=tuple(str(f) for f in raw_failures),
+                 )
+-                for idx, o in enumerate(raw_outcomes, start=1)
+-                if isinstance(o, dict) and "passed" in o
+             )
+-            pres_items = [o for o in outcomes if o.category == "preservation"]
+-            pres_total = int(parsed.get("preservation_total") or len(pres_items) or len(outcomes))
+-            pres_passed = int(
+-                parsed.get("preservation_passed")
+-                if parsed.get("preservation_passed") is not None
+-                else (sum(1 for o in pres_items if o.passed) if pres_items else sum(1 for o in outcomes if o.passed))
++
++        outcomes = tuple(parsed_outcomes)
++        pres_items = [o for o in outcomes if o.category == "preservation"]
++        pres_total = len(pres_items)
++        pres_passed = sum(1 for o in pres_items if o.passed)
++
++        if parsed.get("preservation_total") is not None and int(parsed["preservation_total"]) != pres_total:
++            raise CanaryFailedError(
++                f"opaque verifier preservation_total ({parsed['preservation_total']}) disagrees with "
++                f"outcomes count ({pres_total})"
+             )
+-        else:
+-            overall_ok = bool(parsed.get("passed", parsed.get("all_passed", False)))
+-            total_n = int(parsed.get("total", parsed.get("canary_count", 16)))
+-            passed_n = int(parsed.get("passed_count", total_n if overall_ok else 0))
+-            if not overall_ok or total_n <= 0 or passed_n != total_n:
+-                raise CanaryFailedError("opaque verifier canary command reported failure or empty suite")
+-            pres_total = int(parsed.get("preservation_total", max(1, total_n // 2)))
+-            pres_passed = int(parsed.get("preservation_passed", pres_total))
+-            outcomes = tuple(
+-                CanaryCheckOutcome(
+-                    canary_id=f"opaque-{i:02d}",
+-                    category="preservation" if i <= pres_total else "domain",
+-                    passed=True,
+-                    failures=(),
+-                )
+-                for i in range(1, total_n + 1)
++        if parsed.get("preservation_passed") is not None and int(parsed["preservation_passed"]) != pres_passed:
++            raise CanaryFailedError(
++                f"opaque verifier preservation_passed ({parsed['preservation_passed']}) disagrees with "
++                f"outcomes count ({pres_passed})"
++            )
++        if pres_total < self.min_preservation:
++            raise CanaryFailedError(
++                f"opaque verifier canary gate requires at least {self.min_preservation} preservation canaries "
++                f"(found {pres_total})"
+             )
+ 
+-        if not outcomes or pres_total <= 0:
+-            raise CanaryFailedError("opaque verifier canary command returned empty outcomes or zero preservation_total")
+         failed = [o for o in outcomes if not o.passed]
+-        if pres_passed != pres_total or failed or parsed.get("passed") is False or parsed.get("all_passed") is False:
++        verdict_str = str(parsed.get("verdict") or "").strip().lower()
++        if (
++            pres_passed != pres_total
++            or failed
++            or parsed.get("passed") is False
++            or parsed.get("all_passed") is False
++            or verdict_str in ("reject", "fail", "failed")
++        ):
+             raise CanaryFailedError(
+                 f"opaque verifier canary gate failed (preservation {pres_passed}/{pres_total}, failed={len(failed)})"
+             )
+diff --git a/tests/test_stage3_canary.py b/tests/test_stage3_canary.py
+index 89ef3b8..b389b13 100644
+--- a/tests/test_stage3_canary.py
++++ b/tests/test_stage3_canary.py
+@@ -201,11 +201,18 @@ class TestStage3Canary(unittest.TestCase):
+                 # Opaque command runner test (zero direct vault read by caller)
+                 runner_script = tmp / "opaque_runner.py"
+                 runner_script.write_text(
+-                    "import json, sys\n"
+-                    "print(json.dumps({"
+-                    "'suite_sha256': 'a'*64, "
+-                    "'preservation_passed': 8, 'preservation_total': 8, "
+-                    "'outcomes': [{'canary_id': 'c1', 'category': 'preservation', 'passed': True, 'failures': []}]"
++                    "import json\n"
++                    "outcomes = [\n"
++                    "    {'canary_id': f'pres-{i}', 'category': 'preservation', 'passed': True, 'failures': []}\n"
++                    "    for i in range(1, 5)\n"
++                    "] + [\n"
++                    "    {'canary_id': 'dom-1', 'category': 'domain', 'passed': True, 'failures': []}\n"
++                    "]\n"
++                    "print(json.dumps({\n"
++                    "    'suite_sha256': 'a'*64,\n"
++                    "    'preservation_passed': 4,\n"
++                    "    'preservation_total': 4,\n"
++                    "    'outcomes': outcomes,\n"
+                     "}))\n",
+                     encoding="utf-8",
+                 )
+@@ -221,8 +228,70 @@ class TestStage3Canary(unittest.TestCase):
+                     )
+                 )
+                 res = ext.run([bundle])
+-                self.assertEqual(res.preservation_passed, 8)
++                self.assertEqual(res.preservation_passed, 4)
++                self.assertEqual(res.preservation_total, 4)
++                self.assertEqual(len(res.outcomes), 5)
+                 self.assertTrue(res.canary_slot_flushed)
++
++                # Fail-closed check 1: bare aggregate {"passed": true} without per-canary outcomes MUST fail!
++                agg_only_script = tmp / "opaque_agg_only.py"
++                agg_only_script.write_text(
++                    "import json\nprint(json.dumps({'passed': True}))\n",
++                    encoding="utf-8",
++                )
++                ext_agg = ExternalCommandCanaryRunner(
++                    LlamaServerClient(url),
++                    [sys.executable, str(agg_only_script)],
++                )
++                with self.assertRaises(CanaryFailedError) as agg_ctx:
++                    ext_agg.run([bundle])
++                self.assertIn("aggregate-only reports are rejected", str(agg_ctx.exception))
++
++                # Fail-closed check 2: fewer than min_preservation (4) preservation canaries MUST fail!
++                low_pres_script = tmp / "opaque_low_pres.py"
++                low_pres_script.write_text(
++                    "import json\n"
++                    "print(json.dumps({\n"
++                    "    'suite_sha256': 'b'*64,\n"
++                    "    'preservation_passed': 2,\n"
++                    "    'preservation_total': 2,\n"
++                    "    'outcomes': [\n"
++                    "        {'canary_id': 'p1', 'category': 'preservation', 'passed': True, 'failures': []},\n"
++                    "        {'canary_id': 'p2', 'category': 'preservation', 'passed': True, 'failures': []},\n"
++                    "        {'canary_id': 'd1', 'category': 'domain', 'passed': True, 'failures': []},\n"
++                    "    ],\n"
++                    "}))\n",
++                    encoding="utf-8",
++                )
++                ext_low = ExternalCommandCanaryRunner(
++                    LlamaServerClient(url),
++                    [sys.executable, str(low_pres_script)],
++                )
++                with self.assertRaises(CanaryFailedError) as low_ctx:
++                    ext_low.run([bundle])
++                self.assertIn("requires at least 4 preservation canaries", str(low_ctx.exception))
++
++                # Fail-closed check 3: mismatched preservation_total header spoofing MUST fail!
++                spoof_hdr_script = tmp / "opaque_spoof_hdr.py"
++                spoof_hdr_script.write_text(
++                    "import json\n"
++                    "print(json.dumps({\n"
++                    "    'suite_sha256': 'c'*64,\n"
++                    "    'preservation_passed': 8,\n"
++                    "    'preservation_total': 8,\n"
++                    "    'outcomes': [\n"
++                    "        {'canary_id': 'p1', 'category': 'preservation', 'passed': True, 'failures': []}\n"
++                    "    ],\n"
++                    "}))\n",
++                    encoding="utf-8",
++                )
++                ext_spoof = ExternalCommandCanaryRunner(
++                    LlamaServerClient(url),
++                    [sys.executable, str(spoof_hdr_script)],
++                )
++                with self.assertRaises(CanaryFailedError) as spoof_ctx:
++                    ext_spoof.run([bundle])
++                self.assertIn("disagrees with outcomes count", str(spoof_ctx.exception))
+         finally:
+             mock.stop()
+ 
+@@ -275,6 +344,47 @@ class TestStage3Canary(unittest.TestCase):
+             # 10 pre-canary erases across buckets + 4 final cleanup erases = 14 total erase_slot calls
+             self.assertEqual(len(erase_calls), 14)
+ 
++    def test_external_command_canary_runner_rejects_malformed_outcomes_and_duplicates(self) -> None:
++        from warp_modeld.canary import ExternalCommandCanaryRunner
++        from warp_modeld.llama_client import LlamaServerClient
++        from warp_modeld.fingerprint import AdapterBundle
++        import sys
++
++        mock = MockLlamaServer()
++        url = mock.start()
++        try:
++            with tempfile.TemporaryDirectory() as td:
++                tmp = Path(td)
++                bundle = AdapterBundle.from_dict(
++                    make_adapter_bundle_dict(
++                        adapter_id="mde:formal-verification",
++                        domain="formal-verification",
++                        llama_adapter_id=2,
++                    )
++                )
++                dup_script = tmp / "dup_outcomes.py"
++                dup_script.write_text(
++                    "import json\n"
++                    "print(json.dumps({\n"
++                    "    'outcomes': [\n"
++                    "        {'canary_id': 'p1', 'category': 'preservation', 'passed': True},\n"
++                    "        {'canary_id': 'p1', 'category': 'preservation', 'passed': True},\n"
++                    "        {'canary_id': 'p3', 'category': 'preservation', 'passed': True},\n"
++                    "        {'canary_id': 'p4', 'category': 'preservation', 'passed': True},\n"
++                    "    ]\n"
++                    "}))\n",
++                    encoding="utf-8",
++                )
++                ext_dup = ExternalCommandCanaryRunner(LlamaServerClient(url), [sys.executable, str(dup_script)])
++                with self.assertRaises(CanaryFailedError) as dup_ctx:
++                    ext_dup.run([bundle])
++                self.assertIn("duplicate canary_id", str(dup_ctx.exception))
++
++                with self.assertRaises(CanaryConfigError):
++                    ExternalCommandCanaryRunner(LlamaServerClient(url), [sys.executable], min_preservation=0)
++        finally:
++            mock.stop()
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+-- 
+2.54.0 (Apple Git-157)
+

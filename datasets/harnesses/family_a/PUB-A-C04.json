@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC04\ndef dvdNat (d n : Nat) : Prop := \u2203 k : Nat, n = d * k\ntheorem dvdNat_linComb (d a b u v : Nat) (ha : dvdNat d a) (hb : dvdNat d b) : dvdNat d (a * u + b * v) := by sorry\nend PubAC04\n",
+  "family": "A",
+  "id": "PUB-A-C04",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC04.dvdNat_linComb",
+  "trap_kind": "anti_bypass_algebra"
+}

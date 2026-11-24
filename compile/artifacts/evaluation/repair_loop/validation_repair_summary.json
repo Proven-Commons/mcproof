@@ -1,0 +1,268 @@
+{
+  "arms": {
+    "B0": {
+      "budget_totals": {
+        "completion_tokens": 98510,
+        "inference_certified_items": 23,
+        "mean_retrieved_plane1_tokens_per_turn": 1194.8,
+        "oracle_calls": 139,
+        "prompt_tokens": 241755,
+        "replies_used": 139,
+        "stagnation_events": 38,
+        "total_tokens": 340265
+      },
+      "by_family": {
+        "A": {
+          "k=1": {
+            "passed": 1,
+            "total": 12
+          },
+          "k=2": {
+            "passed": 1,
+            "total": 12
+          },
+          "k=3": {
+            "passed": 1,
+            "total": 12
+          },
+          "k=4": {
+            "passed": 1,
+            "total": 12
+          }
+        },
+        "B": {
+          "k=1": {
+            "passed": 4,
+            "total": 12
+          },
+          "k=2": {
+            "passed": 5,
+            "total": 12
+          },
+          "k=3": {
+            "passed": 5,
+            "total": 12
+          },
+          "k=4": {
+            "passed": 5,
+            "total": 12
+          }
+        },
+        "C": {
+          "k=1": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=2": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=3": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=4": {
+            "passed": 0,
+            "total": 12
+          }
+        },
+        "D": {
+          "k=1": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=2": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=3": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=4": {
+            "passed": 2,
+            "total": 12
+          }
+        }
+      },
+      "pass_curve": {
+        "k=1": {
+          "elapsed_ms_up_to_k": 2640926.5,
+          "pass_rate_pct": 10.42,
+          "passed": 5,
+          "replies_used_up_to_k": 48,
+          "tokens_used_up_to_k": 98485,
+          "total": 48
+        },
+        "k=2": {
+          "elapsed_ms_up_to_k": 4454668.95,
+          "pass_rate_pct": 12.5,
+          "passed": 6,
+          "replies_used_up_to_k": 81,
+          "tokens_used_up_to_k": 190318,
+          "total": 48
+        },
+        "k=3": {
+          "elapsed_ms_up_to_k": 6237362.22,
+          "pass_rate_pct": 12.5,
+          "passed": 6,
+          "replies_used_up_to_k": 111,
+          "tokens_used_up_to_k": 269185,
+          "total": 48
+        },
+        "k=4": {
+          "elapsed_ms_up_to_k": 7869835.55,
+          "pass_rate_pct": 16.67,
+          "passed": 8,
+          "replies_used_up_to_k": 139,
+          "tokens_used_up_to_k": 340265,
+          "total": 48
+        }
+      },
+      "preservation_probes_8": {
+        "passed": 8,
+        "total": 8
+      }
+    },
+    "P2-B": {
+      "budget_totals": {
+        "completion_tokens": 157295,
+        "inference_certified_items": 14,
+        "mean_retrieved_plane1_tokens_per_turn": 1195.7,
+        "oracle_calls": 176,
+        "prompt_tokens": 309676,
+        "replies_used": 176,
+        "stagnation_events": 67,
+        "total_tokens": 466971
+      },
+      "by_family": {
+        "A": {
+          "k=1": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=2": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=3": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=4": {
+            "passed": 0,
+            "total": 12
+          }
+        },
+        "B": {
+          "k=1": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=2": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=3": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=4": {
+            "passed": 0,
+            "total": 12
+          }
+        },
+        "C": {
+          "k=1": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=2": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=3": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=4": {
+            "passed": 0,
+            "total": 12
+          }
+        },
+        "D": {
+          "k=1": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=2": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=3": {
+            "passed": 0,
+            "total": 12
+          },
+          "k=4": {
+            "passed": 0,
+            "total": 12
+          }
+        }
+      },
+      "pass_curve": {
+        "k=1": {
+          "elapsed_ms_up_to_k": 3290749.52,
+          "pass_rate_pct": 0.0,
+          "passed": 0,
+          "replies_used_up_to_k": 48,
+          "tokens_used_up_to_k": 108368,
+          "total": 48
+        },
+        "k=2": {
+          "elapsed_ms_up_to_k": 6452996.33,
+          "pass_rate_pct": 0.0,
+          "passed": 0,
+          "replies_used_up_to_k": 95,
+          "tokens_used_up_to_k": 249509,
+          "total": 48
+        },
+        "k=3": {
+          "elapsed_ms_up_to_k": 9303315.8,
+          "pass_rate_pct": 0.0,
+          "passed": 0,
+          "replies_used_up_to_k": 138,
+          "tokens_used_up_to_k": 358909,
+          "total": 48
+        },
+        "k=4": {
+          "elapsed_ms_up_to_k": 11826729.84,
+          "pass_rate_pct": 0.0,
+          "passed": 0,
+          "replies_used_up_to_k": 176,
+          "tokens_used_up_to_k": 466971,
+          "total": 48
+        }
+      },
+      "preservation_probes_8": {
+        "passed": 8,
+        "total": 8
+      }
+    }
+  },
+  "base_gguf_path": "<workspace>/compile/checkpoints/Qwen3.5-4B-GGUF/Qwen3.5-4B-Q8_0.gguf",
+  "base_gguf_sha256": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1",
+  "decoding": {
+    "per_turn_slot_erase": true,
+    "seed": 42,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "llama_server_live_n_ctx": 6144,
+  "llama_server_version": "version: 0.5.0 (build 11146, commit 7fe450e19)",
+  "mcproof_v02_git_head": "155a474b5270a7771017a62f8e1db71eb2b75fe5",
+  "p2b_gguf_path": "<workspace>/compile/artifacts/p2b/formal-verification.p2b.f16.gguf",
+  "p2b_gguf_sha256": "728272c0974b795ceb990fde1e215b62d64e6faf04fb799c0fd3e01fa4539ba5",
+  "plane1_spec_sha256": "49beff2a0185cfa4032170b614a543c0d67541494e858803d21cfb837111b230",
+  "schema": "mcproof-issue5-validation-summary/v0.2",
+  "validation_jsonl_sha256": "7e403727c8c02bd75c319f85042dc6a1bc6166c731681644237e4eaa3a4ae621"
+}

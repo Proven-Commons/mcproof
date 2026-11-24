@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAV10\nstructure ChanState where\n  sent : Nat\n  inFlight : Nat\n  delivered : Nat\ndef chanInv (s : ChanState) : Prop := s.sent = s.inFlight + s.delivered\ninductive ChanEv | send | ack\ndef stepChan (s : ChanState) : ChanEv \u2192 ChanState\n  | .send => \u27e8s.sent + 1, s.inFlight + 1, s.delivered\u27e9\n  | .ack => if s.inFlight > 0 then \u27e8s.sent, s.inFlight - 1, s.delivered + 1\u27e9 else s\ntheorem channel_trace_inv (s : ChanState) (evs : List ChanEv) (h : chanInv s) : let s' := evs.foldl stepChan s; chanInv s' \u2227 s'.delivered \u2264 s'.sent := by sorry\nend PubAV10\n",
+  "family": "A",
+  "id": "PUB-A-V10",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAV10.channel_trace_inv",
+  "trap_kind": "anti_bypass_invariant"
+}

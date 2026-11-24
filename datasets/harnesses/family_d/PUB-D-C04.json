@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C04",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC04\ntheorem gcd_self_and_zero (n : Nat) : Nat.gcd n n = n \u2227 Nat.gcd n 0 = n := by sorry\nend PubDC04\n",
+    "module_title": "GcdSelf",
+    "positive_lean": "namespace PubDC04\n\ntheorem gcd_self_and_zero (n : Nat) : Nat.gcd n n = n \u2227 Nat.gcd n 0 = n := by\n  exact \u27e8Nat.gcd_self n, Nat.gcd_zero_right n\u27e9\n\nend PubDC04\n",
+    "theorem_names": [
+      "PubDC04.gcd_self_and_zero"
+    ],
+    "verdict_sha": "f38e7857d0a9ad705c3fa439d2b357a850d00aa4"
+  }
+}

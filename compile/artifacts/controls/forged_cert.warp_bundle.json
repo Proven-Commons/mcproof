@@ -1,0 +1,43 @@
+{
+  "adapter_id": "mde:formal-verification",
+  "adapter_path": "compile/artifacts/p2b/formal-verification.p2b.f16.gguf",
+  "adapter_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
+  "certificate": {
+    "adapter_id": "mde:formal-verification",
+    "adapter_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
+    "base_weights_sha256": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
+    "cert_sha256": "d392f82e848165115c2575d6bc1ef1f6a277e71bc7965e343547f8e350d089fb",
+    "frobenius_sq_scaled": 315383710,
+    "leakage_energy_scaled": 0,
+    "max_safety_dot_sq_scaled": 96,
+    "radix_scale": 16777216,
+    "spectral_norm_sq_scaled": 190716150
+  },
+  "checkpoint": {
+    "chat_template_sha256": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+    "config_sha256": "ddc63e1c717afa86c865bb5e01313d89d72bb53b97ad4a8a03ba8510c0621670",
+    "has_horizontal_lattice": false,
+    "has_ssm_recurrent": true,
+    "lattice_layers": 0,
+    "lattice_width": 0,
+    "layout_sha256": "7dbccf0b2961776f1c45b032403ab9b4a59c84569d1e228c30147da20b2cdb08",
+    "model_id": "Qwen/Qwen3.5-4B",
+    "safetensors_provenance_sha256": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64",
+    "tokenizer_sha256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+    "weights_sha256": "1ed4483f1d3ffbc3ffc7a26984be212e7cce455ac1e0651d1bcba1313ea2bd64"
+  },
+  "derivation_digest": "ddc488f2a432f00f0ffcb758714a05a0c6bf1dd85d6ddd11d67079b67ec803f3",
+  "domain": "formal-verification",
+  "llama_adapter_id": 2,
+  "runtime_flags_sha256": "df1b49bd87c005bf9d30a5c9487f9328aa302053827e0781d6186517774a691d",
+  "scale_den": 1000,
+  "scale_num": 1000,
+  "source_lineage": {
+    "contested_heads": [],
+    "corpus_tree_sha256": "5bdb7f30363b956e82947f668f98c48f99876e87fb5ed4f785b873e4f4f98305",
+    "domain_commits": {
+      "formal-verification": "49beff2a0185cfa4032170b614a543c0d6754149"
+    }
+  },
+  "zone_manifest_id": "sha256:4e00656cb47fce97f687ae638afba22c569b9680b3780eeb2e5ea71a62c55eca"
+}

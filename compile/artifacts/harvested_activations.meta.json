@@ -1,0 +1,5452 @@
+{
+  "d_in": 2560,
+  "d_out": 9216,
+  "harvest_runtime": {
+    "determinism_boundary": "platform_specific_bf16_harvest__cpu_float64_compile_deterministic_from_pinned_npz",
+    "device": "mps",
+    "forward_dtype": "bfloat16",
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "provenance": "reconstructed_from_phase2_hardware_report_local_host_not_reharvested",
+    "torch_version": "unrecorded"
+  },
+  "n_compile_decision_states": 332,
+  "n_compile_prompts": 96,
+  "n_ffn_down_k0_samples": 280,
+  "n_k0_anchors": 24,
+  "n_k0_noise": 2048,
+  "npz_sha256": "413a112304d3f80c27e76d16558900f82c16692151275ac488206d202aea72be",
+  "residual_rel_scale": 0.35,
+  "schema": "mcproof-harvested-activations/v0.1",
+  "step_metadata": [
+    {
+      "family": "A",
+      "ffn_out_norm": 30.338534,
+      "id": "PUB-A-C01",
+      "neg_toks": [
+        464
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 24.163687,
+      "id": "PUB-A-C01",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 37
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 23.76357,
+      "id": "PUB-A-C01",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 36
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 32.506961,
+      "id": "PUB-A-C02",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.513296,
+      "id": "PUB-A-C02",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.296044,
+      "id": "PUB-A-C02",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 110
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.777298,
+      "id": "PUB-A-C02",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 109
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 32.494297,
+      "id": "PUB-A-C03",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 27.465625,
+      "id": "PUB-A-C03",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 22.23019,
+      "id": "PUB-A-C03",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 46
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 24.156965,
+      "id": "PUB-A-C03",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 45
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 32.174501,
+      "id": "PUB-A-C04",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.442545,
+      "id": "PUB-A-C04",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 24.17441,
+      "id": "PUB-A-C04",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 77
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.173501,
+      "id": "PUB-A-C04",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 76
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 35.038297,
+      "id": "PUB-A-C05",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.494788,
+      "id": "PUB-A-C05",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.977597,
+      "id": "PUB-A-C05",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 110
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.328071,
+      "id": "PUB-A-C05",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 109
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 37.673448,
+      "id": "PUB-A-C06",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 31.418606,
+      "id": "PUB-A-C06",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 24.890992,
+      "id": "PUB-A-C06",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 78
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.147192,
+      "id": "PUB-A-C06",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 77
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 40.32878,
+      "id": "PUB-A-C07",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 27.596965,
+      "id": "PUB-A-C07",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.322739,
+      "id": "PUB-A-C07",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 93
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 27.70094,
+      "id": "PUB-A-C07",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 92
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 35.760141,
+      "id": "PUB-A-C08",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 28.463439,
+      "id": "PUB-A-C08",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.020816,
+      "id": "PUB-A-C08",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 113
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.177208,
+      "id": "PUB-A-C08",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 112
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 37.981251,
+      "id": "PUB-A-C09",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.547652,
+      "id": "PUB-A-C09",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.642657,
+      "id": "PUB-A-C09",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 133
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 27.010299,
+      "id": "PUB-A-C09",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 132
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 36.964173,
+      "id": "PUB-A-C10",
+      "neg_toks": [
+        464
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.013472,
+      "id": "PUB-A-C10",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 104
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 27.626277,
+      "id": "PUB-A-C10",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 103
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 36.128291,
+      "id": "PUB-A-C11",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.004813,
+      "id": "PUB-A-C11",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.715625,
+      "id": "PUB-A-C11",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 95
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.211063,
+      "id": "PUB-A-C11",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 94
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 37.923539,
+      "id": "PUB-A-C12",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 29.358274,
+      "id": "PUB-A-C12",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.236302,
+      "id": "PUB-A-C12",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 117
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.022907,
+      "id": "PUB-A-C12",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 116
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 38.332862,
+      "id": "PUB-A-C13",
+      "neg_toks": [
+        464
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 27.223742,
+      "id": "PUB-A-C13",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 145
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.980975,
+      "id": "PUB-A-C13",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 144
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 35.202194,
+      "id": "PUB-A-C14",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 24.698338,
+      "id": "PUB-A-C14",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.122266,
+      "id": "PUB-A-C14",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 117
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.321948,
+      "id": "PUB-A-C14",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 116
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 35.405598,
+      "id": "PUB-A-C15",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 27.443478,
+      "id": "PUB-A-C15",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.377274,
+      "id": "PUB-A-C15",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 111
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 27.504567,
+      "id": "PUB-A-C15",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 110
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 36.611641,
+      "id": "PUB-A-C16",
+      "neg_toks": [
+        464
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.121709,
+      "id": "PUB-A-C16",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 51
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.487594,
+      "id": "PUB-A-C16",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 50
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 35.812443,
+      "id": "PUB-A-C17",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.940077,
+      "id": "PUB-A-C17",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 24.846423,
+      "id": "PUB-A-C17",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 107
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.415376,
+      "id": "PUB-A-C17",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 106
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 38.047198,
+      "id": "PUB-A-C18",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.916845,
+      "id": "PUB-A-C18",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.206385,
+      "id": "PUB-A-C18",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 132
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.198039,
+      "id": "PUB-A-C18",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 131
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 37.619328,
+      "id": "PUB-A-C19",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 29.681263,
+      "id": "PUB-A-C19",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 27.473324,
+      "id": "PUB-A-C19",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 161
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 27.159859,
+      "id": "PUB-A-C19",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 160
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 36.018342,
+      "id": "PUB-A-C20",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 28.339857,
+      "id": "PUB-A-C20",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 27.206134,
+      "id": "PUB-A-C20",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 99
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.340946,
+      "id": "PUB-A-C20",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 98
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 38.184289,
+      "id": "PUB-A-C21",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.701079,
+      "id": "PUB-A-C21",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 27.047793,
+      "id": "PUB-A-C21",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 264
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.780449,
+      "id": "PUB-A-C21",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 263
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 36.403974,
+      "id": "PUB-A-C22",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.926763,
+      "id": "PUB-A-C22",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 27.572444,
+      "id": "PUB-A-C22",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 240
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.413332,
+      "id": "PUB-A-C22",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 239
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 34.930575,
+      "id": "PUB-A-C23",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 32.686767,
+      "id": "PUB-A-C23",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.614376,
+      "id": "PUB-A-C23",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 169
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 26.054931,
+      "id": "PUB-A-C23",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 168
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 38.132778,
+      "id": "PUB-A-C24",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        2159
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 25.84115,
+      "id": "PUB-A-C24",
+      "neg_toks": [
+        198,
+        464,
+        8549
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 24.412521,
+      "id": "PUB-A-C24",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        198
+      ],
+      "rel_step": 116
+    },
+    {
+      "family": "A",
+      "ffn_out_norm": 24.477392,
+      "id": "PUB-A-C24",
+      "neg_toks": [
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327
+      ],
+      "pos_toks": [
+        539
+      ],
+      "rel_step": 115
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 38.565606,
+      "id": "PUB-B-C01",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 42.085283,
+      "id": "PUB-B-C01",
+      "neg_toks": [
+        11,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        283
+      ],
+      "rel_step": 16
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 39.230818,
+      "id": "PUB-B-C02",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 49.050635,
+      "id": "PUB-B-C02",
+      "neg_toks": [
+        70735,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        36479
+      ],
+      "rel_step": 2
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 40.96402,
+      "id": "PUB-B-C03",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 44.354383,
+      "id": "PUB-B-C03",
+      "neg_toks": [
+        9845,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        696
+      ],
+      "rel_step": 1
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 38.791578,
+      "id": "PUB-B-C04",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 44.218784,
+      "id": "PUB-B-C04",
+      "neg_toks": [
+        9845,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        696
+      ],
+      "rel_step": 1
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 38.250328,
+      "id": "PUB-B-C05",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 46.557602,
+      "id": "PUB-B-C05",
+      "neg_toks": [
+        364,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        264
+      ],
+      "rel_step": 15
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 39.212114,
+      "id": "PUB-B-C06",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 43.669194,
+      "id": "PUB-B-C06",
+      "neg_toks": [
+        9845,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        696
+      ],
+      "rel_step": 1
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 38.85073,
+      "id": "PUB-B-C07",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 49.506183,
+      "id": "PUB-B-C07",
+      "neg_toks": [
+        413,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        307
+      ],
+      "rel_step": 15
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 38.621562,
+      "id": "PUB-B-C08",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 48.770315,
+      "id": "PUB-B-C08",
+      "neg_toks": [
+        1380,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        307
+      ],
+      "rel_step": 15
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 38.386223,
+      "id": "PUB-B-C09",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 60.279746,
+      "id": "PUB-B-C09",
+      "neg_toks": [
+        413,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        19603
+      ],
+      "rel_step": 15
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 38.756573,
+      "id": "PUB-B-C10",
+      "neg_toks": [
+        727
+      ],
+      "pos_toks": [
+        1445
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 39.30042,
+      "id": "PUB-B-C10",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 38.852305,
+      "id": "PUB-B-C11",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 48.837103,
+      "id": "PUB-B-C11",
+      "neg_toks": [
+        460,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        307
+      ],
+      "rel_step": 15
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 40.301682,
+      "id": "PUB-B-C12",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 55.91233,
+      "id": "PUB-B-C12",
+      "neg_toks": [
+        3753,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        295
+      ],
+      "rel_step": 15
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 38.494163,
+      "id": "PUB-B-C13",
+      "neg_toks": [
+        727
+      ],
+      "pos_toks": [
+        1445
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 39.947197,
+      "id": "PUB-B-C13",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 41.432466,
+      "id": "PUB-B-C14",
+      "neg_toks": [
+        727
+      ],
+      "pos_toks": [
+        1445
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 41.044613,
+      "id": "PUB-B-C14",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 39.794635,
+      "id": "PUB-B-C15",
+      "neg_toks": [
+        727
+      ],
+      "pos_toks": [
+        1445
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 40.289571,
+      "id": "PUB-B-C15",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 36.485909,
+      "id": "PUB-B-C16",
+      "neg_toks": [
+        727
+      ],
+      "pos_toks": [
+        1445
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 38.847315,
+      "id": "PUB-B-C16",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 39.268912,
+      "id": "PUB-B-C17",
+      "neg_toks": [
+        727
+      ],
+      "pos_toks": [
+        1445
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 39.053481,
+      "id": "PUB-B-C17",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 38.275285,
+      "id": "PUB-B-C18",
+      "neg_toks": [
+        727
+      ],
+      "pos_toks": [
+        1445
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 40.065057,
+      "id": "PUB-B-C18",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 38.504379,
+      "id": "PUB-B-C19",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 43.538217,
+      "id": "PUB-B-C19",
+      "neg_toks": [
+        9845,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        696
+      ],
+      "rel_step": 1
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 38.840773,
+      "id": "PUB-B-C20",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 46.978079,
+      "id": "PUB-B-C20",
+      "neg_toks": [
+        460,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        580
+      ],
+      "rel_step": 15
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 39.644493,
+      "id": "PUB-B-C21",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 48.266931,
+      "id": "PUB-B-C21",
+      "neg_toks": [
+        413,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        307
+      ],
+      "rel_step": 15
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 37.478147,
+      "id": "PUB-B-C22",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 55.451564,
+      "id": "PUB-B-C22",
+      "neg_toks": [
+        39358,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        1994
+      ],
+      "rel_step": 15
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 39.411818,
+      "id": "PUB-B-C23",
+      "neg_toks": [
+        727
+      ],
+      "pos_toks": [
+        1445
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 42.151598,
+      "id": "PUB-B-C23",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        271
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 38.997175,
+      "id": "PUB-B-C24",
+      "neg_toks": [
+        3524,
+        2153,
+        2138,
+        1992
+      ],
+      "pos_toks": [
+        727
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "B",
+      "ffn_out_norm": 49.228973,
+      "id": "PUB-B-C24",
+      "neg_toks": [
+        413,
+        3524,
+        2153
+      ],
+      "pos_toks": [
+        307
+      ],
+      "rel_step": 15
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 54.054722,
+      "id": "PUB-C-C01",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 59.634521,
+      "id": "PUB-C-C01",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        28302
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 37.121719,
+      "id": "PUB-C-C01",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 139
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 38.535462,
+      "id": "PUB-C-C01",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 198
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 55.299241,
+      "id": "PUB-C-C02",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 57.856505,
+      "id": "PUB-C-C02",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        28302
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 37.006001,
+      "id": "PUB-C-C02",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 142
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 38.017145,
+      "id": "PUB-C-C02",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 201
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 41.905825,
+      "id": "PUB-C-C03",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 61.22852,
+      "id": "PUB-C-C03",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        3308
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 41.441903,
+      "id": "PUB-C-C03",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 513
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 38.092129,
+      "id": "PUB-C-C03",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 563
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 40.412286,
+      "id": "PUB-C-C04",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 59.508375,
+      "id": "PUB-C-C04",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        3308
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 41.886587,
+      "id": "PUB-C-C04",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 462
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 39.280722,
+      "id": "PUB-C-C04",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 510
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 40.940477,
+      "id": "PUB-C-C05",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 61.345821,
+      "id": "PUB-C-C05",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        3308
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 40.359425,
+      "id": "PUB-C-C05",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 380
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 37.505416,
+      "id": "PUB-C-C05",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 436
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 42.136144,
+      "id": "PUB-C-C06",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 59.966799,
+      "id": "PUB-C-C06",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        28302
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 40.112979,
+      "id": "PUB-C-C06",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 500
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 37.709569,
+      "id": "PUB-C-C06",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 571
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 54.406067,
+      "id": "PUB-C-C07",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 59.268431,
+      "id": "PUB-C-C07",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        28302
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 37.147551,
+      "id": "PUB-C-C07",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 144
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 38.043775,
+      "id": "PUB-C-C07",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 203
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 54.724396,
+      "id": "PUB-C-C08",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 59.352958,
+      "id": "PUB-C-C08",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        28302
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 36.843386,
+      "id": "PUB-C-C08",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 148
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 37.978487,
+      "id": "PUB-C-C08",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 207
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 41.444402,
+      "id": "PUB-C-C09",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 60.977809,
+      "id": "PUB-C-C09",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        3308
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 41.912936,
+      "id": "PUB-C-C09",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 522
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 39.040939,
+      "id": "PUB-C-C09",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 572
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 41.902907,
+      "id": "PUB-C-C10",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 35.054342,
+      "id": "PUB-C-C10",
+      "neg_toks": [
+        487,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        17
+      ],
+      "rel_step": 64
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 41.975139,
+      "id": "PUB-C-C10",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 417
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 38.076073,
+      "id": "PUB-C-C10",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 462
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 40.975841,
+      "id": "PUB-C-C11",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 62.048725,
+      "id": "PUB-C-C11",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        3308
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 40.088664,
+      "id": "PUB-C-C11",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 406
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 37.138261,
+      "id": "PUB-C-C11",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 467
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 39.989439,
+      "id": "PUB-C-C12",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 62.968866,
+      "id": "PUB-C-C12",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        3308
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 40.507502,
+      "id": "PUB-C-C12",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 392
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 37.904865,
+      "id": "PUB-C-C12",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 447
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 54.100292,
+      "id": "PUB-C-C13",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 58.515493,
+      "id": "PUB-C-C13",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        28302
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 37.634129,
+      "id": "PUB-C-C13",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 144
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 38.633822,
+      "id": "PUB-C-C13",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 203
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 53.736306,
+      "id": "PUB-C-C14",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 59.781373,
+      "id": "PUB-C-C14",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        28302
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 37.859409,
+      "id": "PUB-C-C14",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 148
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 38.919427,
+      "id": "PUB-C-C14",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 207
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 41.705266,
+      "id": "PUB-C-C15",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 59.332424,
+      "id": "PUB-C-C15",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        28302
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 42.378069,
+      "id": "PUB-C-C15",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 539
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 37.627552,
+      "id": "PUB-C-C15",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 592
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 41.862599,
+      "id": "PUB-C-C16",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 60.13364,
+      "id": "PUB-C-C16",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        28302
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 43.164648,
+      "id": "PUB-C-C16",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 492
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 38.261111,
+      "id": "PUB-C-C16",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 538
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 39.809906,
+      "id": "PUB-C-C17",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 62.670259,
+      "id": "PUB-C-C17",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        3308
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 40.841027,
+      "id": "PUB-C-C17",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 417
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 37.802583,
+      "id": "PUB-C-C17",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 480
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 42.660114,
+      "id": "PUB-C-C18",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 58.016356,
+      "id": "PUB-C-C18",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        28302
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 39.818344,
+      "id": "PUB-C-C18",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 494
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 36.875516,
+      "id": "PUB-C-C18",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 565
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 54.010663,
+      "id": "PUB-C-C19",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 60.517095,
+      "id": "PUB-C-C19",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        28302
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 36.331272,
+      "id": "PUB-C-C19",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 134
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 38.766361,
+      "id": "PUB-C-C19",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 193
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 54.552487,
+      "id": "PUB-C-C20",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 58.787473,
+      "id": "PUB-C-C20",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        28302
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 38.551268,
+      "id": "PUB-C-C20",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 140
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 40.223361,
+      "id": "PUB-C-C20",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 199
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 43.360475,
+      "id": "PUB-C-C21",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 58.792847,
+      "id": "PUB-C-C21",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        3308
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 41.895331,
+      "id": "PUB-C-C21",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 408
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 39.366337,
+      "id": "PUB-C-C21",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 450
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 42.008393,
+      "id": "PUB-C-C22",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 38.672714,
+      "id": "PUB-C-C22",
+      "neg_toks": [
+        487,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        19
+      ],
+      "rel_step": 64
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 43.049327,
+      "id": "PUB-C-C22",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 438
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 37.971169,
+      "id": "PUB-C-C22",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 482
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 40.757968,
+      "id": "PUB-C-C23",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 61.449288,
+      "id": "PUB-C-C23",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        3308
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 40.15253,
+      "id": "PUB-C-C23",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 416
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 37.851533,
+      "id": "PUB-C-C23",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 485
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 39.731334,
+      "id": "PUB-C-C24",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        44027
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 63.365518,
+      "id": "PUB-C-C24",
+      "neg_toks": [
+        5140,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        3308
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 40.583133,
+      "id": "PUB-C-C24",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 402
+    },
+    {
+      "family": "C",
+      "ffn_out_norm": 37.350059,
+      "id": "PUB-C-C24",
+      "neg_toks": [
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 463
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 48.253827,
+      "id": "PUB-D-C01",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 50.281755,
+      "id": "PUB-D-C01",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        1919
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 44.970696,
+      "id": "PUB-D-C01",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 265
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.62091,
+      "id": "PUB-D-C01",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 306
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 47.905179,
+      "id": "PUB-D-C02",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 49.264316,
+      "id": "PUB-D-C02",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 43.685084,
+      "id": "PUB-D-C02",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 293
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.513748,
+      "id": "PUB-D-C02",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 328
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 48.86117,
+      "id": "PUB-D-C03",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 47.912453,
+      "id": "PUB-D-C03",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 44.323748,
+      "id": "PUB-D-C03",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 334
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.078445,
+      "id": "PUB-D-C03",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 369
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 47.879077,
+      "id": "PUB-D-C04",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 47.96375,
+      "id": "PUB-D-C04",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 42.335084,
+      "id": "PUB-D-C04",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 251
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.916126,
+      "id": "PUB-D-C04",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 287
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 52.808487,
+      "id": "PUB-D-C05",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 57.18343,
+      "id": "PUB-D-C05",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 6
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 42.415057,
+      "id": "PUB-D-C05",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 303
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.729724,
+      "id": "PUB-D-C05",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 343
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 49.742028,
+      "id": "PUB-D-C06",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 50.856787,
+      "id": "PUB-D-C06",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 44.071128,
+      "id": "PUB-D-C06",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 339
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.902984,
+      "id": "PUB-D-C06",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 379
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 52.827913,
+      "id": "PUB-D-C07",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 56.759367,
+      "id": "PUB-D-C07",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 44.152741,
+      "id": "PUB-D-C07",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 231
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.559816,
+      "id": "PUB-D-C07",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 267
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 55.384845,
+      "id": "PUB-D-C08",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 59.414396,
+      "id": "PUB-D-C08",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 43.638913,
+      "id": "PUB-D-C08",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 278
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.499037,
+      "id": "PUB-D-C08",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 314
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 50.173208,
+      "id": "PUB-D-C09",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 52.668352,
+      "id": "PUB-D-C09",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 6
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 43.829277,
+      "id": "PUB-D-C09",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 317
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.039864,
+      "id": "PUB-D-C09",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 355
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 52.140028,
+      "id": "PUB-D-C10",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 55.743971,
+      "id": "PUB-D-C10",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 45.119459,
+      "id": "PUB-D-C10",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 289
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.577658,
+      "id": "PUB-D-C10",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 324
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 51.181474,
+      "id": "PUB-D-C11",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 53.551302,
+      "id": "PUB-D-C11",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 42.470526,
+      "id": "PUB-D-C11",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 289
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.403606,
+      "id": "PUB-D-C11",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 329
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 49.616282,
+      "id": "PUB-D-C12",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 52.336478,
+      "id": "PUB-D-C12",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 6
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 44.595811,
+      "id": "PUB-D-C12",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 359
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.57305,
+      "id": "PUB-D-C12",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 396
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 52.55015,
+      "id": "PUB-D-C13",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 55.292427,
+      "id": "PUB-D-C13",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 44.089921,
+      "id": "PUB-D-C13",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 347
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.458334,
+      "id": "PUB-D-C13",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 386
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 50.155974,
+      "id": "PUB-D-C14",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 50.878901,
+      "id": "PUB-D-C14",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 43.714679,
+      "id": "PUB-D-C14",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 268
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.997899,
+      "id": "PUB-D-C14",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 306
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 49.591711,
+      "id": "PUB-D-C15",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 51.319652,
+      "id": "PUB-D-C15",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 45.082394,
+      "id": "PUB-D-C15",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 286
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.738999,
+      "id": "PUB-D-C15",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 329
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 52.045052,
+      "id": "PUB-D-C16",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 56.096525,
+      "id": "PUB-D-C16",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 44.159648,
+      "id": "PUB-D-C16",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 277
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 37.211277,
+      "id": "PUB-D-C16",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 316
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 53.83625,
+      "id": "PUB-D-C17",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 54.845965,
+      "id": "PUB-D-C17",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 6
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 42.814479,
+      "id": "PUB-D-C17",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 330
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.621487,
+      "id": "PUB-D-C17",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 369
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 50.678063,
+      "id": "PUB-D-C18",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 54.920128,
+      "id": "PUB-D-C18",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 6
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 44.877629,
+      "id": "PUB-D-C18",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 287
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.488177,
+      "id": "PUB-D-C18",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 324
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 51.58255,
+      "id": "PUB-D-C19",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 54.816035,
+      "id": "PUB-D-C19",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 43.001997,
+      "id": "PUB-D-C19",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 393
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.487102,
+      "id": "PUB-D-C19",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 427
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 55.525712,
+      "id": "PUB-D-C20",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 57.977542,
+      "id": "PUB-D-C20",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 7
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 42.644127,
+      "id": "PUB-D-C20",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 269
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.759054,
+      "id": "PUB-D-C20",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 304
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 56.741233,
+      "id": "PUB-D-C21",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 62.827435,
+      "id": "PUB-D-C21",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 43.374003,
+      "id": "PUB-D-C21",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 269
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.946415,
+      "id": "PUB-D-C21",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 308
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 52.417634,
+      "id": "PUB-D-C22",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 55.489881,
+      "id": "PUB-D-C22",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 4
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 42.332918,
+      "id": "PUB-D-C22",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 448
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.321203,
+      "id": "PUB-D-C22",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 482
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 52.933063,
+      "id": "PUB-D-C23",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 59.545265,
+      "id": "PUB-D-C23",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 7
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 43.318645,
+      "id": "PUB-D-C23",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 292
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 36.574818,
+      "id": "PUB-D-C23",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 332
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 60.094961,
+      "id": "PUB-D-C24",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        2
+      ],
+      "rel_step": 0
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 70.617179,
+      "id": "PUB-D-C24",
+      "neg_toks": [
+        2536,
+        2536,
+        2218
+      ],
+      "pos_toks": [
+        63
+      ],
+      "rel_step": 5
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 44.30675,
+      "id": "PUB-D-C24",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        369
+      ],
+      "rel_step": 254
+    },
+    {
+      "family": "D",
+      "ffn_out_norm": 37.112095,
+      "id": "PUB-D-C24",
+      "neg_toks": [
+        2536,
+        2218,
+        1892,
+        26,
+        464,
+        8549,
+        65318,
+        14169,
+        28767,
+        327,
+        8844,
+        5140
+      ],
+      "pos_toks": [
+        488
+      ],
+      "rel_step": 293
+    }
+  ],
+  "target_layer": 31,
+  "target_tensor": "model.language_model.layers.31.mlp.up_proj.weight"
+}

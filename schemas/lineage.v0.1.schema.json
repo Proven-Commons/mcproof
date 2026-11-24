@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "mcproof Plane 1 Lineage Manifest v0.1",
+  "type": "object",
+  "required": [
+    "schema",
+    "domain",
+    "plane1_spec_path",
+    "plane1_spec_sha256",
+    "plane1_spec_bytes",
+    "zone_manifest_id",
+    "source_lineage",
+    "upstream_repos",
+    "siliconcordat_commits",
+    "tracked_plane1_files",
+    "_meta"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "mcproof-lineage/v0.1"
+    },
+    "domain": {
+      "type": "string",
+      "const": "formal-verification"
+    },
+    "plane1_spec_path": {
+      "type": "string",
+      "const": "spec/plane1_formal_spec.md"
+    },
+    "plane1_spec_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "plane1_spec_bytes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "zone_manifest_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "source_lineage": {
+      "type": "object",
+      "required": ["corpus_tree_sha256", "domain_commits", "contested_heads"],
+      "properties": {
+        "corpus_tree_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "domain_commits": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{7,64}$"
+          }
+        },
+        "contested_heads": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "upstream_repos": {
+      "type": "object"
+    },
+    "siliconcordat_commits": {
+      "type": "object"
+    },
+    "tracked_plane1_files": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "_meta": {
+      "type": "object",
+      "required": ["gg.siliconcordat/mde"],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

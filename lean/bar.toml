@@ -1,0 +1,58 @@
+[project]
+name = "mcproof"
+status = "in-progress"
+page = "README.md"
+spec_authors = ["proven-commons-author"]
+entry_points = ["Main.lean"]
+
+[spec]
+files = ["SPEC.md", "Mcproof/Spec.lean"]
+code = [
+  "Mcproof.clampNat",
+  "Mcproof.bezoutCheck",
+  "Mcproof.ratLeCross",
+  "Mcproof.isSafeSegment",
+  "Mcproof.cleanSegments",
+  "Mcproof.TransitionBounds.ValidPath",
+  "Mcproof.TransitionBounds.quotientHeuristic",
+  "Mcproof.TransitionBounds.prefundedVal",
+  "Mcproof.TransitionBounds.prefundedHeuristic",
+  "Mcproof.TransitionBounds.DualConstraint",
+  "Mcproof.TransitionBounds.DualConstraint.weight",
+  "Mcproof.TransitionBounds.DualConstraint.demand",
+  "Mcproof.TransitionBounds.DualConstraint.coeff",
+  "Mcproof.TransitionBounds.planSum",
+  "Mcproof.TransitionBounds.dualObjective",
+  "Mcproof.TransitionBounds.actionDualLoad",
+  "Mcproof.TransitionBounds.dualObjectivePairs",
+  "Mcproof.TransitionBounds.dualFloorNat",
+  "Mcproof.TransitionBounds.cyclicSwitchTax",
+  "Mcproof.TransitionBounds.cyclicSwitchDist",
+  "Mcproof.TransitionBounds.countTrue",
+  "Mcproof.TransitionBounds.intactSupply",
+  "Mcproof.TransitionBounds.vertexArcFlow",
+  "Mcproof.TransitionBounds.tokensInCut",
+  "Mcproof.TransitionBounds.horizonCutCapacity",
+  "Mcproof.TransitionBounds.deficitNat",
+  "Mcproof.TransitionBounds.composedDeficitHeuristic",
+  "Mcproof.TransitionBounds.ceilDivNat",
+  "Mcproof.AdapterBounds.vecDot",
+  "Mcproof.AdapterBounds.vecNormSq",
+  "Mcproof.AdapterBounds.vecAdd",
+  "Mcproof.AdapterBounds.vecSub",
+  "Mcproof.AdapterBounds.vecScale",
+  "Mcproof.AdapterBounds.vecHadamard",
+  "Mcproof.AdapterBounds.vecSqDiag",
+  "Mcproof.AdapterBounds.tangentProjScaled",
+  "Mcproof.AdapterBounds.sumNat",
+  "Mcproof.AdapterBounds.sumSqNat",
+  "Mcproof.AdapterBounds.shrinkageSandwichCheck"
+]
+
+[tests]
+results = "tests/TEST-RESULTS.md"
+command = "python3 tests/run_tests.py"
+files = ["tests/run_tests.py"]
+
+[ci]
+required_check = "ci / bar"

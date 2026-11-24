@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAV08\ndef WeakNull2 (a b c d : Int) : Prop := \u2200 x y : Int, x = 0 \u2227 y = 0 \u2192 a * x + b * y = 0 \u2227 c * x + d * y = 0\ntheorem identity_has_weakNull : WeakNull2 1 0 0 1 := by sorry\ntheorem kernel_annihilates_det (a b c d x y : Int) (h1 : a * x + b * y = 0) (h2 : c * x + d * y = 0) : (a * d - b * c) * x = 0 := by sorry\nend PubAV08\n",
+  "family": "A",
+  "id": "PUB-A-V08",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAV08.kernel_annihilates_det",
+  "trap_kind": "weak_statement_vacuous_trap"
+}

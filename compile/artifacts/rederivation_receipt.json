@@ -1,0 +1,96 @@
+{
+  "certificate_sha256": "56820652f47de5866a57fd39bbb092ea2c14c658f2671dbcbcafcc2fa5180b76",
+  "checked_file_count": 9,
+  "factor_f16_digest": "7ffa87806e74b2c01adb871412031d2aade0a61f43b69a987f3eaee8de162801",
+  "files": {
+    "formal-verification.p2b.binding.json": {
+      "byte_diff_count": 0,
+      "byte_len": 3429,
+      "crlf_only_mismatch": false,
+      "diagnostic": "exact_match",
+      "expected_sha256": "93c8accd871093c896ba08f511c14ac0d71c6505ef447733bd4db72456d23d5d",
+      "rederived_sha256": "93c8accd871093c896ba08f511c14ac0d71c6505ef447733bd4db72456d23d5d",
+      "zero_byte_diff": true
+    },
+    "formal-verification.p2b.certificate.json": {
+      "byte_diff_count": 0,
+      "byte_len": 312,
+      "crlf_only_mismatch": false,
+      "diagnostic": "exact_match",
+      "expected_sha256": "e0c6b9a7bbd0f7f3da2ad09def08521a07cb62564bef8ca905c0744a5181d4f5",
+      "rederived_sha256": "e0c6b9a7bbd0f7f3da2ad09def08521a07cb62564bef8ca905c0744a5181d4f5",
+      "zero_byte_diff": true
+    },
+    "formal-verification.p2b.f16.gguf": {
+      "byte_diff_count": 0,
+      "byte_len": 189408,
+      "crlf_only_mismatch": false,
+      "diagnostic": "exact_match",
+      "expected_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
+      "rederived_sha256": "01a13e44b6a2da5293653d3bfafc803d0fcd7438f3822bc28055f8bf6b6b41aa",
+      "zero_byte_diff": true
+    },
+    "formal-verification.p2b.f16.wfsl": {
+      "byte_diff_count": 0,
+      "byte_len": 189357,
+      "crlf_only_mismatch": false,
+      "diagnostic": "exact_match",
+      "expected_sha256": "7f68b13bac77427e1734d32bf6e5593d61975313abfd62fe1041f878f7b15164",
+      "rederived_sha256": "7f68b13bac77427e1734d32bf6e5593d61975313abfd62fe1041f878f7b15164",
+      "zero_byte_diff": true
+    },
+    "formal-verification.p2b.gate_policy.json": {
+      "byte_diff_count": 0,
+      "byte_len": 236,
+      "crlf_only_mismatch": false,
+      "diagnostic": "exact_match",
+      "expected_sha256": "a6445d66592528c2e68020c9b9df8d89573e5fe319cefaca17d816872ff6dc97",
+      "rederived_sha256": "a6445d66592528c2e68020c9b9df8d89573e5fe319cefaca17d816872ff6dc97",
+      "zero_byte_diff": true
+    },
+    "formal-verification.p2b.int4_f16.wfsl": {
+      "byte_diff_count": 0,
+      "byte_len": 78803,
+      "crlf_only_mismatch": false,
+      "diagnostic": "exact_match",
+      "expected_sha256": "cafadd5de9a114655c8a9f2d04bea51de1e292773a81e691fd538ff8c1e70449",
+      "rederived_sha256": "cafadd5de9a114655c8a9f2d04bea51de1e292773a81e691fd538ff8c1e70449",
+      "zero_byte_diff": true
+    },
+    "formal-verification.p2b.int4_int8.wfsl": {
+      "byte_diff_count": 0,
+      "byte_len": 58357,
+      "crlf_only_mismatch": false,
+      "diagnostic": "exact_match",
+      "expected_sha256": "a1b8566c5a4ef4337c55e56673fe9fe6d6bcc6fb90288c9d6ad650787f343d16",
+      "rederived_sha256": "a1b8566c5a4ef4337c55e56673fe9fe6d6bcc6fb90288c9d6ad650787f343d16",
+      "zero_byte_diff": true
+    },
+    "formal-verification.p2b.warp_bundle.json": {
+      "byte_diff_count": 0,
+      "byte_len": 2104,
+      "crlf_only_mismatch": false,
+      "diagnostic": "exact_match",
+      "expected_sha256": "1653a78658531be3950c3a6533fa97364736ccade86e163e9e4664d219bb1c2d",
+      "rederived_sha256": "1653a78658531be3950c3a6533fa97364736ccade86e163e9e4664d219bb1c2d",
+      "zero_byte_diff": true
+    },
+    "formal-verification.p2b.wmcp_meta.json": {
+      "byte_diff_count": 0,
+      "byte_len": 1583,
+      "crlf_only_mismatch": false,
+      "diagnostic": "exact_match",
+      "expected_sha256": "475ad6151b3e039050b4deedf2586150f7f220103fe2469c3fc896642a854bca",
+      "rederived_sha256": "475ad6151b3e039050b4deedf2586150f7f220103fe2469c3fc896642a854bca",
+      "zero_byte_diff": true
+    }
+  },
+  "matched_file_count": 9,
+  "parameter_provenance": {
+    "gate_policy_source": "mcproof_compile.compiler_suite.PRE_REGISTERED_GATE_POLICY",
+    "hyperparameters_source": "mcproof_compile.compiler_suite.DEFAULT_*",
+    "lineage_source": "spec/lineage.json"
+  },
+  "schema": "mcproof-rederivation-receipt/v0.2",
+  "zero_byte_diff_all": true
+}

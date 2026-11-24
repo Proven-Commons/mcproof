@@ -1,0 +1,215 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    rems, mods = inst['remainders'], inst['moduli']\n    x, step = 0, 1\n    for r, m in zip(rems, mods):\n        while x % m != r % m:\n            x += step\n        step *= m\n    return {'x': x % step, 'M': step}\n",
+  "id": "PUB-B-C02",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "moduli": [
+            3,
+            5,
+            7
+          ],
+          "remainders": [
+            2,
+            3,
+            2
+          ]
+        },
+        {
+          "M": 105,
+          "x": 128
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c02_mut_1"
+    },
+    {
+      "args": [
+        {
+          "moduli": [
+            3,
+            5,
+            7
+          ],
+          "remainders": [
+            2,
+            3,
+            2
+          ]
+        },
+        {
+          "M": 105,
+          "x": 24
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c02_mut_2"
+    },
+    {
+      "args": [
+        {
+          "moduli": [
+            6,
+            9
+          ],
+          "remainders": [
+            2,
+            2
+          ]
+        },
+        {
+          "M": 54,
+          "x": 2
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c02_mut_3"
+    },
+    {
+      "args": [
+        {
+          "moduli": [
+            4,
+            6
+          ],
+          "remainders": [
+            1,
+            1
+          ]
+        },
+        {
+          "M": 24,
+          "x": 1
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c02_mut_4"
+    },
+    {
+      "args": [
+        {
+          "moduli": [
+            4,
+            9
+          ],
+          "remainders": [
+            1,
+            4
+          ]
+        },
+        {
+          "M": 36,
+          "x": -23
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c02_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "moduli": [
+            3,
+            5,
+            7
+          ],
+          "remainders": [
+            2,
+            3,
+            2
+          ]
+        },
+        {
+          "M": 105,
+          "x": 23
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "moduli": [
+            4,
+            9
+          ],
+          "remainders": [
+            1,
+            4
+          ]
+        },
+        {
+          "M": 36,
+          "x": 13
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "moduli": [
+            2,
+            5,
+            11
+          ],
+          "remainders": [
+            0,
+            3,
+            4
+          ]
+        },
+        {
+          "M": 110,
+          "x": 48
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "moduli": [
+            7,
+            13
+          ],
+          "remainders": [
+            6,
+            2
+          ]
+        },
+        {
+          "M": 91,
+          "x": 41
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "moduli": [
+            5,
+            7,
+            8
+          ],
+          "remainders": [
+            1,
+            2,
+            3
+          ]
+        },
+        {
+          "M": 280,
+          "x": 51
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

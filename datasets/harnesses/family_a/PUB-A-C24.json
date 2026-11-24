@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC24\nstructure LeaseState where\n  epoch : Nat\n  leader : Nat\ndef grantLease (s : LeaseState) (reqEpoch candidate : Nat) : Option LeaseState :=\n  if reqEpoch > s.epoch then some \u27e8reqEpoch, candidate\u27e9 else none\ntheorem lease_epoch_monotonic (s s' : LeaseState) (reqEpoch candidate : Nat) (h : grantLease s reqEpoch candidate = some s') : s'.epoch > s.epoch \u2227 s'.leader = candidate := by sorry\ntheorem lease_reject_stale (s : LeaseState) (reqEpoch candidate : Nat) (hle : reqEpoch \u2264 s.epoch) : grantLease s reqEpoch candidate = none := by sorry\nend PubAC24\n",
+  "family": "A",
+  "id": "PUB-A-C24",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC24.lease_epoch_monotonic",
+  "trap_kind": "anti_bypass_invariant"
+}

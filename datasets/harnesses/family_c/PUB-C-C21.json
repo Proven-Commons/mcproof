@@ -1,0 +1,14 @@
+{
+  "expected_tier": "CONJECTURE",
+  "family": "C",
+  "id": "PUB-C-C21",
+  "oracle_type": "verdict_audit",
+  "spec_meta": {
+    "expected_axioms": [
+      "propext"
+    ],
+    "expected_verdict": "different",
+    "source_commit": "795f10a9c1e18aecdcd65ba75c83b2a7501108ce",
+    "verdict_id": "audit-proto-mutex-different"
+  }
+}

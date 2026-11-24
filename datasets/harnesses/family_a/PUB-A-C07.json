@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC07\ndef binom : Nat \u2192 Nat \u2192 Nat\n  | _, 0 => 1\n  | 0, _ + 1 => 0\n  | n + 1, k + 1 => binom n k + binom n (k + 1)\ntheorem binom_gt_zero (n k : Nat) (h : n < k) : binom n k = 0 := by sorry\ntheorem binom_self (n : Nat) : binom n n = 1 := by sorry\ntheorem pascal_step (n k : Nat) : binom (n + 1) (k + 1) = binom n k + binom n (k + 1) := by sorry\nend PubAC07\n",
+  "family": "A",
+  "id": "PUB-A-C07",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC07.pascal_step",
+  "trap_kind": "anti_bypass_induction"
+}

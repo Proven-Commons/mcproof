@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C15",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC15\ntheorem interval_sub_enclosure (a1 b1 a2 b2 x y : Int) (hx : a1 \u2264 x \u2227 x \u2264 b1) (hy : a2 \u2264 y \u2227 y \u2264 b2) : a1 - b2 \u2264 x - y \u2227 x - y \u2264 b1 - a2 := by sorry\nend PubDC15\n",
+    "module_title": "IvSub",
+    "positive_lean": "namespace PubDC15\n\ntheorem interval_sub_enclosure (a1 b1 a2 b2 x y : Int)\n    (hx : a1 \u2264 x \u2227 x \u2264 b1) (hy : a2 \u2264 y \u2227 y \u2264 b2) :\n    a1 - b2 \u2264 x - y \u2227 x - y \u2264 b1 - a2 := by\n  omega\n\nend PubDC15\n",
+    "theorem_names": [
+      "PubDC15.interval_sub_enclosure"
+    ],
+    "verdict_sha": "f66c829d25bc0a978e50adfabfe240697cb8879c"
+  }
+}

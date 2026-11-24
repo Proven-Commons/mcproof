@@ -1,0 +1,15 @@
+{
+  "expected_tier": "VERIFIED",
+  "family": "C",
+  "id": "PUB-C-C19",
+  "oracle_type": "bar_check",
+  "spec_meta": {
+    "bar_status": "in-progress",
+    "pkg": "Ticket",
+    "test_cmd": "python3 tests/run_tests.py",
+    "theorem_names": [
+      "Ticket.Spec.mutex_holds",
+      "Ticket.Spec.serving_mono"
+    ]
+  }
+}

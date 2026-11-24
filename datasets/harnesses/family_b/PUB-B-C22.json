@@ -1,0 +1,331 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    cap = inst['capacity']\n    buf, head, count, popped, dropped = [0] * cap, 0, 0, [], 0\n    for item in inst['ops']:\n        if item['op'] == 'PUSH':\n            if count < cap:\n                buf[(head + count) % cap] = item['val']\n                count += 1\n            else:\n                dropped += 1\n        else:\n            if count > 0:\n                popped.append(buf[head])\n                head = (head + 1) % cap\n                count -= 1\n    rem = [buf[(head + k) % cap] for k in range(count)]\n    return {'popped': popped, 'remaining': rem, 'dropped_count': dropped}\n",
+  "id": "PUB-B-C22",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "capacity": 2,
+          "ops": [
+            {
+              "op": "PUSH",
+              "val": 10
+            },
+            {
+              "op": "PUSH",
+              "val": 20
+            },
+            {
+              "op": "PUSH",
+              "val": 30
+            },
+            {
+              "op": "POP"
+            }
+          ]
+        },
+        {
+          "dropped_count": 1,
+          "popped": [
+            20
+          ],
+          "remaining": [
+            10
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c22_mut_1"
+    },
+    {
+      "args": [
+        {
+          "capacity": 2,
+          "ops": [
+            {
+              "op": "PUSH",
+              "val": 10
+            },
+            {
+              "op": "PUSH",
+              "val": 20
+            },
+            {
+              "op": "PUSH",
+              "val": 30
+            },
+            {
+              "op": "POP"
+            }
+          ]
+        },
+        {
+          "dropped_count": 0,
+          "popped": [
+            10
+          ],
+          "remaining": [
+            20,
+            30
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c22_mut_2"
+    },
+    {
+      "args": [
+        {
+          "capacity": 3,
+          "ops": [
+            {
+              "op": "POP"
+            },
+            {
+              "op": "PUSH",
+              "val": 7
+            },
+            {
+              "op": "POP"
+            }
+          ]
+        },
+        {
+          "dropped_count": 0,
+          "popped": [
+            0,
+            7
+          ],
+          "remaining": []
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c22_mut_3"
+    },
+    {
+      "args": [
+        {
+          "capacity": 1,
+          "ops": [
+            {
+              "op": "PUSH",
+              "val": 5
+            },
+            {
+              "op": "PUSH",
+              "val": 6
+            },
+            {
+              "op": "POP"
+            },
+            {
+              "op": "PUSH",
+              "val": 8
+            }
+          ]
+        },
+        {
+          "dropped_count": 1,
+          "popped": [
+            5
+          ],
+          "remaining": [
+            6
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c22_mut_4"
+    },
+    {
+      "args": [
+        {
+          "capacity": 2,
+          "ops": [
+            {
+              "op": "PUSH",
+              "val": 1
+            },
+            {
+              "op": "PUSH",
+              "val": 2
+            },
+            {
+              "op": "POP"
+            },
+            {
+              "op": "PUSH",
+              "val": 3
+            },
+            {
+              "op": "POP"
+            }
+          ]
+        },
+        {
+          "dropped_count": 0,
+          "popped": [
+            1,
+            3
+          ],
+          "remaining": [
+            2
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c22_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "capacity": 2,
+          "ops": [
+            {
+              "op": "PUSH",
+              "val": 10
+            },
+            {
+              "op": "PUSH",
+              "val": 20
+            },
+            {
+              "op": "PUSH",
+              "val": 30
+            },
+            {
+              "op": "POP"
+            }
+          ]
+        },
+        {
+          "dropped_count": 1,
+          "popped": [
+            10
+          ],
+          "remaining": [
+            20
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "capacity": 3,
+          "ops": [
+            {
+              "op": "POP"
+            },
+            {
+              "op": "PUSH",
+              "val": 7
+            },
+            {
+              "op": "POP"
+            }
+          ]
+        },
+        {
+          "dropped_count": 0,
+          "popped": [
+            7
+          ],
+          "remaining": []
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "capacity": 1,
+          "ops": [
+            {
+              "op": "PUSH",
+              "val": 5
+            },
+            {
+              "op": "PUSH",
+              "val": 6
+            },
+            {
+              "op": "POP"
+            },
+            {
+              "op": "PUSH",
+              "val": 8
+            }
+          ]
+        },
+        {
+          "dropped_count": 1,
+          "popped": [
+            5
+          ],
+          "remaining": [
+            8
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "capacity": 4,
+          "ops": []
+        },
+        {
+          "dropped_count": 0,
+          "popped": [],
+          "remaining": []
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "capacity": 2,
+          "ops": [
+            {
+              "op": "PUSH",
+              "val": 1
+            },
+            {
+              "op": "PUSH",
+              "val": 2
+            },
+            {
+              "op": "POP"
+            },
+            {
+              "op": "PUSH",
+              "val": 3
+            },
+            {
+              "op": "POP"
+            }
+          ]
+        },
+        {
+          "dropped_count": 0,
+          "popped": [
+            1,
+            2
+          ],
+          "remaining": [
+            3
+          ]
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

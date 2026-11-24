@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+"""Deterministic dependency bootstrapper for fresh clones of `Proven-Commons/mcproof`.
+
+Clones the exact 40-character commit SHAs pinned in `spec/lineage.json` into
+`../deps` (or `--deps-dir`), writes `DEPS_MANIFEST.json`, and verifies every
+checkout's `git rev-parse HEAD` via constant-time comparison. Pass
+`--with-siliconcordat` to also clone `siliconcordat/{mde,exo,warp,weft}` at
+their pinned commit SHAs.
+"""
+from __future__ import annotations
+
+import argparse
+import hmac
+import json
+from pathlib import Path
+import re
+import subprocess
+import sys
+from typing import Any
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
+
+from mcproof.lineage import (  # noqa: E402
+    COMMIT_RE,
+    SILICONCORDAT_PINNED_COMMITS,
+    UPSTREAM_REPO_DIRS,
+    verify_lineage_manifest,
+)
+
+
+def _clone_at_exact_sha(url: str, commit: str, dest: Path) -> None:
+    if not COMMIT_RE.fullmatch(commit):
+        raise ValueError(f"refusing non-40-hex commit pin {commit!r} for {url}")
+    if (dest / ".git").exists():
+        head = subprocess.run(
+            ["git", "-C", str(dest), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        if hmac.compare_digest(head, commit):
+            return
+        subprocess.run(["git", "-C", str(dest), "fetch", "--depth", "1", "origin", commit], check=True)
+        subprocess.run(["git", "-C", str(dest), "-c", "advice.detachedHead=false", "checkout", "--force", commit], check=True)
+    else:
+        dest.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "-C", str(dest), "init", "--quiet"], check=True)
+        subprocess.run(["git", "-C", str(dest), "remote", "add", "origin", url], check=True)
+        subprocess.run(["git", "-C", str(dest), "fetch", "--depth", "1", "origin", commit], check=True)
+        subprocess.run(["git", "-C", str(dest), "-c", "advice.detachedHead=false", "checkout", "--force", "FETCH_HEAD"], check=True)
+
+    actual_head = subprocess.run(
+        ["git", "-C", str(dest), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    if not hmac.compare_digest(actual_head, commit):
+        raise RuntimeError(f"HEAD mismatch in {dest.name}: got {actual_head}, expected {commit}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="Clone pinned Tier 2 and Plane 1 dependencies from spec/lineage.json.")
+    ap.add_argument(
+        "--deps-dir",
+        default=str(REPO_ROOT.parent / "deps"),
+        help="Destination directory for upstream repos and DEPS_MANIFEST.json (default: ../deps)",
+    )
+    ap.add_argument(
+        "--with-siliconcordat",
+        action="store_true",
+        help="Also clone siliconcordat/{mde,exo,warp,weft} at pinned commits into --siliconcordat-dir",
+    )
+    default_sc_dir = (
+        REPO_ROOT.parent.parent / "siliconcordat"
+        if (REPO_ROOT.parent.parent / "siliconcordat").is_dir()
+        else REPO_ROOT.parent / "siliconcordat"
+    )
+    ap.add_argument(
+        "--siliconcordat-dir",
+        default=str(default_sc_dir),
+        help="Destination directory for siliconcordat sibling repos (default: ../siliconcordat)",
+    )
+    ap.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the exact repositories and 40-char SHAs that would be fetched without network access",
+    )
+    args = ap.parse_args(argv)
+
+    lineage_path = REPO_ROOT / "spec" / "lineage.json"
+    lineage = json.loads(lineage_path.read_text(encoding="utf-8"))
+    upstream_repos: dict[str, Any] = lineage["upstream_repos"]
+
+    deps_target = Path(args.deps_dir).expanduser().resolve()
+    manifest_repos: dict[str, dict[str, Any]] = {}
+    plan: list[tuple[str, str, str, Path]] = []
+
+    for repo_name, info in sorted(upstream_repos.items()):
+        sub_dir = UPSTREAM_REPO_DIRS.get(repo_name, re.sub(r"[^A-Za-z0-9_.-]", "-", repo_name.split("/")[-1]))
+        commit = str(info["commit"])
+        url = str(info["url"])
+        dest = deps_target / sub_dir
+        plan.append((repo_name, url, commit, dest))
+        manifest_repos[repo_name] = {
+            "dir": sub_dir,
+            "url": url,
+            "commit": commit,
+            "roles": list(info.get("roles", [])),
+        }
+
+    sc_plan: list[tuple[str, str, str, Path]] = []
+    if args.with_siliconcordat:
+        sc_root = Path(args.siliconcordat_dir).expanduser().resolve()
+        for sc_repo, sc_commit in sorted(SILICONCORDAT_PINNED_COMMITS.items()):
+            short = sc_repo.split("/")[-1]
+            sc_url = f"https://github.com/{sc_repo}"
+            sc_plan.append((sc_repo, sc_url, sc_commit, sc_root / short))
+
+    if args.dry_run:
+        print(json.dumps({
+            "deps_dir": str(deps_target),
+            "upstream_repos": [{"repo": r, "url": u, "commit": c, "dir": d.name} for r, u, c, d in plan],
+            "siliconcordat_repos": [{"repo": r, "url": u, "commit": c, "dir": d.name} for r, u, c, d in sc_plan],
+        }, indent=2))
+        return 0
+
+    deps_target.mkdir(parents=True, exist_ok=True)
+    for repo_name, url, commit, dest in plan:
+        print(f"[bootstrap-deps] {repo_name} @ {commit} -> {dest}")
+        _clone_at_exact_sha(url, commit, dest)
+
+    manifest_obj = {
+        "schema": "mcproof-deps/v0.1",
+        "purpose": "Pinned Plane 1 formal specifications and Tier 2 deterministic verification oracles for siliconcordat/mde#4",
+        "repos": manifest_repos,
+    }
+    (deps_target / "DEPS_MANIFEST.json").write_text(
+        json.dumps(manifest_obj, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    for sc_repo, sc_url, sc_commit, sc_dest in sc_plan:
+        print(f"[bootstrap-deps] {sc_repo} @ {sc_commit} -> {sc_dest}")
+        _clone_at_exact_sha(sc_url, sc_commit, sc_dest)
+
+    rep = verify_lineage_manifest(REPO_ROOT, d_dir=deps_target, require_deps=True)
+    if not rep.passed:
+        print(f"[bootstrap-deps] FAIL: {rep.findings}", file=sys.stderr)
+        return 1
+    print(f"[bootstrap-deps] OK: verified {len(plan)} upstream repos + DEPS_MANIFEST.json ({rep.corpus_tree_sha256[:16]})")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

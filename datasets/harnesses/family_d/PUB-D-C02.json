@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-C02",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDC02\ndef isEvenInt (z : Int) : Prop := \u2203 k : Int, z = 2 * k\ntheorem even_add_even (a b : Int) (ha : isEvenInt a) (hb : isEvenInt b) : isEvenInt (a + b) := by sorry\nend PubDC02\n",
+    "module_title": "EvenSum",
+    "positive_lean": "namespace PubDC02\n\ndef isEvenInt (z : Int) : Prop := \u2203 k : Int, z = 2 * k\n\ntheorem even_add_even (a b : Int) (ha : isEvenInt a) (hb : isEvenInt b) : isEvenInt (a + b) := by\n  cases ha with\n  | intro u hu =>\n    cases hb with\n    | intro v hv =>\n      exact \u27e8u + v, by omega\u27e9\n\nend PubDC02\n",
+    "theorem_names": [
+      "PubDC02.even_add_even"
+    ],
+    "verdict_sha": "f505214726b8f424c6a835fb193dc91847d3be4c"
+  }
+}

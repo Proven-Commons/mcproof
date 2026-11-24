@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-V04",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDV04\ndef pathEdges : Nat \u2192 List (Nat \u00d7 Nat)\n  | 0 => []\n  | n + 1 => (n, n + 1) :: pathEdges n\ntheorem pathGraph_edges_len (n : Nat) : (pathEdges n).length + 1 = n + 1 := by sorry\nend PubDV04\n",
+    "module_title": "PathTreeInv",
+    "positive_lean": "namespace PubDV04\n\ndef pathEdges : Nat \u2192 List (Nat \u00d7 Nat)\n  | 0 => []\n  | n + 1 => (n, n + 1) :: pathEdges n\n\ntheorem pathGraph_edges_len (n : Nat) : (pathEdges n).length + 1 = n + 1 := by\n  induction n with\n  | zero => rfl\n  | succ m ih =>\n    simp only [pathEdges, List.length_cons]\n    omega\n\nend PubDV04\n",
+    "theorem_names": [
+      "PubDV04.pathGraph_edges_len"
+    ],
+    "verdict_sha": "0630f72d9cdcab612d0628e86f39d8202cf8ff06"
+  }
+}

@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Lean / Lake
+lean/.lake/
+
+# MDE broker ephemeral state
+.mde/
+datasets/.mde/
+
+# Large checkpoints, raw activations, isolated worktrees, and sealed response dumps
+checkpoints/
+compile/checkpoints/
+compile/artifacts/*.npz
+stack/worktrees/
+stack/results/smoke/
+stack/results/final/*.jsonl
+verification/rederived_p2b/
+verification/stack_sealed_receipts/
+
+# OS
+.DS_Store

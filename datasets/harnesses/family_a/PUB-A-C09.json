@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC09\ndef deg (v : Nat) : List (Nat \u00d7 Nat) \u2192 Nat\n  | [] => 0\n  | (a, b) :: es => (if a == v then 1 else 0) + (if b == v then 1 else 0) + deg v es\ndef edgeEndpointCount : List (Nat \u00d7 Nat) \u2192 Nat\n  | [] => 0\n  | _ :: es => 2 + edgeEndpointCount es\ntheorem handshaking_degSum (es : List (Nat \u00d7 Nat)) : edgeEndpointCount es = 2 * es.length := by sorry\ntheorem deg_append (v : Nat) (es1 es2 : List (Nat \u00d7 Nat)) : deg v (es1 ++ es2) = deg v es1 + deg v es2 := by sorry\nend PubAC09\n",
+  "family": "A",
+  "id": "PUB-A-C09",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC09.handshaking_degSum",
+  "trap_kind": "anti_bypass_induction"
+}

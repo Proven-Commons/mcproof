@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC17\ndef BrokenFarkas (y1 y2 b1 b2 : Int) : Prop := y1 \u2265 0 \u2227 y2 \u2265 0 \u2227 y1 * b1 + y2 * b2 < 0\ntheorem brokenFarkas_false_infeasible : BrokenFarkas 0 1 1 (-1) \u2227 (\u2203 x : Int, 1 * x = 1 \u2227 (-1) * x = (-1)) := by sorry\ntheorem farkas1d_infeasible (a1 a2 b1 b2 y1 y2 : Int) (hdual : y1 * a1 + y2 * a2 = 0) (hb : y1 * b1 + y2 * b2 < 0) : \u00ac (\u2203 x : Int, a1 * x = b1 \u2227 a2 * x = b2) := by sorry\nend PubAC17\n",
+  "family": "A",
+  "id": "PUB-A-C17",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC17.farkas1d_infeasible",
+  "trap_kind": "weak_statement_vacuous_trap"
+}

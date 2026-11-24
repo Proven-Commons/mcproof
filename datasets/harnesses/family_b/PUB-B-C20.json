@@ -1,0 +1,326 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    clocks = [0] * inst['num_procs']\n    sent, ts = {}, []\n    for ev in inst['events']:\n        p = ev['proc']\n        if ev['kind'] in ('LOCAL', 'SEND'):\n            clocks[p] += 1\n            if ev['kind'] == 'SEND':\n                sent[ev['msg_id']] = clocks[p]\n        else:\n            clocks[p] = max(clocks[p], sent[ev['msg_id']]) + 1\n        ts.append(clocks[p])\n    return {'timestamps': ts, 'final_clocks': clocks}\n",
+  "id": "PUB-B-C20",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "kind": "SEND",
+              "msg_id": 10,
+              "proc": 0
+            },
+            {
+              "kind": "RECV",
+              "msg_id": 10,
+              "proc": 1
+            }
+          ],
+          "num_procs": 2
+        },
+        {
+          "final_clocks": [
+            1,
+            1
+          ],
+          "timestamps": [
+            1,
+            1
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c20_mut_1"
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "kind": "RECV",
+              "msg_id": 99,
+              "proc": 1
+            }
+          ],
+          "num_procs": 2
+        },
+        {
+          "final_clocks": [
+            0,
+            1
+          ],
+          "timestamps": [
+            1
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c20_mut_2"
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "kind": "SEND",
+              "msg_id": 10,
+              "proc": 0
+            },
+            {
+              "kind": "RECV",
+              "msg_id": 10,
+              "proc": 1
+            },
+            {
+              "kind": "RECV",
+              "msg_id": 10,
+              "proc": 1
+            }
+          ],
+          "num_procs": 2
+        },
+        {
+          "final_clocks": [
+            1,
+            3
+          ],
+          "timestamps": [
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c20_mut_3"
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "kind": "SEND",
+              "msg_id": 10,
+              "proc": 0
+            },
+            {
+              "kind": "RECV",
+              "msg_id": 10,
+              "proc": 1
+            }
+          ],
+          "num_procs": 2
+        },
+        {
+          "final_clocks": [
+            1,
+            0
+          ],
+          "timestamps": [
+            1,
+            2
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c20_mut_4"
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "kind": "SEND",
+              "msg_id": 10,
+              "proc": 0
+            },
+            {
+              "kind": "SEND",
+              "msg_id": 10,
+              "proc": 0
+            }
+          ],
+          "num_procs": 2
+        },
+        {
+          "final_clocks": [
+            2,
+            0
+          ],
+          "timestamps": [
+            1,
+            2
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c20_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "kind": "SEND",
+              "msg_id": 10,
+              "proc": 0
+            },
+            {
+              "kind": "RECV",
+              "msg_id": 10,
+              "proc": 1
+            }
+          ],
+          "num_procs": 2
+        },
+        {
+          "final_clocks": [
+            1,
+            2
+          ],
+          "timestamps": [
+            1,
+            2
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "kind": "LOCAL",
+              "proc": 0
+            },
+            {
+              "kind": "SEND",
+              "msg_id": 1,
+              "proc": 0
+            },
+            {
+              "kind": "RECV",
+              "msg_id": 1,
+              "proc": 2
+            },
+            {
+              "kind": "SEND",
+              "msg_id": 2,
+              "proc": 2
+            },
+            {
+              "kind": "RECV",
+              "msg_id": 2,
+              "proc": 1
+            }
+          ],
+          "num_procs": 3
+        },
+        {
+          "final_clocks": [
+            2,
+            5,
+            4
+          ],
+          "timestamps": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "kind": "LOCAL",
+              "proc": 1
+            },
+            {
+              "kind": "LOCAL",
+              "proc": 1
+            },
+            {
+              "kind": "SEND",
+              "msg_id": 5,
+              "proc": 0
+            },
+            {
+              "kind": "RECV",
+              "msg_id": 5,
+              "proc": 1
+            }
+          ],
+          "num_procs": 2
+        },
+        {
+          "final_clocks": [
+            1,
+            3
+          ],
+          "timestamps": [
+            1,
+            2,
+            1,
+            3
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "events": [],
+          "num_procs": 1
+        },
+        {
+          "final_clocks": [
+            0
+          ],
+          "timestamps": []
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "events": [
+            {
+              "kind": "LOCAL",
+              "proc": 0
+            },
+            {
+              "kind": "LOCAL",
+              "proc": 1
+            }
+          ],
+          "num_procs": 2
+        },
+        {
+          "final_clocks": [
+            1,
+            1
+          ],
+          "timestamps": [
+            1,
+            1
+          ]
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

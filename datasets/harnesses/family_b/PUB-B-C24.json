@@ -1,0 +1,293 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "def propose_cert(inst: dict) -> dict:\n    n, cur = inst['num_nodes'], inst['initial_holder']\n    vc = [0] * n\n    vc[cur] = 1\n    for src, dst in inst['hops']:\n        if src != cur or dst != (cur + 1) % n:\n            return {'valid': False, 'final_holder': -1, 'visit_counts': [], 'full_rotations': -1}\n        cur = dst\n        vc[cur] += 1\n    return {'valid': True, 'final_holder': cur, 'visit_counts': vc, 'full_rotations': len(inst['hops']) // n}\n",
+  "id": "PUB-B-C24",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "hops": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "initial_holder": 0,
+          "num_nodes": 3
+        },
+        {
+          "final_holder": -1,
+          "full_rotations": -1,
+          "valid": false,
+          "visit_counts": []
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c24_mut_1"
+    },
+    {
+      "args": [
+        {
+          "hops": [
+            [
+              0,
+              2
+            ]
+          ],
+          "initial_holder": 0,
+          "num_nodes": 3
+        },
+        {
+          "final_holder": 2,
+          "full_rotations": 0,
+          "valid": true,
+          "visit_counts": [
+            1,
+            0,
+            1
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c24_mut_2"
+    },
+    {
+      "args": [
+        {
+          "hops": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "initial_holder": 0,
+          "num_nodes": 3
+        },
+        {
+          "final_holder": 0,
+          "full_rotations": 1,
+          "valid": true,
+          "visit_counts": [
+            1,
+            1,
+            1
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c24_mut_3"
+    },
+    {
+      "args": [
+        {
+          "hops": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "initial_holder": 0,
+          "num_nodes": 3
+        },
+        {
+          "final_holder": 1,
+          "full_rotations": 1,
+          "valid": true,
+          "visit_counts": [
+            2,
+            1,
+            1
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c24_mut_4"
+    },
+    {
+      "args": [
+        {
+          "hops": [
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "initial_holder": 2,
+          "num_nodes": 4
+        },
+        {
+          "final_holder": 0,
+          "full_rotations": 1,
+          "valid": true,
+          "visit_counts": [
+            1,
+            0,
+            1,
+            1
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_c24_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "hops": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "initial_holder": 0,
+          "num_nodes": 3
+        },
+        {
+          "final_holder": 0,
+          "full_rotations": 1,
+          "valid": true,
+          "visit_counts": [
+            2,
+            1,
+            1
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "hops": [
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "initial_holder": 2,
+          "num_nodes": 4
+        },
+        {
+          "final_holder": 0,
+          "full_rotations": 0,
+          "valid": true,
+          "visit_counts": [
+            1,
+            0,
+            1,
+            1
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "hops": [
+            [
+              0,
+              2
+            ]
+          ],
+          "initial_holder": 0,
+          "num_nodes": 3
+        },
+        {
+          "final_holder": -1,
+          "full_rotations": -1,
+          "valid": false,
+          "visit_counts": []
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "hops": [],
+          "initial_holder": 1,
+          "num_nodes": 2
+        },
+        {
+          "final_holder": 1,
+          "full_rotations": 0,
+          "valid": true,
+          "visit_counts": [
+            0,
+            1
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "hops": [
+            [
+              1,
+              2
+            ],
+            [
+              0,
+              1
+            ]
+          ],
+          "initial_holder": 1,
+          "num_nodes": 3
+        },
+        {
+          "final_holder": -1,
+          "full_rotations": -1,
+          "valid": false,
+          "visit_counts": []
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

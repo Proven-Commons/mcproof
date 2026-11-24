@@ -1,0 +1,516 @@
+{
+  "entry_fn": "verify",
+  "family": "B",
+  "generator_source": "from fractions import Fraction\ndef propose_cert(inst: dict) -> dict:\n    A, b, c = inst['A'], inst['b'], inst['c']\n    m, n = len(A), len(c)\n    # Exact vertex enumeration for 2D/3D small LP instances\n    from itertools import combinations\n    rows = [(A[i], b[i]) for i in range(m)] + [([1 if j == k else 0 for j in range(n)], 0) for k in range(n)]\n    best_x, best_v = None, None\n    for comb in combinations(rows, n):\n        M = [[Fraction(r[0][j], 1) for j in range(n)] for r in comb]\n        rhs = [Fraction(r[1], 1) for r in comb]\n        ok = True\n        for col in range(n):\n            p = next((i for i in range(col, n) if M[i][col] != 0), None)\n            if p is None: ok = False; break\n            M[col], M[p], rhs[col], rhs[p] = M[p], M[col], rhs[p], rhs[col]\n            pv = M[col][col]; sc = Fraction(pv.denominator, pv.numerator)\n            M[col] = [z * sc for z in M[col]]; rhs[col] *= sc\n            for i in range(n):\n                if i != col and M[i][col] != 0:\n                    f = M[i][col]; M[i] = [M[i][j] - f * M[col][j] for j in range(n)]; rhs[i] -= f * rhs[col]\n        if not ok: continue\n        if all(x >= 0 for x in rhs) and all(sum(A[i][j] * rhs[j] for j in range(n)) >= b[i] for i in range(m)):\n            val = sum(c[j] * rhs[j] for j in range(n))\n            if best_v is None or val < best_v: best_v, best_x = val, rhs\n    drows = [([A[i][j] for i in range(m)], c[j]) for j in range(n)] + [([-1 if i == k else 0 for i in range(m)], 0) for k in range(m)]\n    best_y = None\n    for comb in combinations(drows, m):\n        M = [[Fraction(r[0][i], 1) for i in range(m)] for r in comb]\n        rhs = [Fraction(r[1], 1) for r in comb]\n        ok = True\n        for col in range(m):\n            p = next((i for i in range(col, m) if M[i][col] != 0), None)\n            if p is None: ok = False; break\n            M[col], M[p], rhs[col], rhs[p] = M[p], M[col], rhs[p], rhs[col]\n            pv = M[col][col]; sc = Fraction(pv.denominator, pv.numerator)\n            M[col] = [z * sc for z in M[col]]; rhs[col] *= sc\n            for i in range(m):\n                if i != col and M[i][col] != 0:\n                    f = M[i][col]; M[i] = [M[i][j] - f * M[col][j] for j in range(m)]; rhs[i] -= f * rhs[col]\n        if not ok: continue\n        if all(y >= 0 for y in rhs) and all(sum(A[i][j] * rhs[i] for i in range(m)) <= c[j] for j in range(n)):\n            if sum(b[i] * rhs[i] for i in range(m)) == best_v: best_y = rhs; break\n    return {'x': [[v.numerator, v.denominator] for v in best_x], 'y': [[v.numerator, v.denominator] for v in best_y], 'obj': [best_v.numerator, best_v.denominator]}\n",
+  "id": "PUB-B-V07",
+  "planted_mutations": [
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              2
+            ],
+            [
+              3,
+              1
+            ]
+          ],
+          "b": [
+            4,
+            5
+          ],
+          "c": [
+            3,
+            2
+          ]
+        },
+        {
+          "obj": [
+            0,
+            1
+          ],
+          "x": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ],
+          "y": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v07_mut_1"
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              2
+            ],
+            [
+              3,
+              1
+            ]
+          ],
+          "b": [
+            4,
+            5
+          ],
+          "c": [
+            3,
+            2
+          ]
+        },
+        {
+          "obj": [
+            32,
+            5
+          ],
+          "x": [
+            [
+              6,
+              5
+            ],
+            [
+              7,
+              5
+            ]
+          ],
+          "y": [
+            [
+              1,
+              5
+            ],
+            [
+              8,
+              5
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v07_mut_2"
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              2
+            ],
+            [
+              3,
+              1
+            ]
+          ],
+          "b": [
+            4,
+            5
+          ],
+          "c": [
+            3,
+            2
+          ]
+        },
+        {
+          "obj": [
+            32,
+            5
+          ],
+          "x": [
+            [
+              12,
+              10
+            ],
+            [
+              7,
+              5
+            ]
+          ],
+          "y": [
+            [
+              1,
+              5
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v07_mut_3"
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              2
+            ],
+            [
+              3,
+              1
+            ]
+          ],
+          "b": [
+            4,
+            5
+          ],
+          "c": [
+            3,
+            2
+          ]
+        },
+        {
+          "obj": [
+            33,
+            5
+          ],
+          "x": [
+            [
+              6,
+              5
+            ],
+            [
+              7,
+              5
+            ]
+          ],
+          "y": [
+            [
+              1,
+              5
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v07_mut_4"
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              1
+            ]
+          ],
+          "b": [
+            2,
+            3
+          ],
+          "c": [
+            4,
+            1
+          ]
+        },
+        {
+          "obj": [
+            11,
+            1
+          ],
+          "x": [
+            [
+              -2,
+              1
+            ],
+            [
+              19,
+              1
+            ]
+          ],
+          "y": [
+            [
+              4,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {},
+      "name": "pub_b_v07_mut_5"
+    }
+  ],
+  "valid_cases": [
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              2
+            ],
+            [
+              3,
+              1
+            ]
+          ],
+          "b": [
+            4,
+            5
+          ],
+          "c": [
+            3,
+            2
+          ]
+        },
+        {
+          "obj": [
+            32,
+            5
+          ],
+          "x": [
+            [
+              6,
+              5
+            ],
+            [
+              7,
+              5
+            ]
+          ],
+          "y": [
+            [
+              3,
+              5
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              1
+            ],
+            [
+              2,
+              1
+            ]
+          ],
+          "b": [
+            3,
+            4
+          ],
+          "c": [
+            5,
+            4
+          ]
+        },
+        {
+          "obj": [
+            13,
+            1
+          ],
+          "x": [
+            [
+              1,
+              1
+            ],
+            [
+              2,
+              1
+            ]
+          ],
+          "y": [
+            [
+              3,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              2,
+              1
+            ],
+            [
+              1,
+              3
+            ]
+          ],
+          "b": [
+            4,
+            5
+          ],
+          "c": [
+            2,
+            3
+          ]
+        },
+        {
+          "obj": [
+            32,
+            5
+          ],
+          "x": [
+            [
+              7,
+              5
+            ],
+            [
+              6,
+              5
+            ]
+          ],
+          "y": [
+            [
+              3,
+              5
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              1
+            ]
+          ],
+          "b": [
+            2,
+            3
+          ],
+          "c": [
+            4,
+            1
+          ]
+        },
+        {
+          "obj": [
+            11,
+            1
+          ],
+          "x": [
+            [
+              2,
+              1
+            ],
+            [
+              3,
+              1
+            ]
+          ],
+          "y": [
+            [
+              4,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    },
+    {
+      "args": [
+        {
+          "A": [
+            [
+              1,
+              1
+            ]
+          ],
+          "b": [
+            5
+          ],
+          "c": [
+            2,
+            7
+          ]
+        },
+        {
+          "obj": [
+            10,
+            1
+          ],
+          "x": [
+            [
+              5,
+              1
+            ],
+            [
+              0,
+              1
+            ]
+          ],
+          "y": [
+            [
+              2,
+              1
+            ]
+          ]
+        }
+      ],
+      "kwargs": {}
+    }
+  ]
+}

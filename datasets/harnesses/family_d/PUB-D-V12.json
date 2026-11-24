@@ -1,0 +1,14 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "D",
+  "id": "PUB-D-V12",
+  "spec_meta": {
+    "challenge_lean": "namespace PubDV12\ndef nextDelay (cur cap : Nat) : Nat := Nat.min (2 * cur) cap\ntheorem capped_backoff_le_max (cur cap : Nat) : nextDelay cur cap \u2264 cap := by sorry\nend PubDV12\n",
+    "module_title": "RetryBackoffCap",
+    "positive_lean": "namespace PubDV12\n\ndef nextDelay (cur cap : Nat) : Nat := Nat.min (2 * cur) cap\n\ntheorem capped_backoff_le_max (cur cap : Nat) : nextDelay cur cap \u2264 cap := by\n  unfold nextDelay\n  simp only [Nat.min_def]\n  split <;> omega\n\nend PubDV12\n",
+    "theorem_names": [
+      "PubDV12.capped_backoff_le_max"
+    ],
+    "verdict_sha": "1968927da7cdd0cf01fffe5c4df477606d3e4730"
+  }
+}

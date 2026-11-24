@@ -1,0 +1,12 @@
+{
+  "challenge_lean": "namespace PubAC20\ndef WeakRecvSpec (_localTs _msgTs nextTs : Nat) : Prop := nextTs \u2265 0\ndef resetClock (_localTs _msgTs : Nat) : Nat := 0\ndef lamportRecv (localTs msgTs : Nat) : Nat := Nat.max localTs msgTs + 1\ntheorem resetClock_meets_weak (l m : Nat) : WeakRecvSpec l m (resetClock l m) := by sorry\ntheorem lamportRecv_causal (localTs msgTs : Nat) : lamportRecv localTs msgTs > localTs \u2227 lamportRecv localTs msgTs > msgTs := by sorry\nend PubAC20\n",
+  "family": "A",
+  "id": "PUB-A-C20",
+  "permitted_axioms": [
+    "propext",
+    "Classical.choice",
+    "Quot.sound"
+  ],
+  "theorem_name": "PubAC20.lamportRecv_causal",
+  "trap_kind": "weak_statement_vacuous_trap"
+}

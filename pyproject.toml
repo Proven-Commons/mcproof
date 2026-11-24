@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcproof"
+version = "0.1.0"
+description = "Deterministic Tier 2 formal verification oracle harness, Plane 1 specification, datasets, weft compiler, 4-layer stack, and verification suite for the Siliconcordat Formal Verification MDE."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Apache-2.0 AND CC-BY-4.0"}
+authors = [
+  {name = "Proven Commons"}
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "numpy>=1.26"]
+
+[project.scripts]
+mcproof = "mcproof.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "compile/tests", "stack/tests"]
+pythonpath = ["src", "tests", "compile/src", "stack/src"]
+addopts = "-q"
+filterwarnings = [
+  "ignore:assertions not in test modules or plugins will be ignored:pytest.PytestConfigWarning",
+]

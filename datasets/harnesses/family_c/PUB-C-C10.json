@@ -1,0 +1,15 @@
+{
+  "expected_tier": "PROVEN",
+  "family": "C",
+  "id": "PUB-C-C10",
+  "oracle_type": "verdict_audit",
+  "spec_meta": {
+    "expected_axioms": [
+      "propext",
+      "Quot.sound"
+    ],
+    "expected_verdict": "faithful",
+    "source_commit": "a124132251b1a8f71feb781afd9ec257fda84350",
+    "verdict_id": "audit-comb-handshake-faithful"
+  }
+}

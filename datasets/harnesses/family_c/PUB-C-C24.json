@@ -1,0 +1,15 @@
+{
+  "expected_tier": "CONJECTURE",
+  "family": "C",
+  "id": "PUB-C-C24",
+  "oracle_type": "f0_claim_gate",
+  "spec_meta": {
+    "cert_artifact_bytes_utf8": "{\"selected_bank\":\"mcproof-f0-anchor\",\"verified_rows\":128}\n",
+    "cert_artifact_sha256": "6b581846dbc0e5dbbb4014ff12922f38736b7632423c1cdc2a02df1541f83268",
+    "expected_chart_bucket": "claimed",
+    "expected_f0_tier": "claimed",
+    "head_sha": "442b5cc1b2b2fdd352ebe20a382c5e0a5a5a1ef1",
+    "matches_cert": false,
+    "pr": 308
+  }
+}
