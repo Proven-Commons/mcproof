@@ -157,6 +157,8 @@ class LeanBarRulesAndSokoTest(unittest.TestCase):
             ("@[init]\ndef evilInit : IO Unit := pure ()\ntheorem t (n : Nat) : n = n := rfl\n", "FORBIDDEN_INIT_ATTRIBUTE"),
             ("@[builtin_init]\ndef evilInit : IO Unit := pure ()\ntheorem t (n : Nat) : n = n := rfl\n", "FORBIDDEN_INIT_ATTRIBUTE"),
             ("attribute [builtin_init] evilInit\ntheorem t (n : Nat) : n = n := rfl\n", "FORBIDDEN_INIT_ATTRIBUTE"),
+            ("initialize do pure ()\ntheorem t (n : Nat) : n = n := rfl\n", "FORBIDDEN_INIT_ATTRIBUTE"),
+            ("builtin_initialize do pure ()\ntheorem t (n : Nat) : n = n := rfl\n", "FORBIDDEN_INIT_ATTRIBUTE"),
             ("#guard_msgs in\ntheorem t (n : Nat) : n = n := rfl\n", "FORBIDDEN_EVAL_COMMAND"),
             ("#guard 1 + 1 == 2\ntheorem t (n : Nat) : n = n := rfl\n", "FORBIDDEN_EVAL_COMMAND"),
             ("def f (n : Nat) : Nat := panic! \"boom\"\ntheorem t (n : Nat) : n = n := rfl\n", "FORBIDDEN_PANIC"),
@@ -175,6 +177,8 @@ class LeanBarRulesAndSokoTest(unittest.TestCase):
             clean_controls = [
                 "export Nat (succ)\ntheorem t (n : Nat) : n + 0 = n := Nat.add_zero n\n",
                 "theorem init_eq (n : Nat) : n = n := rfl\nattribute [simp] init_eq\n",
+                "def initialize' : Nat := 1\ndef my_initialize : Nat := initialize'\ntheorem t (n : Nat) : n = n := rfl\n",
+                'def msg (n : Nat) : String := s!"#eval dbgTraceVal panic! initialize {n}"\ntheorem t (n : Nat) : n = n := rfl\n',
             ]
             for src in clean_controls:
                 with self.subTest(control=src.splitlines()[0]):
@@ -253,6 +257,98 @@ class LeanBarRulesAndSokoTest(unittest.TestCase):
                 self.assertEqual(len(captured), 1)
                 self.assertIn(needle, captured[0])
                 self.assertEqual(captured[0].count('"') % 2, 0, f"unbalanced quotes passed to soko: {captured[0]!r}")
+
+        # Interpolated string (`s!"..."`, `f!"..."`, `m!"..."`, custom `<ident>!"..."`)
+        # `{...}` nesting with embedded `'"'`, `'\\"'`, nested `s!"..."`, and comments/strings
+        # must never desynchronize BAR_FORBIDDEN_RULES, soko handoff, or _lean_commands_that_may_run.
+        interp_hide_cases = [
+            (
+                "s_interp_float_line_comment",
+                'def x := s!"{\'"\'}"\ntheorem fspec (x : Float) : x = x := rfl\n-- "\n',
+                "Float",
+                None,
+                None,
+            ),
+            (
+                "f_interp_export_block_comment",
+                'def x := f!"{\'"\'}"\n@[export evil_sym]\ndef f (n : Nat) : Nat := n\n/- " -/\n',
+                "@[export evil_sym]",
+                "FORBIDDEN_EXPORT_ATTR",
+                None,
+            ),
+            (
+                "m_interp_eval_line_comment",
+                'def x := m!"{\'"\'}"\n#eval IO.println "pwn"\n-- "\n',
+                "#eval",
+                "FORBIDDEN_EVAL_COMMAND",
+                "#eval",
+            ),
+            (
+                "custom_interp_dbg_and_escaped_dquote",
+                'def x := my!"{\'\\"\'}"\ndef f (n : Nat) : Nat := dbgTraceVal n\n-- "\n',
+                "dbgTraceVal",
+                "FORBIDDEN_DBG",
+                None,
+            ),
+            (
+                "nested_interp_panic",
+                'def x := s!"a {s!"{\'"\'}"} b"\ndef f : Nat := panic! "boom"\n-- "\n',
+                "panic!",
+                "FORBIDDEN_PANIC",
+                None,
+            ),
+            (
+                "interp_struct_and_comment_braces_init",
+                'def x := s!"{ /- " } -/ \'}\' }"\ninitialize do pure ()\n-- "\n',
+                "initialize",
+                "FORBIDDEN_INIT_ATTRIBUTE",
+                None,
+            ),
+            (
+                "payload_inside_interp_expr",
+                'def x := s!"val {dbgTraceVal 1}"\ntheorem t (n : Nat) : n = n := rfl\n',
+                "dbgTraceVal",
+                "FORBIDDEN_DBG",
+                None,
+            ),
+            (
+                "run_cmd_inside_interp_expr",
+                'def x := s!"val {run_cmd pure ()}"\ntheorem t (n : Nat) : n = n := rfl\n',
+                "run_cmd",
+                "METAPROGRAM_ESCAPE",
+                "run_cmd",
+            ),
+        ]
+        for label, src, needle, expected_rule, expected_cmd in interp_hide_cases:
+            with self.subTest(interp_case=label):
+                sanitized = lean_harness.strip_lean_comments_and_strings(src, blank_chars=True)
+                self.assertIn(needle, sanitized)
+                self.assertEqual(sanitized.count('"') % 2, 0, f"odd quote count in {sanitized!r}")
+                captured_interp: list[str] = []
+
+                def _capture_soko_interp(passed_src: str, label: str = "<lean>", strict_init_only: bool = True):
+                    captured_interp.append(passed_src)
+                    return {"label": label, "ok": True, "finding_count": 0, "findings": []}
+
+                fake_soko = types.SimpleNamespace(audit_lean4_source=_capture_soko_interp)
+                with mock.patch.object(lean_harness, "_load_soko_lean4_auditor", return_value=fake_soko):
+                    rep = lean_harness.lint_lean4_source(
+                        src, label=f"<{label}>", check_vacuous=False, require_theorem=False
+                    )
+                self.assertEqual(len(captured_interp), 1)
+                self.assertIn(needle, captured_interp[0])
+                self.assertEqual(captured_interp[0].count('"') % 2, 0)
+                if expected_rule is not None:
+                    self.assertFalse(rep["passed"])
+                    self.assertIn(expected_rule, {f["rule"] for f in rep["findings"]})
+                if expected_cmd is not None:
+                    self.assertIn(expected_cmd, lean_harness._lean_commands_that_may_run(src))
+
+        # Literal text inside interpolated strings must NOT trigger command detection.
+        self.assertEqual(
+            lean_harness._lean_commands_that_may_run('def x := s!"#eval run_cmd {1}"\n'),
+            [],
+        )
 
     def test_t5_soko_auditor_fail_closed_and_exec_module_cleanup(self) -> None:
         src = "theorem t (n : Nat) : n = n := rfl\n"
@@ -539,9 +635,20 @@ class EnvScrubAndConfinementTest(unittest.TestCase):
 
 
 class RationalDigitCapTest(unittest.TestCase):
-    """T8: Pre-int() rational digit cap and bounded dual_objective output."""
+    """T8: Pre-int() rational digit cap and bounded formatting across all LP outputs."""
 
-    def test_t8_rational_lp_blocks_oversized_digits_and_caps_dual_objective(self) -> None:
+    @staticmethod
+    def _coprime_59_digit_denominators(count: int) -> list[int]:
+        """Generate `count` pairwise-coprime 59-digit integers (< 10^60) deterministically."""
+        vals: list[int] = []
+        cand = 10**58 + 1
+        while len(vals) < count:
+            if all(math.gcd(cand, prev) == 1 for prev in vals):
+                vals.append(cand)
+            cand += 2
+        return vals
+
+    def test_t8_rational_lp_blocks_oversized_digits_and_formats_huge_rationals_without_false_reject(self) -> None:
         huge = "9" * 5000
         old_limit = sys.get_int_max_str_digits()
         sys.set_int_max_str_digits(0)
@@ -562,31 +669,72 @@ class RationalDigitCapTest(unittest.TestCase):
         finally:
             sys.set_int_max_str_digits(old_limit)
 
-        # Construct 10 coprime ~30-digit denominators (each <= 10^60) whose exact sum
-        # exceeds MAX_DUAL_OBJECTIVE_BITS (~850 bits) -> must be capped cleanly.
-        primes = [
-            10**29 + 319,
-            10**29 + 363,
-            10**29 + 381,
-            10**29 + 417,
-            10**29 + 441,
-            10**29 + 471,
-            10**29 + 477,
-            10**29 + 523,
-            10**29 + 531,
-            10**29 + 567,
-        ]
-        rep_cap = domain_protocol.verify_rational_lp_certificate({
+        # Valid 6-row 59-digit coprime certificate exceeds MAX_DUAL_OBJECTIVE_BITS (~1157 bits > 850),
+        # yet every input is within MAX_CERT_ABS_INT (10^60) and mathematically valid -> VERIFIED
+        # with bounded dual_objective summary (never falsely REJECTED).
+        coprimes6 = self._coprime_59_digit_denominators(6)
+        rep_valid = domain_protocol.verify_rational_lp_certificate({
             "mode": "bounds",
-            "A": [[1] for _ in primes],
-            "b": [f"1/{p}" for p in primes],
-            "c": [10],
-            "y": [1 for _ in primes],
+            "A": [[1] for _ in coprimes6],
+            "b": [f"1/{d}" for d in coprimes6],
+            "c": [6],
+            "y": [1 for _ in coprimes6],
             "claimed_lower_bound": 0,
         })
-        self.assertFalse(rep_cap["passed"])
-        self.assertEqual(rep_cap["dual_objective"], "<capped>")
-        self.assertIn("LP_DUAL_OBJECTIVE_DIGIT_CAP", {f["rule"] for f in rep_cap["findings"]})
+        self.assertTrue(rep_valid["passed"], f"valid cert falsely rejected: {rep_valid}")
+        self.assertEqual(rep_valid["epistemic_status"], "VERIFIED")
+        self.assertEqual(rep_valid["findings"], [])
+        self.assertTrue(rep_valid["dual_objective"].startswith("<rational:"))
+        self.assertTrue(rep_valid["dual_objective"].endswith(">"))
+        self.assertLess(len(rep_valid["dual_objective"]), 64)
+
+        # Invalid 80-row 59-digit coprime certificates produce ~4640-digit denominators (> Python's
+        # default 4300-digit int_max_str_digits cap). Under the default cap, ALL four finding
+        # formatting paths must return clean REJECTED reports with ZERO uncaught ValueError.
+        coprimes80 = self._coprime_59_digit_denominators(80)
+        self.assertGreater(sys.get_int_max_str_digits(), 0)
+
+        rep_below = domain_protocol.verify_rational_lp_certificate({
+            "mode": "bounds",
+            "A": [[1] for _ in coprimes80],
+            "b": [f"1/{d}" for d in coprimes80],
+            "c": [80],
+            "y": [1 for _ in coprimes80],
+            "claimed_lower_bound": 1,
+        })
+        self.assertFalse(rep_below["passed"])
+        self.assertEqual(rep_below["epistemic_status"], "REJECTED")
+        self.assertEqual([f["rule"] for f in rep_below["findings"]], ["LP_DUAL_OBJECTIVE_BELOW_CLAIM"])
+        self.assertIn("<rational:", rep_below["findings"][0]["message"])
+        self.assertTrue(rep_below["dual_objective"].startswith("<rational:"))
+
+        rep_infeas_col = domain_protocol.verify_rational_lp_certificate({
+            "mode": "bounds",
+            "A": [[f"1/{d}"] for d in coprimes80],
+            "b": [0 for _ in coprimes80],
+            "c": [0],
+            "y": [1 for _ in coprimes80],
+            "claimed_lower_bound": 0,
+        })
+        self.assertFalse(rep_infeas_col["passed"])
+        self.assertEqual([f["rule"] for f in rep_infeas_col["findings"]], ["LP_DUAL_INFEASIBLE_COLUMN"])
+        self.assertIn("<rational:", rep_infeas_col["findings"][0]["message"])
+        self.assertEqual(rep_infeas_col["dual_objective"], "0/1")
+
+        rep_farkas = domain_protocol.verify_rational_lp_certificate({
+            "mode": "infeasible",
+            "A": [[f"1/{d}"] for d in coprimes80],
+            "b": [f"-1/{d}" for d in coprimes80],
+            "y": [1 for _ in coprimes80],
+        })
+        self.assertFalse(rep_farkas["passed"])
+        self.assertEqual(
+            [f["rule"] for f in rep_farkas["findings"]],
+            ["LP_FARKAS_POSITIVE_COLUMN", "LP_FARKAS_NONPOSITIVE_WITNESS"],
+        )
+        for finding in rep_farkas["findings"]:
+            self.assertIn("<rational:", finding["message"])
+        self.assertTrue(rep_farkas["dual_objective"].startswith("<rational:-"))
 
 
 if __name__ == "__main__":

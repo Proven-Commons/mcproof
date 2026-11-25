@@ -61,9 +61,13 @@ BAR_FORBIDDEN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
         ),
     ),
     (
-        # `attribute [init]` and `@[init]` / `@[builtin_init]` run on import.
+        # `attribute [init]`, `@[init]` / `@[builtin_init]`, and `initialize` /
+        # `builtin_initialize` declarations run IO on import or elaboration.
         "FORBIDDEN_INIT_ATTRIBUTE",
-        re.compile(r"(?:@|attribute\s*)\[[^\]]*\b(?:builtin_init|init)\b"),
+        re.compile(
+            r"(?:@|attribute\s*)\[[^\]]*\b(?:builtin_init|init)\b"
+            r"|(?<![\w.'»«])(?:builtin_initialize|initialize)(?![\w.'»«])"
+        ),
     ),
     (
         # `@[export ...]` / `attribute [export ...]` rewrites compiled symbol names.
@@ -589,6 +593,9 @@ def strip_lean_comments_and_strings(src: str, *, blank_chars: bool = False) -> s
     """Strip `--` line comments, nested `/- ... -/` block comments, and string literals while keeping line numbers.
 
     Raw strings (`r"..."`, `r#"..."#`, any number of hashes) do not treat `\\` as an escape.
+    Interpolated strings (`s!"..."`, `f!"..."`, `m!"..."`, and custom `<ident>!"..."` macros)
+    track nested `{...}` Lean expressions so embedded character literals (`'"'`, `'\\"'`),
+    strings, comments, and nested interpolations cannot desynchronize quote parity.
     Character literals, including `'"'` and escaped forms, are kept by default so definition
     comparisons stay exact; pass `blank_chars=True` to replace char literals with `'c'` and
     replace `"` inside `«...»` identifiers so downstream line/string scanners (e.g., `soko`)
@@ -597,7 +604,27 @@ def strip_lean_comments_and_strings(src: str, *, blank_chars: bool = False) -> s
     out: list[str] = []
     i = 0
     n = len(src)
+    interp_braces: list[int] = []
     while i < n:
+        if interp_braces and interp_braces[-1] == 0:
+            ch = src[i]
+            if ch == "\\" and i + 1 < n:
+                if src[i + 1] == "\n":
+                    out.append("\n")
+                i += 2
+            elif ch == "{":
+                out.append('" { ')
+                interp_braces[-1] = 1
+                i += 1
+            elif ch == '"':
+                out.append('"')
+                interp_braces.pop()
+                i += 1
+            else:
+                if ch == "\n":
+                    out.append("\n")
+                i += 1
+            continue
         if src.startswith("/-", i):
             depth = 1
             i += 2
@@ -620,13 +647,32 @@ def strip_lean_comments_and_strings(src: str, *, blank_chars: bool = False) -> s
         if _is_raw_str_start(src, i):
             i = _append_raw_string(src, i, out)
             continue
+        if src[i] == "{" and interp_braces:
+            interp_braces[-1] += 1
+            out.append("{")
+            i += 1
+            continue
+        if src[i] == "}" and interp_braces:
+            interp_braces[-1] -= 1
+            if interp_braces[-1] == 0:
+                out.append(' } "')
+            else:
+                out.append("}")
+            i += 1
+            continue
         if src[i] == "«" or _is_lean_id_first(src[i]):
             j = _lean_ident_end(src, i)
             ident = src[i:j]
+            is_interp = j > i and src[j - 1] == "!" and j < n and src[j] == '"'
             if blank_chars and '"' in ident:
                 ident = ident.replace('"', "_")
             out.append(ident)
-            i = j
+            if is_interp:
+                out.append('"')
+                interp_braces.append(0)
+                i = j + 1
+            else:
+                i = j
             continue
         if src[i] == "'":
             end = _char_lit_end(src, i)
@@ -656,6 +702,8 @@ def strip_lean_comments_and_strings(src: str, *, blank_chars: bool = False) -> s
             continue
         out.append(src[i])
         i += 1
+    if interp_braces and interp_braces[-1] == 0:
+        out.append('"')
     return "".join(out)
 
 
@@ -2021,16 +2069,30 @@ def _raw_string_resume(src: str, i: int) -> tuple[int, int | None]:
 
 
 def _lean_commands_that_may_run(src: str) -> list[str]:
-    """Commands Lean can elaborate, including one hidden by a short raw-string closer.
+    """Commands Lean can elaborate, including one hidden by a short raw-string closer or interpolation.
 
-    A command inside a terminated string or comment is not included. The comment
-    stripper is unchanged, so a compile that must still run those payloads is
-    unchanged too.
+    A command inside a terminated string or comment is not included, while commands inside
+    or following `{...}` interpolated string expressions (`s!"..."`, `f!"..."`, `m!"..."`,
+    `<ident>!"..."`) are still scanned.
     """
     found: list[str] = []
     n = len(src)
     i = 0
+    interp_braces: list[int] = []
     while i < n:
+        if interp_braces and interp_braces[-1] == 0:
+            ch = src[i]
+            if ch == "\\" and i + 1 < n:
+                i += 2
+            elif ch == "{":
+                interp_braces[-1] = 1
+                i += 1
+            elif ch == '"':
+                interp_braces.pop()
+                i += 1
+            else:
+                i += 1
+            continue
         if src.startswith("/-", i):
             depth = 1
             i += 2
@@ -2055,6 +2117,14 @@ def _lean_commands_that_may_run(src: str) -> list[str]:
             else:
                 i = end if end > i else i + 1
             continue
+        if src[i] == "{" and interp_braces:
+            interp_braces[-1] += 1
+            i += 1
+            continue
+        if src[i] == "}" and interp_braces:
+            interp_braces[-1] -= 1
+            i += 1
+            continue
         match = _LAKE_COMMAND_RE.match(src, i)
         if match:
             cmd = match.group(0)
@@ -2078,7 +2148,12 @@ def _lean_commands_that_may_run(src: str) -> list[str]:
                 i = end
                 continue
         if src[i] == "«" or _is_lean_id_first(src[i]):
-            i = _lean_ident_end(src, i)
+            j = _lean_ident_end(src, i)
+            if j > i and src[j - 1] == "!" and j < n and src[j] == '"':
+                interp_braces.append(0)
+                i = j + 1
+            else:
+                i = j
             continue
         i += 1
     return found
