@@ -61,15 +61,29 @@ BAR_FORBIDDEN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
         ),
     ),
     (
-        # `attribute [init]` is not `@[init]`. It still runs when the module is imported.
-        # The marker may sit mid-line or be split across a newline (`attribute\n[init]`).
+        # `attribute [init]` and `@[init]` / `@[builtin_init]` run on import.
         "FORBIDDEN_INIT_ATTRIBUTE",
-        re.compile(r"attribute\s*\[[^\]]*\b(?:builtin_init|init)\b"),
+        re.compile(r"(?:@|attribute\s*)\[[^\]]*\b(?:builtin_init|init)\b"),
     ),
     (
-        # Not only at the start of a line. A mid-line `#eval` still runs during elaboration.
+        # `@[export ...]` / `attribute [export ...]` rewrites compiled symbol names.
+        "FORBIDDEN_EXPORT_ATTR",
+        re.compile(r"(?:@|attribute\s*)\[[^\]]*\bexport\b"),
+    ),
+    (
+        # Debug tracing hooks emit side-channel output outside kernel checking.
+        "FORBIDDEN_DBG",
+        re.compile(r"\b(?:dbg_trace|dbg_sleep|dbg_stack_trace|dbgTrace\w*|dbgSleep|dbgStackTrace)\b"),
+    ),
+    (
+        # Runtime panic macros abort extracted code instead of proving totality.
+        "FORBIDDEN_PANIC",
+        re.compile(r"(?<!\w)(?:panic!|unreachable!|assert!|debug_assert!)(?![\w!])|\b(?:panicWithDef|panicWithPosWithDecl)\b"),
+    ),
+    (
+        # Not only at the start of a line. A mid-line `#eval` or `#guard_msgs` still runs during elaboration.
         "FORBIDDEN_EVAL_COMMAND",
-        re.compile(r"#(?:eval|reduce|check|print|synth)\b"),
+        re.compile(r"#(?:eval|reduce|check|print|synth|guard_msgs|guard)\b"),
     ),
 )
 
@@ -78,6 +92,9 @@ BAR_FORBIDDEN_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
 # reach the kernel so those checks stay in place.
 COMPILE_BLOCKING_LINT_RULES = frozenset({
     "FORBIDDEN_INIT_ATTRIBUTE",
+    "FORBIDDEN_EXPORT_ATTR",
+    "FORBIDDEN_DBG",
+    "FORBIDDEN_PANIC",
     "FORBIDDEN_EVAL_COMMAND",
     "METAPROGRAM_ESCAPE",
     "SYNTAX_OVERRIDE_DECL",
@@ -142,6 +159,7 @@ except OSError:
     pass
 else:
     raise SystemExit(5)
+print("MCPROOF_PROBE_OK")
 raise SystemExit(0)
 """
 
@@ -167,8 +185,13 @@ def _toolchain_elan_home() -> str:
     return str(root) if (root / "bin").is_dir() else ""
 
 
-def _sandbox_env_pairs(caller_env: Mapping[str, str] | None) -> list[tuple[str, str]]:
-    """Allowlist passed to `env -i` and to `bwrap --setenv`. Nothing else crosses."""
+def _sandbox_env_pairs(
+    caller_env: Mapping[str, str] | None = None,
+    *,
+    harness_lean_path: str | None = None,
+) -> list[tuple[str, str]]:
+    """Allowlist passed to `env -i` and to `bwrap --setenv`. Caller env never crosses."""
+    _ = caller_env  # Intentionally ignored: caller env must never cross the sandbox boundary.
     elan = _toolchain_elan_home()
     path_parts = ["/usr/bin", "/bin"]
     if elan:
@@ -182,9 +205,8 @@ def _sandbox_env_pairs(caller_env: Mapping[str, str] | None) -> list[tuple[str, 
     ]
     if elan:
         pairs.append(("ELAN_HOME", elan))
-    lean_path = (caller_env or {}).get("LEAN_PATH")
-    if lean_path:
-        pairs.append(("LEAN_PATH", lean_path))
+    if harness_lean_path:
+        pairs.append(("LEAN_PATH", harness_lean_path))
     return pairs
 
 
@@ -194,6 +216,7 @@ def _confine_argv(
     cwd: Path,
     caller_env: Mapping[str, str] | None,
     readable_dirs: Sequence[Path],
+    harness_lean_path: str | None = None,
 ) -> list[str]:
     """`prlimit` + `env -i` + `bwrap` over the toolchain, not the host root."""
     prlimit_bin = shutil.which("prlimit")
@@ -206,7 +229,7 @@ def _confine_argv(
         )
     cwd_path = Path(cwd).resolve()
     cwd_s = str(cwd_path)
-    pairs = _sandbox_env_pairs(caller_env)
+    pairs = _sandbox_env_pairs(caller_env, harness_lean_path=harness_lean_path)
     argv: list[str] = [
         prlimit_bin,
         f"--cpu={_SANDBOX_CPU_SEC}",
@@ -269,14 +292,23 @@ def _spawn_confined(
     caller_env: Mapping[str, str] | None,
     timeout_sec: float,
     readable_dirs: Sequence[Path] = (),
+    harness_lean_path: str | None = None,
+    host_env: Mapping[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    argv = _confine_argv(cmd, cwd=cwd, caller_env=caller_env, readable_dirs=readable_dirs)
+    argv = _confine_argv(
+        cmd,
+        cwd=cwd,
+        caller_env=caller_env,
+        readable_dirs=readable_dirs,
+        harness_lean_path=harness_lean_path,
+    )
     return subprocess.run(
         argv,
         capture_output=True,
         text=True,
         timeout=timeout_sec,
         check=False,
+        env=dict(host_env) if host_env is not None else None,
     )
 
 
@@ -297,7 +329,8 @@ def linux_bwrap_functional(*, timeout_sec: float = 15.0) -> bool:
         _BWRAP_FUNCTIONAL = False
         return False
     sentinel = f"mcproof-sentinel-{uuid.uuid4().hex}"
-    os.environ["MCPROOF_SANDBOX_SENTINEL"] = sentinel
+    probe_host_env = dict(os.environ)
+    probe_host_env["MCPROOF_SANDBOX_SENTINEL"] = sentinel
     try:
         with tempfile.TemporaryDirectory(prefix="mcproof_bwrap_probe_") as tmp:
             script = Path(tmp) / "probe.py"
@@ -308,13 +341,12 @@ def linux_bwrap_functional(*, timeout_sec: float = 15.0) -> bool:
                 cwd=Path(tmp),
                 caller_env={},
                 timeout_sec=timeout_sec,
+                host_env=probe_host_env,
             )
     except (OSError, subprocess.TimeoutExpired, CandidateSandboxUnavailable):
         _BWRAP_FUNCTIONAL = False
         return False
-    finally:
-        os.environ.pop("MCPROOF_SANDBOX_SENTINEL", None)
-    _BWRAP_FUNCTIONAL = probe.returncode == 0
+    _BWRAP_FUNCTIONAL = probe.returncode == 0 and (probe.stdout or "").strip() == "MCPROOF_PROBE_OK"
     return _BWRAP_FUNCTIONAL
 
 
@@ -325,6 +357,7 @@ def run_confined_command(
     env: Mapping[str, str] | None = None,
     timeout_sec: float = 300,
     readable_dirs: Sequence[Path] = (),
+    harness_lean_path: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run `cmd` where the candidate cannot see the host.
 
@@ -345,6 +378,7 @@ def run_confined_command(
         caller_env=env,
         timeout_sec=timeout_sec,
         readable_dirs=readable_dirs,
+        harness_lean_path=harness_lean_path,
     )
 
 
@@ -408,7 +442,11 @@ def _load_soko_lean4_auditor() -> Any:
         raise RuntimeError(f"failed to load lean4_auditor from {soko_path}")
     mod = importlib.util.module_from_spec(spec)
     sys.modules["soko_lean4_auditor"] = mod
-    spec.loader.exec_module(mod)
+    try:
+        spec.loader.exec_module(mod)
+    except Exception as exc:
+        sys.modules.pop("soko_lean4_auditor", None)
+        raise RuntimeError(f"failed to execute lean4_auditor from {soko_path}: {exc}") from exc
     return mod
 
 
@@ -544,11 +582,14 @@ def _char_lit_end(src: str, i: int) -> int | None:
     return None
 
 
-def strip_lean_comments_and_strings(src: str) -> str:
+def strip_lean_comments_and_strings(src: str, *, blank_chars: bool = False) -> str:
     """Strip `--` line comments, nested `/- ... -/` block comments, and string literals while keeping line numbers.
 
     Raw strings (`r"..."`, `r#"..."#`, any number of hashes) do not treat `\\` as an escape.
-    Character literals, including `'"'` and escaped forms, are kept so a following command stays visible.
+    Character literals, including `'"'` and escaped forms, are kept by default so definition
+    comparisons stay exact; pass `blank_chars=True` to replace char literals with `'c'` and
+    replace `"` inside `«...»` identifiers so downstream line/string scanners (e.g., `soko`)
+    cannot be desynchronized by `'"'` or `«"»`.
     """
     out: list[str] = []
     i = 0
@@ -578,13 +619,20 @@ def strip_lean_comments_and_strings(src: str) -> str:
             continue
         if src[i] == "«" or _is_lean_id_first(src[i]):
             j = _lean_ident_end(src, i)
-            out.append(src[i:j])
+            ident = src[i:j]
+            if blank_chars and '"' in ident:
+                ident = ident.replace('"', "_")
+            out.append(ident)
             i = j
             continue
         if src[i] == "'":
             end = _char_lit_end(src, i)
             if end is not None:
-                out.append(src[i:end])
+                if blank_chars:
+                    nl_count = src.count("\n", i, end)
+                    out.append("\n" * nl_count + "'c'")
+                else:
+                    out.append(src[i:end])
                 i = end
                 continue
         if src[i] == '"':
@@ -1045,7 +1093,7 @@ def verify_lean4_prompt_obligations(
     if findings:
         return findings
 
-    proj_dir = (lean_project_dir or (repo_root() / "lean")).resolve()
+    proj_dir = _checked_project_dir(lean_project_dir or (repo_root() / "lean"))
     lean_bin = find_lean_tool("lean")
     env = _lean_env()
     lib_olean_dir = proj_dir / ".lake" / "build" / "lib" / "lean"
@@ -1071,10 +1119,7 @@ def verify_lean4_prompt_obligations(
         f"  let pairs : List (Name × Name × Name) := [{', '.join(pair_entries)}]\n"
         "  for (axN, fullN, shortN) in pairs do\n"
         "    let some specI := env.find? axN | IO.println s!\"MCPROOF_PSPEC_ERR\\tSPEC_ELAB_FAIL\\t{shortN}\"; continue\n"
-        "    let candOpt := match env.find? fullN with\n"
-        "      | some ci => some ci\n"
-        "      | none => env.find? shortN\n"
-        "    let some candI := candOpt | IO.println s!\"MCPROOF_PSPEC_ERR\\tMISSING_PROMPT_THEOREM_NAME\\t{shortN}\"; continue\n"
+        "    let some candI := env.find? fullN | IO.println s!\"MCPROOF_PSPEC_ERR\\tMISSING_PROMPT_THEOREM_NAME\\t{shortN}\"; continue\n"
         "    match candI with\n"
         "    | .thmInfo ct =>\n"
         "      let (ok, _) ← (Meta.isDefEq specI.type ct.type).run' {}\n"
@@ -1094,29 +1139,30 @@ def verify_lean4_prompt_obligations(
         lean_path_parts = [str(tdp)]
         if lib_olean_dir.is_dir():
             lean_path_parts.append(str(lib_olean_dir))
-        sysroot_proc = subprocess.run([lean_bin, "--print-libdir"], capture_output=True, text=True, check=False)
+        sysroot_proc = subprocess.run([lean_bin, "--print-libdir"], capture_output=True, text=True, env=env, check=False)
         if sysroot_proc.returncode == 0 and sysroot_proc.stdout.strip():
             lean_path_parts.append(sysroot_proc.stdout.strip())
-        run_env = dict(env)
-        run_env["LEAN_PATH"] = os.pathsep.join(lean_path_parts)
+        harness_lp = os.pathsep.join(lean_path_parts)
 
         readable = (lib_olean_dir,) if lib_olean_dir.is_dir() else ()
         try:
             c_proc = run_confined_command(
                 [lean_bin, "-j", "1", "-D", "Elab.async=false", str(cand_f), "-o", str(cand_o)],
                 cwd=tdp,
-                env=run_env,
+                env=env,
                 timeout_sec=timeout_sec,
                 readable_dirs=readable,
+                harness_lean_path=harness_lp,
             )
             if c_proc.returncode != 0:
                 return findings
             d_proc = run_confined_command(
                 [lean_bin, "-j", "1", "-D", "Elab.async=false", str(drv_f)],
                 cwd=tdp,
-                env=run_env,
+                env=env,
                 timeout_sec=timeout_sec,
                 readable_dirs=readable,
+                harness_lean_path=harness_lp,
             )
         except CandidateSandboxUnavailable as exc:
             findings.append({"line": 1, "rule": "SANDBOX_UNAVAILABLE", "message": str(exc)})
@@ -1159,7 +1205,7 @@ def verify_lean4_against_challenge(
     if findings:
         return findings
 
-    proj_dir = (lean_project_dir or (repo_root() / "lean")).resolve()
+    proj_dir = _checked_project_dir(lean_project_dir or (repo_root() / "lean"))
     lean_bin = find_lean_tool("lean")
     env = _lean_env()
     lib_olean_dir = proj_dir / ".lake" / "build" / "lib" / "lean"
@@ -1179,27 +1225,28 @@ def verify_lean4_against_challenge(
         lean_path_parts = [str(tdp)]
         if lib_olean_dir.is_dir():
             lean_path_parts.append(str(lib_olean_dir))
-        sysroot_proc = subprocess.run([lean_bin, "--print-libdir"], capture_output=True, text=True, check=False)
+        sysroot_proc = subprocess.run([lean_bin, "--print-libdir"], capture_output=True, text=True, env=env, check=False)
         if sysroot_proc.returncode == 0 and sysroot_proc.stdout.strip():
             lean_path_parts.append(sysroot_proc.stdout.strip())
-        run_env = dict(env)
-        run_env["LEAN_PATH"] = os.pathsep.join(lean_path_parts)
+        harness_lp = os.pathsep.join(lean_path_parts)
 
         readable = (lib_olean_dir,) if lib_olean_dir.is_dir() else ()
         try:
             s_proc = run_confined_command(
                 [lean_bin, "-j", "1", "-D", "Elab.async=false", str(spec_f), "-o", str(spec_o)],
                 cwd=tdp,
-                env=run_env,
+                env=env,
                 timeout_sec=timeout_sec,
                 readable_dirs=readable,
+                harness_lean_path=harness_lp,
             )
             c_proc = run_confined_command(
                 [lean_bin, "-j", "1", "-D", "Elab.async=false", str(cand_f), "-o", str(cand_o)],
                 cwd=tdp,
-                env=run_env,
+                env=env,
                 timeout_sec=timeout_sec,
                 readable_dirs=readable,
+                harness_lean_path=harness_lp,
             )
             if s_proc.returncode != 0 or c_proc.returncode != 0:
                 findings.append({
@@ -1211,9 +1258,10 @@ def verify_lean4_against_challenge(
             cmp_proc = run_confined_command(
                 [lean_bin, "-j", "1", "-D", "Elab.async=false", str(drv_f)],
                 cwd=tdp,
-                env=run_env,
+                env=env,
                 timeout_sec=timeout_sec,
                 readable_dirs=readable,
+                harness_lean_path=harness_lp,
             )
         except CandidateSandboxUnavailable as exc:
             findings.append({"line": 1, "rule": "SANDBOX_UNAVAILABLE", "message": str(exc)})
@@ -1303,10 +1351,34 @@ def lint_lean4_source(
 ) -> dict[str, Any]:
     """Run static Lean 4 source audits combining soko lean4_auditor, Proven-Commons bar rules, and WeakStatement checks."""
     soko_mod = _load_soko_lean4_auditor()
-    soko_rep = soko_mod.audit_lean4_source(source, label=label, strict_init_only=strict_init_only)
+    soko_source = strip_lean_comments_and_strings(source, blank_chars=True)
+    soko_rep = soko_mod.audit_lean4_source(soko_source, label=label, strict_init_only=strict_init_only)
+    if not isinstance(soko_rep, Mapping):
+        raise RuntimeError(f"soko lean4_auditor returned non-mapping result: {type(soko_rep).__name__}")
+    raw_soko_findings = soko_rep.get("findings")
+    if not isinstance(raw_soko_findings, list):
+        raise RuntimeError("soko lean4_auditor result missing list 'findings' field")
+    if "ok" in soko_rep:
+        soko_ok = soko_rep["ok"]
+    elif "passed" in soko_rep:
+        soko_ok = soko_rep["passed"]
+    else:
+        raise RuntimeError("soko lean4_auditor result missing bool 'ok'/'passed' status field")
+    if not isinstance(soko_ok, bool):
+        raise RuntimeError(f"soko lean4_auditor status field must be bool: {soko_ok!r}")
+    if "finding_count" in soko_rep and soko_rep["finding_count"] != len(raw_soko_findings):
+        raise RuntimeError(
+            f"soko lean4_auditor finding_count ({soko_rep['finding_count']!r}) != len(findings) ({len(raw_soko_findings)})"
+        )
+    if soko_ok and len(raw_soko_findings) > 0:
+        raise RuntimeError("soko lean4_auditor contradiction: ok/passed=True with non-empty findings")
+    if not soko_ok and len(raw_soko_findings) == 0:
+        raise RuntimeError("soko lean4_auditor fail-open: ok/passed=False with empty findings")
 
     findings: list[dict[str, Any]] = []
-    for f in soko_rep.get("findings", []):
+    for f in raw_soko_findings:
+        if not isinstance(f, Mapping):
+            raise RuntimeError(f"soko lean4_auditor finding entry is not a mapping: {type(f).__name__}")
         if allow_challenge_sorry and f.get("code") == "UNPROVED_SORRY":
             continue
         findings.append({
@@ -1350,9 +1422,26 @@ def lint_lean4_source(
     }
 
 
+_LEAN_SCRUB_VARS: tuple[str, ...] = (
+    "LEAN_PATH",
+    "LEAN_OPTS",
+    "LEAN_SRC_PATH",
+    "LEAN_SYSROOT",
+    "LEAN_CC",
+    "ELAN_TOOLCHAIN",
+    "ELAN_HOME",
+    "LAKE_HOME",
+    "LAKE_PKG_PATH",
+    "LD_PRELOAD",
+    "LD_LIBRARY_PATH",
+)
+
+
 def _lean_env() -> dict[str, str]:
-    env = dict(os.environ)
     bin_dir = str(elan_bin_dir())
+    env = dict(os.environ)
+    for var in _LEAN_SCRUB_VARS:
+        env.pop(var, None)
     cur_path = env.get("PATH", "")
     env["PATH"] = f"{bin_dir}{os.pathsep}{cur_path}" if cur_path else bin_dir
     return env
@@ -1445,9 +1534,49 @@ class LeanVerificationResult:
         }
 
 
+def _checked_project_dir(project_dir: Path) -> Path:
+    """Reject any symlink on `project_dir` or its ancestors without following `.resolve()`."""
+    abs_path = Path(os.path.abspath(str(project_dir)))
+    cur = Path(abs_path.anchor)
+    for part in abs_path.parts[1:]:
+        cur = cur / part
+        try:
+            st = os.lstat(cur)
+        except OSError as exc:
+            raise UntrustedProjectPath(f"project path component unreadable ({cur}): {exc}") from exc
+        if stat.S_ISLNK(st.st_mode):
+            raise UntrustedProjectPath(f"project path crosses a symlink: {cur}")
+    return abs_path
+
+
+def _read_toolchain_nofollow(lean_project_dir: Path, *, default: str = "leanprover/lean4:v4.35.0") -> str:
+    """Read `lean-toolchain` via O_NOFOLLOW + fstat to prevent symlink check-then-use TOCTOU."""
+    if not _nofollow_dir_ops_available():
+        return default
+    try:
+        dir_fd = os.open(lean_project_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError:
+        return default
+    try:
+        try:
+            fd = os.open("lean-toolchain", os.O_RDONLY | os.O_NOFOLLOW, dir_fd=dir_fd)
+        except OSError:
+            return default
+        try:
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode):
+                return default
+            raw = os.read(fd, 4096)
+        finally:
+            os.close(fd)
+    finally:
+        os.close(dir_fd)
+    text = raw.decode("utf-8", "replace").strip()
+    return text or default
+
+
 def _read_toolchain(lean_project_dir: Path) -> str:
-    tc = lean_project_dir / "lean-toolchain"
-    return tc.read_text(encoding="utf-8").strip() if tc.is_file() else "leanprover/lean4:v4.35.0"
+    return _read_toolchain_nofollow(lean_project_dir)
 
 
 def verify_lean4_source(
@@ -1463,7 +1592,7 @@ def verify_lean4_source(
     max_memory_mib: int | None = 1400,
 ) -> LeanVerificationResult:
     """Compile a Lean 4 source string, audit source escape hatches, verify kernel collectAxioms, and run leanchecker."""
-    proj_dir = (lean_project_dir or (repo_root() / "lean")).resolve()
+    proj_dir = _checked_project_dir(lean_project_dir or (repo_root() / "lean"))
     toolchain = _read_toolchain(proj_dir)
     lint = lint_lean4_source(
         source,
@@ -1557,8 +1686,7 @@ def verify_lean4_source(
         lean_path_parts = [str(tmp_dir)]
         if lib_olean_dir.is_dir():
             lean_path_parts.append(str(lib_olean_dir))
-        run_env = dict(env)
-        run_env["LEAN_PATH"] = os.pathsep.join(lean_path_parts)
+        harness_lp = os.pathsep.join(lean_path_parts)
 
         comp_cmd = build_capped_lean_args(
             lean_bin,
@@ -1570,9 +1698,10 @@ def verify_lean4_source(
             comp = run_confined_command(
                 comp_cmd,
                 cwd=tmp_dir,
-                env=run_env,
+                env=env,
                 timeout_sec=timeout_sec,
                 readable_dirs=(lib_olean_dir,) if lib_olean_dir.is_dir() else (),
+                harness_lean_path=harness_lp,
             )
         except subprocess.TimeoutExpired as exc:
             findings.append({
@@ -1662,9 +1791,10 @@ def verify_lean4_source(
             ax_run = run_confined_command(
                 [lean_bin, str(audit_driver)],
                 cwd=tmp_dir,
-                env=run_env,
+                env=env,
                 timeout_sec=timeout_sec,
                 readable_dirs=(lib_olean_dir,) if lib_olean_dir.is_dir() else (),
+                harness_lean_path=harness_lp,
             )
         except CandidateSandboxUnavailable as exc:
             findings.append({"line": 1, "rule": "SANDBOX_UNAVAILABLE", "message": str(exc)})
@@ -1732,9 +1862,10 @@ def verify_lean4_source(
                 lc_run = run_confined_command(
                     [leanchecker_bin, mod_name],
                     cwd=tmp_dir,
-                    env=run_env,
+                    env=env,
                     timeout_sec=timeout_sec,
                     readable_dirs=(lib_olean_dir,) if lib_olean_dir.is_dir() else (),
+                    harness_lean_path=harness_lp,
                 )
             except CandidateSandboxUnavailable as exc:
                 findings.append({"line": 1, "rule": "SANDBOX_UNAVAILABLE", "message": str(exc)})
@@ -1830,12 +1961,24 @@ def finding_blocks_comparator(finding: Mapping[str, Any]) -> bool:
     message = str(finding.get("message", ""))
     if rule in {"FORBIDDEN_EVAL_COMMAND", "FORBIDDEN_ELAB_COMMAND"}:
         return True
-    tokens = ("run_meta", "run_cmd", "run_elab", "run_tac", "#eval", "#reduce", "#check", "#print", "#synth")
+    tokens = (
+        "run_meta",
+        "run_cmd",
+        "run_elab",
+        "run_tac",
+        "#eval",
+        "#reduce",
+        "#check",
+        "#print",
+        "#synth",
+        "#guard_msgs",
+        "#guard",
+    )
     return rule in {"METAPROGRAM_ESCAPE", "FORBIDDEN_BUILD_SIDE_EFFECT"} and any(token in message for token in tokens)
 
 
 _LAKE_COMMAND_RE = re.compile(
-    r"(?<![\w.'»«])(?:#(?:eval|reduce|check|print|synth)|run_cmd|run_elab|run_tac)(?![\w.'»«])"
+    r"(?<![\w.'»«])(?:#(?:eval|reduce|check|print|synth|guard_msgs|guard)|run_cmd|run_elab|run_tac)(?![\w.'»«])"
 )
 
 
@@ -2143,19 +2286,19 @@ def _audit_solution_axioms(
             MODULE_AXIOM_AUDIT_TEMPLATE.format(module_name=solution_mod),
             encoding="utf-8",
         )
-        ax_env = dict(env)
         lean_path_parts = [str(ax_tmp)]
         olean_rel = ".lake/build/lib/lean"
         if _real_dir(build_dir, olean_rel):
             lean_path_parts.append(str(build_dir / olean_rel))
-        ax_env["LEAN_PATH"] = os.pathsep.join(lean_path_parts)
+        harness_lp = os.pathsep.join(lean_path_parts)
         try:
             ax_run = run_confined_command(
                 [lean_bin, str(audit_driver)],
                 cwd=ax_tmp,
-                env=ax_env,
+                env=env,
                 timeout_sec=timeout_sec,
                 readable_dirs=(build_dir,),
+                harness_lean_path=harness_lp,
             )
         except CandidateSandboxUnavailable as exc:
             return measured, sorry_decls, nonstd, str(exc)
@@ -2216,8 +2359,11 @@ def verify_lean4_project_comparator(
     Trusted steps run in a directory built from an in-memory copy. The caller's tree is never
     written. `allow_unsandboxed` does not run candidate Lean on the host.
     """
-    proj = (project_dir or (repo_root() / "lean")).resolve()
+    raw_proj = project_dir or (repo_root() / "lean")
     findings: list[dict[str, Any]] = []
+    toolchain = "leanprover/lean4:v4.35.0"
+    theorem_names: tuple[str, ...] = ()
+    challenge_mod = ""
 
     def _stopped(*, sandboxed: bool = False, caveats: tuple[str, ...] = ()) -> LeanVerificationResult:
         return LeanVerificationResult(
@@ -2234,15 +2380,17 @@ def verify_lean4_project_comparator(
             challenge_sorry_whitelisted_module=challenge_mod or None,
         )
 
+    try:
+        proj = _checked_project_dir(raw_proj)
+    except UntrustedProjectPath as exc:
+        findings.append({"line": 1, "rule": exc.rule, "message": str(exc)})
+        return _stopped()
+
     lake_hit = _lake_symlink_finding(proj)
     if lake_hit is not None:
         # The platform refusal must not stat or read through a candidate path.
-        if lake_hit.get("rule") == _NOFOLLOW_OPEN_RULE:
-            toolchain = "leanprover/lean4:v4.35.0"
-        else:
-            toolchain = _read_toolchain(proj) if (proj / "lean-toolchain").is_file() and not (proj / "lean-toolchain").is_symlink() else "leanprover/lean4:v4.35.0"
-        theorem_names = ()
-        challenge_mod = ""
+        if lake_hit.get("rule") != _NOFOLLOW_OPEN_RULE:
+            toolchain = _read_toolchain_nofollow(proj)
         findings.append(lake_hit)
         return _stopped()
 

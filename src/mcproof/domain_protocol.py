@@ -1285,21 +1285,32 @@ def loads_strict_certificate_json(raw_json: str, *, max_abs_int: int = MAX_CERT_
     )
 
 
+MAX_DUAL_OBJECTIVE_BITS = 850  # ~255 decimal digits; blocks quadratic bigint stringification DoS
+
+
 def _parse_exact_rational(val: Any, *, max_abs_int: int = MAX_CERT_ABS_INT) -> Fraction:
     """Parse an exact `int` (`type(val) is int`, never `bool`) or canonical `'p/q'` string into `Fraction`."""
     if type(val) is int:
         if abs(val) > max_abs_int:
             raise ValueError("integer exceeds cap")
         return Fraction(val, 1)
-    if isinstance(val, str) and STRICT_RATIONAL_RE.fullmatch(val):
-        if "/" in val:
-            n_str, d_str = val.split("/", 1)
-            num, den = int(n_str), int(d_str)
-        else:
-            num, den = int(val), 1
-        if abs(num) > max_abs_int or abs(den) > max_abs_int:
-            raise ValueError("rational component exceeds cap")
-        return Fraction(num, den)
+    max_digits = len(str(max_abs_int)) + 1
+    if isinstance(val, str):
+        if len(val) > (2 * max_digits + 3):
+            raise ValueError(f"rational string exceeds safe length bound ({len(val)} chars)")
+        if STRICT_RATIONAL_RE.fullmatch(val):
+            if "/" in val:
+                n_str, d_str = val.split("/", 1)
+                if len(n_str.lstrip("-")) > max_digits or len(d_str) > max_digits:
+                    raise ValueError("rational component exceeds safe digit bound")
+                num, den = int(n_str), int(d_str)
+            else:
+                if len(val.lstrip("-")) > max_digits:
+                    raise ValueError("rational component exceeds safe digit bound")
+                num, den = int(val), 1
+            if abs(num) > max_abs_int or abs(den) > max_abs_int:
+                raise ValueError("rational component exceeds cap")
+            return Fraction(num, den)
     raise ValueError(f"invalid exact rational token {val!r} (bool/float forbidden)")
 
 
@@ -1411,11 +1422,22 @@ def verify_rational_lp_certificate(cert: Mapping[str, Any]) -> dict[str, Any]:
     else:
         findings.append({"rule": "LP_CERT_UNSUPPORTED_MODE", "message": f"unsupported LP mode {mode!r}"})
 
+    if yt_b.numerator.bit_length() > MAX_DUAL_OBJECTIVE_BITS or yt_b.denominator.bit_length() > MAX_DUAL_OBJECTIVE_BITS:
+        findings.append(
+            {
+                "rule": "LP_DUAL_OBJECTIVE_DIGIT_CAP",
+                "message": "exact dual objective exceeds safe output digit cap",
+            }
+        )
+        dual_obj_str = "<capped>"
+    else:
+        dual_obj_str = f"{yt_b.numerator}/{yt_b.denominator}"
+
     passed = len(findings) == 0
     return {
         "passed": passed,
         "epistemic_status": "VERIFIED" if passed else "REJECTED",
-        "dual_objective": f"{yt_b.numerator}/{yt_b.denominator}",
+        "dual_objective": dual_obj_str,
         "findings": findings,
     }
 
