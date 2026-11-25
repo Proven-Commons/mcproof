@@ -32,6 +32,7 @@ import time
 from typing import Any, Callable, Mapping, Sequence
 import urllib.request
 
+from .lineage import canonical_json_bytes
 from .lean_harness import (
     BAR_FORBIDDEN_RULES,
     THEOREM_DECL_RE,
@@ -345,7 +346,7 @@ def compute_failure_signature(findings: Sequence[Mapping[str, Any]]) -> str:
             for f in findings
         }
     )
-    raw = json.dumps(pairs, separators=(",", ":")).encode("utf-8")
+    raw = canonical_json_bytes(pairs)
     return hashlib.sha256(raw).hexdigest()[:24]
 
 
@@ -779,7 +780,7 @@ def make_llama_server_generator(
     def _post_json(url: str, payload: Mapping[str, Any]) -> dict[str, Any]:
         req = urllib.request.Request(
             url,
-            data=json.dumps(dict(payload)).encode("utf-8"),
+            data=canonical_json_bytes(dict(payload)),
             headers={"Content-Type": "application/json"},
             method="POST",
         )
@@ -1960,7 +1961,7 @@ def run_repair_split(
         if checkpoint_jsonl is not None:
             checkpoint_jsonl.parent.mkdir(parents=True, exist_ok=True)
             with checkpoint_jsonl.open("a", encoding="utf-8", newline="\n") as fh:
-                fh.write(json.dumps(res, sort_keys=True) + "\n")
+                fh.write(canonical_json_bytes(res).decode("utf-8") + "\n")
 
     n_total = len(results)
     pass_curve: dict[str, dict[str, Any]] = {}

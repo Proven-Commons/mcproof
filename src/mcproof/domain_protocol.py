@@ -1285,21 +1285,45 @@ def loads_strict_certificate_json(raw_json: str, *, max_abs_int: int = MAX_CERT_
     )
 
 
+MAX_DUAL_OBJECTIVE_BITS = 850  # ~255 decimal digits; blocks quadratic bigint stringification DoS
+
+
+def _format_bounded_fraction(
+    q: Fraction,
+    *,
+    max_bits: int = MAX_DUAL_OBJECTIVE_BITS,
+    always_ratio: bool = False,
+) -> str:
+    """Format an exact `Fraction` without triggering big-int decimal stringification."""
+    n_bits = q.numerator.bit_length()
+    d_bits = q.denominator.bit_length()
+    if n_bits > max_bits or d_bits > max_bits:
+        sign = "-" if q.numerator < 0 else ""
+        return f"<rational:{sign}{n_bits}b/{d_bits}b>"
+    if always_ratio or q.denominator != 1:
+        return f"{q.numerator}/{q.denominator}"
+    return str(q.numerator)
+
+
 def _parse_exact_rational(val: Any, *, max_abs_int: int = MAX_CERT_ABS_INT) -> Fraction:
     """Parse an exact `int` (`type(val) is int`, never `bool`) or canonical `'p/q'` string into `Fraction`."""
     if type(val) is int:
         if abs(val) > max_abs_int:
             raise ValueError("integer exceeds cap")
         return Fraction(val, 1)
-    if isinstance(val, str) and STRICT_RATIONAL_RE.fullmatch(val):
-        if "/" in val:
-            n_str, d_str = val.split("/", 1)
-            num, den = int(n_str), int(d_str)
-        else:
-            num, den = int(val), 1
-        if abs(num) > max_abs_int or abs(den) > max_abs_int:
-            raise ValueError("rational component exceeds cap")
-        return Fraction(num, den)
+    max_digits = len(str(max_abs_int)) + 1
+    if isinstance(val, str):
+        if len(val) > (2 * max_digits + 3):
+            raise ValueError(f"rational string exceeds safe length bound ({len(val)} chars)")
+        if STRICT_RATIONAL_RE.fullmatch(val):
+            if "/" in val:
+                n_str, d_str = val.split("/", 1)
+                num, den = int(n_str), int(d_str)
+            else:
+                num, den = int(val), 1
+            if abs(num) > max_abs_int or abs(den) > max_abs_int:
+                raise ValueError("rational component exceeds cap")
+            return Fraction(num, den)
     raise ValueError(f"invalid exact rational token {val!r} (bool/float forbidden)")
 
 
@@ -1379,7 +1403,10 @@ def verify_rational_lp_certificate(cert: Mapping[str, Any]) -> dict[str, Any]:
                     findings.append(
                         {
                             "rule": "LP_DUAL_INFEASIBLE_COLUMN",
-                            "message": f"column {j}: (y^T A)[{j}] = {yt_a[j]} exceeds c[{j}] = {cost_c[j]}",
+                            "message": (
+                                f"column {j}: (y^T A)[{j}] = {_format_bounded_fraction(yt_a[j])} "
+                                f"exceeds c[{j}] = {_format_bounded_fraction(cost_c[j])}"
+                            ),
                         }
                     )
                     break
@@ -1387,7 +1414,10 @@ def verify_rational_lp_certificate(cert: Mapping[str, Any]) -> dict[str, Any]:
             findings.append(
                 {
                     "rule": "LP_DUAL_OBJECTIVE_BELOW_CLAIM",
-                    "message": f"y^T b = {yt_b} < claimed_lower_bound = {claimed_lb}",
+                    "message": (
+                        f"y^T b = {_format_bounded_fraction(yt_b)} < "
+                        f"claimed_lower_bound = {_format_bounded_fraction(claimed_lb)}"
+                    ),
                 }
             )
     elif mode == "infeasible":
@@ -1397,7 +1427,7 @@ def verify_rational_lp_certificate(cert: Mapping[str, Any]) -> dict[str, Any]:
                 findings.append(
                     {
                         "rule": "LP_FARKAS_POSITIVE_COLUMN",
-                        "message": f"Farkas certificate requires (y^T A)[{j}] <= 0, got {yt_a[j]}",
+                        "message": f"Farkas certificate requires (y^T A)[{j}] <= 0, got {_format_bounded_fraction(yt_a[j])}",
                     }
                 )
                 break
@@ -1405,17 +1435,19 @@ def verify_rational_lp_certificate(cert: Mapping[str, Any]) -> dict[str, Any]:
             findings.append(
                 {
                     "rule": "LP_FARKAS_NONPOSITIVE_WITNESS",
-                    "message": f"Farkas certificate requires y^T b > 0, got {yt_b}",
+                    "message": f"Farkas certificate requires y^T b > 0, got {_format_bounded_fraction(yt_b)}",
                 }
             )
     else:
         findings.append({"rule": "LP_CERT_UNSUPPORTED_MODE", "message": f"unsupported LP mode {mode!r}"})
 
+    dual_obj_str = _format_bounded_fraction(yt_b, always_ratio=True)
+
     passed = len(findings) == 0
     return {
         "passed": passed,
         "epistemic_status": "VERIFIED" if passed else "REJECTED",
-        "dual_objective": f"{yt_b.numerator}/{yt_b.denominator}",
+        "dual_objective": dual_obj_str,
         "findings": findings,
     }
 

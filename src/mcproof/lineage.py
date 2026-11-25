@@ -65,7 +65,13 @@ class StaleLineageError(ValueError):
 
 
 def canonical_json_bytes(payload: Any) -> bytes:
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    ).encode("utf-8")
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -94,7 +100,7 @@ def sha256_file(path: Path) -> str:
 
 def compute_zone_manifest_id(manifest: Mapping[str, Any]) -> str:
     body = {k: v for k, v in manifest.items() if k != "manifest_id"}
-    raw = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    raw = canonical_json_bytes(body)
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
