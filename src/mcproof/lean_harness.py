@@ -181,7 +181,10 @@ def _address_space_cap_bytes() -> int:
 
 
 def _toolchain_elan_home() -> str:
-    root = Path(elan_bin_dir()).resolve().parent
+    try:
+        root = Path(elan_bin_dir()).resolve().parent
+    except FileNotFoundError:
+        return ""
     return str(root) if (root / "bin").is_dir() else ""
 
 
