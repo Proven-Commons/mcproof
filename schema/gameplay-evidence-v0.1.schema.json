@@ -1,0 +1,219 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://proven-commons.github.io/mcproof/schema/gameplay-evidence-v0.1.schema.json",
+  "title": "Gameplay Evidence Exchange v0.1",
+  "description": "Closed evidence envelope. Digest equality, duplicate-key rejection, exact source UTF-8 hashing, and badge derivation require the runtime validator.",
+  "type": "object",
+  "required": [
+    "schema",
+    "artifact_sha256",
+    "producer",
+    "claim",
+    "mechanics",
+    "payload",
+    "evidence",
+    "source"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "gameplay-evidence/v0.1"},
+    "artifact_sha256": {"$ref": "#/definitions/sha256"},
+    "producer": {
+      "type": "object",
+      "required": ["repository", "revision", "adapter"],
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "revision": {"$ref": "#/definitions/commit"},
+        "adapter": {"$ref": "#/definitions/nonemptyText"}
+      }
+    },
+    "claim": {
+      "type": "object",
+      "required": ["id", "kind", "statement"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/definitions/identifier"},
+        "kind": {
+          "type": "string",
+          "enum": ["route", "state_transition", "goal", "counterexample", "observation"]
+        },
+        "statement": {"$ref": "#/definitions/nonemptyText"}
+      }
+    },
+    "mechanics": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/mechanic"}
+    },
+    "payload": {
+      "type": "object",
+      "required": [
+        "domain",
+        "model",
+        "model_sha256",
+        "initial_state",
+        "initial_state_sha256",
+        "actions",
+        "actions_sha256",
+        "trajectory",
+        "trajectory_sha256",
+        "outcome"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "domain": {"$ref": "#/definitions/identifier"},
+        "model": {"$ref": "#/definitions/jsonValue"},
+        "model_sha256": {"$ref": "#/definitions/sha256"},
+        "initial_state": {"$ref": "#/definitions/jsonValue"},
+        "initial_state_sha256": {"$ref": "#/definitions/sha256"},
+        "actions": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/jsonValue"}
+        },
+        "actions_sha256": {"$ref": "#/definitions/sha256"},
+        "trajectory": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/jsonValue"}
+        },
+        "trajectory_sha256": {"$ref": "#/definitions/sha256"},
+        "outcome": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/definitions/jsonValue"}
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["checks", "negative_controls", "limitations"],
+      "additionalProperties": false,
+      "properties": {
+        "checks": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/check"}
+        },
+        "negative_controls": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/negativeControl"}
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/definitions/nonemptyText"}
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["media_type", "raw_sha256", "raw"],
+      "additionalProperties": false,
+      "properties": {
+        "media_type": {"$ref": "#/definitions/nonemptyText"},
+        "raw_sha256": {"$ref": "#/definitions/sha256"},
+        "raw": {"type": "string"}
+      }
+    }
+  },
+  "definitions": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.:-]+$"
+    },
+    "nonemptyText": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "jsonValue": {
+      "anyOf": [
+        {"type": "null"},
+        {"type": "boolean"},
+        {"type": "string"},
+        {
+          "type": "integer",
+          "minimum": -9223372036854775808,
+          "maximum": 9223372036854775807
+        },
+        {
+          "type": "array",
+          "items": {"$ref": "#/definitions/jsonValue"}
+        },
+        {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/definitions/jsonValue"}
+        }
+      ]
+    },
+    "mechanic": {
+      "type": "object",
+      "required": ["id", "path", "source_revision", "raw_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/definitions/identifier"},
+        "path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*\\\\)[^\\x00]+\\.(?:[yY][aA][mM][lL]|[yY][mM][lL])$"
+        },
+        "source_revision": {"$ref": "#/definitions/commit"},
+        "raw_sha256": {"$ref": "#/definitions/sha256"}
+      }
+    },
+    "check": {
+      "type": "object",
+      "required": [
+        "kind",
+        "status",
+        "checker",
+        "source_labels",
+        "initial_state_sha256",
+        "actions_sha256",
+        "trajectory_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["model_replay", "model_proof", "live_execution"]
+        },
+        "status": {"type": "string", "enum": ["PASS", "FAIL"]},
+        "checker": {
+          "type": "object",
+          "required": ["name", "revision", "artifact_sha256"],
+          "additionalProperties": false,
+          "properties": {
+            "name": {"$ref": "#/definitions/nonemptyText"},
+            "revision": {"$ref": "#/definitions/nonemptyText"},
+            "artifact_sha256": {"$ref": "#/definitions/sha256"}
+          }
+        },
+        "source_labels": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/nonemptyText"}
+        },
+        "initial_state_sha256": {"$ref": "#/definitions/sha256"},
+        "actions_sha256": {"$ref": "#/definitions/sha256"},
+        "trajectory_sha256": {"$ref": "#/definitions/sha256"}
+      }
+    },
+    "negativeControl": {
+      "type": "object",
+      "required": ["name", "mutation", "observed", "passed"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"$ref": "#/definitions/nonemptyText"},
+        "mutation": {"$ref": "#/definitions/nonemptyText"},
+        "observed": {"$ref": "#/definitions/nonemptyText"},
+        "passed": {"type": "boolean"}
+      }
+    }
+  }
+}
