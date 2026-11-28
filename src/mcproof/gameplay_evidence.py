@@ -59,11 +59,24 @@ REPOSITORY_RE = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 CLAIM_KINDS = frozenset({"route", "state_transition", "goal", "counterexample", "observation"})
 CHECK_KINDS = frozenset({"model_replay", "model_proof", "live_execution"})
 BADGE_ORDER = ("OBSERVED", "REPLAYED", "MODEL_PROVEN", "LIVE_CONFIRMED")
+# Nesting past this depth is rejected with a pinned error, not RecursionError.
+MAX_JSON_DEPTH = 64
 
 
-def _validate_canonical_value(value: Any, path: str, active: set[int]) -> None:
+def _require_utf8_text(value: str, path: str) -> None:
+    """Reject unpaired UTF-16 surrogates and other non-UTF-8 text."""
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise ValueError(f"{path}: must be encodable as exact UTF-8 bytes") from exc
+
+
+def _validate_canonical_value(value: Any, path: str, active: set[int], depth: int = 0) -> None:
     """Reject values whose JSON encoding would be lossy or outside the contract."""
-    if value is None or isinstance(value, (str, bool)):
+    if value is None or isinstance(value, bool):
+        return
+    if isinstance(value, str):
+        _require_utf8_text(value, path)
         return
     if isinstance(value, int):
         if not INT64_MIN <= value <= INT64_MAX:
@@ -72,6 +85,8 @@ def _validate_canonical_value(value: Any, path: str, active: set[int]) -> None:
     if isinstance(value, float):
         raise ValueError(f"{path}: floating-point values are not canonical JSON")
     if isinstance(value, (dict, list)):
+        if depth >= MAX_JSON_DEPTH:
+            raise ValueError(f"{path}: JSON nesting exceeds {MAX_JSON_DEPTH}")
         identity = id(value)
         if identity in active:
             raise ValueError(f"{path}: cyclic value is not JSON")
@@ -81,10 +96,11 @@ def _validate_canonical_value(value: Any, path: str, active: set[int]) -> None:
                 for key, child in value.items():
                     if not isinstance(key, str):
                         raise TypeError(f"{path}: JSON object keys must be strings")
-                    _validate_canonical_value(child, f"{path}.{key}", active)
+                    _require_utf8_text(key, f"{path} key")
+                    _validate_canonical_value(child, f"{path}.{key}", active, depth + 1)
             else:
                 for index, child in enumerate(value):
-                    _validate_canonical_value(child, f"{path}[{index}]", active)
+                    _validate_canonical_value(child, f"{path}[{index}]", active, depth + 1)
         finally:
             active.remove(identity)
         return
@@ -200,9 +216,15 @@ def _yaml_path(value: Any, path: str, errors: list[str]) -> bool:
     return True
 
 
-def _strict_json_tree(value: Any, path: str, errors: list[str], active: set[int]) -> None:
+def _strict_json_tree(value: Any, path: str, errors: list[str], active: set[int], depth: int = 0) -> None:
     """Validate JSON-safe artifact data, rejecting every float and unsafe int."""
-    if value is None or isinstance(value, (str, bool)):
+    if value is None or isinstance(value, bool):
+        return
+    if isinstance(value, str):
+        try:
+            _require_utf8_text(value, path)
+        except ValueError as exc:
+            _error(errors, path, str(exc).split(": ", 1)[-1])
         return
     if isinstance(value, int):
         if not INT64_MIN <= value <= INT64_MAX:
@@ -212,6 +234,9 @@ def _strict_json_tree(value: Any, path: str, errors: list[str], active: set[int]
         _error(errors, path, "floats are forbidden in gameplay artifacts")
         return
     if isinstance(value, (dict, list)):
+        if depth >= MAX_JSON_DEPTH:
+            _error(errors, path, f"JSON nesting exceeds {MAX_JSON_DEPTH}")
+            return
         identity = id(value)
         if identity in active:
             _error(errors, path, "cyclic values are forbidden")
@@ -223,10 +248,15 @@ def _strict_json_tree(value: Any, path: str, errors: list[str], active: set[int]
                     if not isinstance(key, str):
                         _error(errors, path, "object keys must be strings")
                         continue
-                    _strict_json_tree(child, f"{path}.{key}", errors, active)
+                    try:
+                        _require_utf8_text(key, f"{path} key")
+                    except ValueError as exc:
+                        _error(errors, f"{path} key", str(exc).split(": ", 1)[-1])
+                        continue
+                    _strict_json_tree(child, f"{path}.{key}", errors, active, depth + 1)
             else:
                 for index, child in enumerate(value):
-                    _strict_json_tree(child, f"{path}[{index}]", errors, active)
+                    _strict_json_tree(child, f"{path}[{index}]", errors, active, depth + 1)
         finally:
             active.remove(identity)
         return
@@ -389,7 +419,10 @@ def _derive_source_badges(value: dict[str, Any]) -> list[str]:
     checks = value["evidence"]["checks"]
     if any(check["status"] == "FAIL" for check in checks):
         return badges
-    if not any(control["passed"] for control in value["evidence"]["negative_controls"]):
+    controls = value["evidence"]["negative_controls"]
+    # Every negative control must pass; one failure is a veto, and at least
+    # one passing control is required before higher source badges are issued.
+    if not controls or any(not control["passed"] for control in controls):
         return badges
 
     passing_kinds = {check["kind"] for check in checks if check["status"] == "PASS"}

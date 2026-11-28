@@ -460,6 +460,81 @@ class BadgeDerivationTests(ArtifactReportAssertions, unittest.TestCase):
         self.assertInvalid(artifact)
 
 
+
+    def test_a_failed_negative_control_vetoes_replay(self) -> None:
+        artifact = self.with_checks([("model_replay", "PASS")])
+        artifact["evidence"]["negative_controls"] = [_control(True), _control(False)]
+        reseal(artifact)
+        self.assertSourceBadges(artifact, ["OBSERVED"])
+
+
+class FailClosedGuardTests(ArtifactReportAssertions, unittest.TestCase):
+    def test_deep_nesting_is_rejected_without_recursionerror(self) -> None:
+        from mcproof.gameplay_evidence import MAX_JSON_DEPTH
+
+        for depth in (1200, 1500, 5000):
+            with self.subTest(depth=depth):
+                nested: object = 0
+                for _ in range(depth):
+                    nested = [nested]
+                with self.assertRaises(ValueError) as raised:
+                    canonical_json_bytes(nested)
+                self.assertIn("nesting exceeds %s" % MAX_JSON_DEPTH, str(raised.exception))
+                artifact = valid_artifact()
+                artifact["payload"]["outcome"] = nested
+                report = verify_gameplay_artifact(artifact)
+                self.assertFalse(report["valid"])
+                self.assertTrue(any("nesting exceeds" in err for err in report["errors"]), report["errors"])
+
+    def test_lone_surrogates_are_rejected_in_text_fields_and_keys(self) -> None:
+        lone = "x" + chr(0xD800)
+        artifact = valid_artifact()
+        artifact["claim"]["statement"] = lone
+        with self.assertRaises(ValueError) as raised:
+            reseal(artifact)
+        self.assertIn("UTF-8", str(raised.exception))
+        artifact = valid_artifact()
+        artifact["claim"]["statement"] = lone
+        self.assertInvalid(artifact, "UTF-8")
+        artifact = valid_artifact()
+        artifact["payload"]["model"][lone] = "ok"
+        with self.assertRaises(ValueError) as raised:
+            reseal(artifact)
+        self.assertIn("UTF-8", str(raised.exception))
+        artifact = valid_artifact()
+        artifact["payload"]["model"][lone] = "ok"
+        self.assertInvalid(artifact, "UTF-8")
+
+    def test_format_rules_are_pinned_on_resealed_artifacts(self) -> None:
+        cases = [
+            (("claim", "id"), "bad id", "identifier"),
+            (("producer", "repository"), "owner", "repository"),
+            (("evidence", "checks", 0, "checker", "artifact_sha256"), "0" * 64, "SHA-256"),
+            (("evidence", "checks", 0, "checker", "artifact_sha256"), "a" * 65, "hexadecimal"),
+            (("producer", "revision"), "A" * 40, "commit"),
+            (("evidence", "checks", 0, "kind"), "other", "kind"),
+            (("evidence", "checks", 0, "status"), "SKIP", "status"),
+            (("mechanics", 0, "path"), "a\x00b.yaml", "path"),
+        ]
+        for path, bad, message in cases:
+            with self.subTest(path=path, bad=bad):
+                artifact = valid_artifact()
+                node(artifact, path[:-1])[path[-1]] = bad
+                reseal(artifact)
+                self.assertInvalid(artifact, message)
+        artifact = valid_artifact()
+        artifact["payload"]["actions"] = {}
+        artifact["payload"]["actions_sha256"] = sha256_json({})
+        for check in artifact["evidence"]["checks"]:
+            check["actions_sha256"] = artifact["payload"]["actions_sha256"]
+        reseal(artifact)
+        self.assertInvalid(artifact, "actions")
+        artifact = valid_artifact()
+        artifact["source"]["raw"] = 1
+        reseal(artifact)
+        self.assertInvalid(artifact, "raw")
+
+
 class SchemaTests(unittest.TestCase):
     def test_schema_is_json_and_closes_every_envelope_object(self) -> None:
         path = Path(__file__).resolve().parents[1] / "schema" / "gameplay-evidence-v0.1.schema.json"
